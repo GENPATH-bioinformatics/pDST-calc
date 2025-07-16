@@ -1,0 +1,22 @@
+Drug,OrgMolecular_Weight,Diluent,Critical_Concentration
+Amikacin (AMK),585.6,Water,1
+Bedaquiline (BDQ),555.5,DMSO,1
+Clofazimine (CFZ),473.39,DMSO,1
+Cycloserine (CYC),102.09,Water,1
+Delamanid (DMD),534.48,DMSO,0.06
+Ethambutol hydrochloride (EMB hyd),204.31,Water,5
+Ethionamide (ETH),166.24,DMSO,5
+Imipenem (IPM),299.35,Phosphate pH 7.2,1
+Isoniazid CC (INH)-cc,137.14,Water,1
+Isoniazid high (INH)-h,137.14,Water,10
+Isoniazid low (INH)-l,137.14,Water,0.05
+Levofloxacin (LVX),361.37,1/2 volume of water then 0.1 mol/L NaOH dropwise to dissolve/Water,1
+Linezolid (LZD),337.35,Water,1
+Meropenem (MRP),383.46,Water,1
+Moxifloxacin hydrochloride (MFX hyd),437.89,Water,0.25
+Para-aminosalicylic Acid (PAS),153.14,Water or DMSO,4
+Pretomanid (PA-824),359.3,DMSO,1
+Prothionamide (PTO),180.27,DMSO and Water,2.5
+Rifabutin (RBT),847.02,DMSO,0.5
+Rifampicin (RIF),822.94,Water,2
+Streptomycin sulfate salt (STM),1457.38,Water,1
