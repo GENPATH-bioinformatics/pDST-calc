@@ -1,67 +1,83 @@
-# Tuberculosis Drug Susceptibility Testing Tool
+# DST Calculator
 
-A bioinformatics tool to support drug preparation in tuberculosis susceptibility testing.
+This project provides a Drug Susceptibility Testing (DST) calculator with both a command-line interface (CLI) and a Shiny for Python web app.
 
-## Project Timeline
+## Requirements
 
-### Key Dates
-- **Internal Hand-in**: start of October 2025
-- **Final Submission**: 17 October 2025
+- Python 3.8+
+- pip
 
-### Development Phases
-1. **Phase 1: Environment Setup and Basic Infrastructure** 
-   - Project structure setup
+## Installation
 
-2. **Phase 2: Core Functionality Development**
-   - Drug preparation calculations
-   - Data validation
-   - Basic user interface
+1. Clone the repository:
+   ```bash
+   git clone <repo-url>
+   cd dstcalc
+   ```
+2. Install dependencies (for development or quick setup):
+   ```bash
+   pip install -r requirements.txt
+   ```
+   - `requirements.txt` is provided for developer convenience and compatibility with tools and platforms that expect it.
 
-3. **Phase 3: Testing and Validation** 
-   - Unit testing
-   - Performance optimization
+## Local Package Installation (Recommended for CLI usage)
 
-4. **Phase 4: Documentation and Final Review**
-   - Code documentation
-   - User manual
+To install the project as a local package (editable mode):
+```bash
+pip install -e .
+```
+- This uses `setup.py` and `pyproject.toml` to install the package and dependencies.
+- After this, you can run the CLI tool from anywhere with:
+  ```bash
+  dstcalc
+  ```
+
+## Running the CLI Tool (without local install)
+
+From the project root, you can also run:
+```bash
+python src/cli/main.py
+```
+
+## Running the Shiny Web App
+
+From the project root, run:
+```bash
+PYTHONPATH=src shiny run src/shinyapp/app.py
+```
+If port 8000 is in use, specify another port:
+```bash
+PYTHONPATH=src shiny run --port 8001 src/shinyapp/app.py
+```
+
+## Running Tests
+
+If you have test files (e.g., in `tests/`):
+```bash
+pytest --cov=src
+```
+
+## Troubleshooting
+- **ModuleNotFoundError:** Make sure you set `PYTHONPATH=src` when running the Shiny app.
+- **Port already in use:** Use a different port with `--port`.
+- **Data not found:** Ensure your `drug_data.csv` is in the correct `data/` directory.
+- **Dependency issues:** Reinstall requirements with `pip install -r requirements.txt` or `pip install -e .`
 
 ## Project Structure
 
-```
-thesis_project/
-├── src/           # Source code
-├── tests/         # Unit tests
-├── docs/          # Documentation
-└── data/          # Data files
-```
+- `src/core/` — Core logic, calculation functions, and data utilities
+- `src/cli/` — Command-line interface entry point (`main.py`)
+- `src/shinyapp/` — Shiny for Python web app
+- `data/` — Drug data CSV and reference files
+- `requirements.txt` — Python dependencies for development and quick setup
+- `setup.py` and `pyproject.toml` — Packaging and distribution configuration
+- `tests/` — Unit and integration tests
+- `docs/` — Documentation, user manual, and development log
 
-## Setup Instructions
+## Documentation
 
-### 1. Install Conda
+- [User Manual](docs/USER_MANUAL.md)
+- [Development Log](docs/DEVELOPMENT_LOG.md)
 
-Download and install Miniconda from:
-https://docs.conda.io/en/latest/miniconda.html
-
-### 2. Create and Activate Environment
-
-```bash
-# Create a new conda environment
-conda create -n tb_dst python=3.10
-
-# Activate the environment
-conda activate tb_dst
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-## Key Dependencies
-
-- NumPy: Numerical computing
-- Shiny: Interactive web applications
-- Pandas: Data manipulation
-- OpenPyXL: Excel file handling
-- BioPython: Bioinformatics tools
-- Pytest: Unit testing
-
-## 
+---
+For more details, see the documentation in `docs/`.

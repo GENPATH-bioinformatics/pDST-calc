@@ -1,60 +1,32 @@
-# Development and Testing Log
+# Development Log: DST Calculator
 
-This document tracks the development progress, testing activities, and decisions made during the project.
+## Overview
+This log tracks the development progress, major milestones, and key decisions for the DST Calculator project.
 
-## Development Log
+---
+## Week 1
 
-### Phase 1: Environment Setup and Basic Infrastructure
+### Features Added
+- Project directory setup done.
+- Excel formulas and project flow sketched and defined.
+- Drugs data from excel loaded into CSV for easy updates in data/.
+- Drug database import created in "src/core/drug_database.py".
+- Drug calculation functions created in "src/core/dst_calc.py".
+- CLI tool with interactive drug selection and critical value entry created in "src/cli/main.py".
+- Error handling for invalid selections and missing data.
+- Shiny for Python app skeleton added created in "src/shinyapp/app.py".
+- USER_MANUAL.md added in docs/.
+- tests/ added with unit tests for cli/main.py.
+- Added first steps to packaging, just added setup.py, pyproject.toml and "__init__.py" to core/ files.
+- Created README.md's.
+- Created .gitignore.
+- README.md's updated
 
-#### Current Status: In Progress
-- [x] Project structure created
-- [x] Basic dependencies installed
-- [ ] Development environment configured
-- [ ] Initial test framework setup
-- [ ] Basic documentation structure
+### Notes for Future Work
+- Check calculation logic in `dst_calc.py` functions with Emilyn.
+- Ask Abi about enforcing version control either tox / nox (Multi-env test automation), or pyenv (.python-version).
+- Expand test coverage.
+- Implement feature that if first part is done in prev session, that user can continue to second half by entering certain values.
+- Make step 4 & 7 result table printable.
+---
 
-#### Testing Activities
-- [ ] Environment setup verification
-- [ ] Basic functionality tests
-- [ ] Dependency compatibility tests
-
-## Development Decisions
-
-### 1. Technology Stack
-- **CLI Framework**: Click
-  - Reason: Modern, maintainable, and supports complex command structures
-- **Excel Handling**: pandas with openpyxl
-  - Reason: Powerful data manipulation capabilities with Excel support
-
-### 2. Testing Strategy
-- Unit testing with pytest
-
-### 3. Documentation Approach
-- Inline code documentation
-- API documentation
-- User manual
-
-### Key Features to Highlight
-1. Automated drug preparation calculations
-2. Data validation and error handling
-3. User-friendly interface
-4. Performance and accuracy
-
-## Daily Development Log
-
-### [Date: YYYY-MM-DD]
-- **Activities**:
-  - [Activity 1]
-  - [Activity 2]
-- **Tests Added**:
-  - [Test 1]
-  - [Test 2]
-- **Issues Encountered**:
-  - [Issue 1]
-  - [Issue 2]
-- **Solutions**:
-  - [Solution 1]
-  - [Solution 2]
-- **Next Steps**:
-  - [Step 1]
-  - [Step 2] 
