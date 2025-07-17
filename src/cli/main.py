@@ -45,7 +45,7 @@ def custom_critical_values(selected_df):
 def purchased_weights(selected_df):
     while True:
         purch_weights = []
-        for idx, row in selected_df.iterrows():
+        for row in selected_df.iterrows():
             while True:
                 try:
                     value = input(f"Enter purchased molecular weight for {row['Drug']} (original: {row['OrgMolecular_Weight']}): ").strip()
@@ -70,7 +70,7 @@ def purchased_weights(selected_df):
 def stock_volume(selected_df):
     while True:
         stock_volumes = []
-        for idx, row in selected_df.iterrows():
+        for row in selected_df.iterrows():
             while True:
                 try:
                     value = input(f"Enter desired stock volume (ml) for {row['Drug']}: ").strip()
@@ -88,6 +88,147 @@ def stock_volume(selected_df):
             break
         else:
             print("Let's re-enter the stock solution volumes.")
+
+def cal_potency(selected_df):
+    potencies = []
+    est_drugweights = []
+    for row in selected_df.iterrows():
+        try:
+            mol_purch = float(row.get('PurchMolecular_Weight (g/mol)', row.get('PurchMolecular_Weight')))
+            mol_org = float(row.get('OrgMolecular_Weight (g/mol)', row.get('OrgMolecular_Weight')))
+            crit_conc = float(row['Critical_Concentration'])
+            stock_vol = float(row.get('Stock_Volume (ml)', row.get('Stock_Volume')))
+            pot = potency(mol_purch, mol_org)
+            est_dw = est_drugweight(crit_conc, stock_vol, pot)
+        except Exception as e:
+            pot = None
+            est_dw = None
+        potencies.append(pot)
+        est_drugweights.append(est_dw)
+    selected_df['Potency'] = potencies
+    selected_df['Est_DrugWeight (mg)'] = est_drugweights
+    print("\nTable with calculated Potency and Estimated Drug Weight:")
+    print(tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+
+def act_drugweight (selected_df):
+    print("\n")
+    while True:
+        drugweights = []
+        for row in selected_df.iterrows():
+            while True:
+                try:
+                    value = input(f"Enter actual weight for {row['Drug']}: ").strip()
+                    drugweight = float(value)
+                    drugweights.append(drugweight)
+                    break
+                except ValueError:
+                    print("Invalid input. Please enter a numeric value.")
+        selected_df["Actual_DrugWeight (mg)"] = drugweights
+        # Show summary and ask for confirmation
+        print("\nSummary of actual drug weights (mg):")
+        print(tabulate(selected_df[["Drug", "Actual_DrugWeight (mg)"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+        confirm = input("\nAre these drug weights correct? (y/n): ").strip().lower()
+        if confirm == 'y':
+            break
+        else:
+            print("Let's re-enter the drug weights.")    
+
+def cal_stockdil(selected_df):
+    vol_dils = []
+    conc_stockdiluent = []
+    for row in selected_df.iterrows():
+        try:
+            drugweight_est = float(row.get('Est_DrugWeight (mg)'))
+            drugweight_act = float(row.get('Actual_DrugWeight (mg)'))
+            stock_vol = float(row.get('Stock_Volume (ml)'))
+            vol_dil = vol_diluent(drugweight_est,drugweight_act,stock_vol)
+            conc_stdil= conc_stock(drugweight_act,vol_dil)
+        except Exception as e:
+            vol_dil = None
+            conc_stdil = None
+        vol_dils.append(vol_dil)
+        conc_stockdiluent.append(conc_stdil)
+    selected_df['Volume_Dilutent (ml)'] = vol_dils
+    selected_df['Concentration_stock_dilution (ug/ml)'] = conc_stockdiluent
+
+    summary_cols = [
+        'Drug',
+        'Est_DrugWeight (mg)',
+        'Actual_DrugWeight (mg)',
+        'Volume_Dilutent (ml)',
+        'Concentration_stock_dilution (ug/ml)'
+    ]
+    print("\nSummary Table:")
+    print(tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+
+def mgit_tubes (selected_df):
+    while True:
+        num_mgit = []
+        for row in selected_df.iterrows():
+            while True:
+                try:
+                    value = input(f"Enter number of MGIT tubes to be done for {row['Drug']}: ").strip()
+                    num = float(value)
+                    num_mgit.append(num)
+                    break
+                except ValueError:
+                    print("Invalid input. Please enter a numeric value.")
+        selected_df["Total Mgit tubes"] = num_mgit
+        # Show summary and ask for confirmation
+        print("\nSummary of number of MGIT tubes:")
+        print(tabulate(selected_df[["Drug", "Total Mgit tubes"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+        confirm = input("\nAre these numbers correct? (y/n): ").strip().lower()
+        if confirm == 'y':
+            break
+        else:
+            print("Let's re-enter the number of MGIT tubes to be done.")
+
+def cal_mgit_ws(selected_df):
+    conc_mgits = []
+    vol_ws = []
+    vol_ws_ali = []
+    vol_diluents = []
+    vol_left = []
+
+    for row in selected_df.iterrows():
+        try:
+            cc_val = float(row.get('Critical_Concentration'))
+            concentration_mgit = conc_mgit(cc_val)
+            num_mgit = float(row.get('Total Mgit tubes'))
+            volume_ws = vol_workingsol(num_mgit)
+            conc_st = float(row.get('Concentration_stock_dilution (ug/ml)'))
+            print(conc_st)
+            vol_stws = vol_ss_to_ws(volume_ws,concentration_mgit,conc_st)
+            vol_dil_toadd = vol_final_dil(vol_stws,volume_ws)
+            vol_st = float(row.get('Volume_Dilutent (ml)'))
+            vol_st_lft = vol_ssleft(vol_stws,vol_st)
+            
+        except Exception as e:
+            vol_dil = None
+            conc_stdil = None
+        conc_mgits.append(concentration_mgit)
+        vol_ws.append(volume_ws)
+        vol_ws_ali.append(vol_stws)
+        vol_diluents.append(vol_dil_toadd)
+        vol_left.append(vol_st_lft)
+
+    selected_df['WorkingSol_Conc_MGIT'] = conc_mgits
+    selected_df['WorkingSol_Volume (ml)'] = vol_ws
+    selected_df['Volume_WorkingSol_to_aliquot (ml)'] = vol_ws_ali
+    selected_df['Volume_Dil_to_Add (ml)'] = vol_diluents
+    selected_df['Volume_Stock_Left (ml)'] = vol_left
+
+    summary_cols = [
+        'Drug',
+        'Total Mgit tubes',
+        'WorkingSol_Conc_MGIT',
+        'WorkingSol_Volume (ml)',
+        'Volume_WorkingSol_to_aliquot (ml)',
+        'Volume_Dil_to_Add (ml)',
+        'Volume_Stock_Left (ml)'
+    ]
+    print("\nSummary Table:")
+    print(tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
 
 def main():
     df = load_drug_data()
@@ -125,31 +266,32 @@ def main():
     stock_volume(selected_df)
 
     # 4) Calculate Potency and Estimated Drug Weight for each drug
-    potencies = []
-    est_drugweights = []
-    for idx, row in selected_df.iterrows():
-        try:
-            mol_purch = float(row.get('PurchMolecular_Weight (g/mol)', row.get('PurchMolecular_Weight')))
-            mol_org = float(row.get('OrgMolecular_Weight (g/mol)', row.get('OrgMolecular_Weight')))
-            crit_conc = float(row['Critical_Concentration'])
-            stock_vol = float(row.get('Stock_Volume (ml)', row.get('Stock_Volume')))
-            pot = potency(mol_purch, mol_org)
-            est_dw = est_drugweight(crit_conc, stock_vol, pot)
-        except Exception as e:
-            pot = None
-            est_dw = None
-        potencies.append(pot)
-        est_drugweights.append(est_dw)
-    selected_df['Potency'] = potencies
-    selected_df['Est_DrugWeight (mg)'] = est_drugweights
-    print("\nTable with calculated Potency and Estimated Drug Weight:")
-    print(tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+    cal_potency(selected_df)
 
     # 5) Instruct user to weigh out the estimated drug weights
     print("\nINSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:")
-    for idx, row in selected_df.iterrows():
+    for row in selected_df.iterrows():
         print(f"  - {row['Drug']}: {round(row['Est_DrugWeight (mg)'],8)} mg")
 
- 
+    act_drugweight(selected_df)
+    #print(tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+
+    # Calculate new volume of dilutent and new concentration of stock dilution for each drug
+    cal_stockdil(selected_df)
+    
+#---------------------------------------------WORKING SOLUTION
+
+    # 6) Prompt user to enter the number of MGIT Tubes to be used
+    print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
+    mgit_tubes(selected_df)
+
+    # Calculate MGIT conc, volume of working solution needed, volume of working solution to aliquot, volume of diluent and volume of stock solution left
+    cal_mgit_ws(selected_df)
+
+    # 7) Output final values of Volume of Working Solution to Aliquot and Volume of Diluent to be added
+    print("\n----------------------------\nRESULT\n----------------------------\n Final Values:")
+    for idx, row in selected_df.iterrows():
+        print(f"  - {row['Drug']}: Volume of Stock solution to be added for working solution is {round(row['Volume_of_Working_Solution_to_aliquot (ml)'],8)} ml, and volume of diluent to be added is {round(row['Volume_Dilutent_to_Add (ml)'],8)} ml")    
+
 if __name__ == "__main__":
     main()

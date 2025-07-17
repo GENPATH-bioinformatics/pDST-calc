@@ -21,6 +21,13 @@ This log tracks the development progress, major milestones, and key decisions fo
 - Created README.md's.
 - Created .gitignore.
 - README.md's updated
+- Added Hypothesis testing (Property-based testing)
+- User input of PurchMolecular_Weight- and Stock_Volume values entry created in "src/cli/main.py".
+- Input correction added.
+- Tabulate implemented for readability.
+- User input of MGIT tubes created in "src/cli/main.py".
+- Input correction added.
+- Output Summary Tables updated/refined.
 
 ### Notes for Future Work
 - Check calculation logic in `dst_calc.py` functions with Emilyn.
