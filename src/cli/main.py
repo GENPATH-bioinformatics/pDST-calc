@@ -40,15 +40,15 @@ def custom_critical_values(selected_df):
         prompt = f"Enter critical value for {row['Drug']} (current: {current_value}): "
         new_value = input(prompt).strip()
         if new_value:
-            selected_df.at[idx, 'Critical_Concentration'] = new_value
+            selected_df.at[idx, 'Critical_Concentration'] = float(new_value)
 
 def purchased_weights(selected_df):
     while True:
         purch_weights = []
-        for row in selected_df.iterrows():
+        for idx, row in selected_df.iterrows():
             while True:
                 try:
-                    value = input(f"Enter purchased molecular weight for {row['Drug']} (original: {row['OrgMolecular_Weight']}): ").strip()
+                    value = input(f"Enter purchased molecular weight for {row['Drug']} (original: {row['OrgMolecular_Weight (g/mol)']}): ").strip()
                     purch_weight = float(value)
                     purch_weights.append(purch_weight)
                     break
@@ -57,20 +57,17 @@ def purchased_weights(selected_df):
         selected_df["PurchMolecular_Weight (g/mol)"] = purch_weights
         # Show summary and ask for confirmation
         print("\nSummary of purchased molecular weights:")
-        print(tabulate(selected_df[["Drug", "OrgMolecular_Weight", "PurchMolecular_Weight (g/mol)"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
+        print(tabulate(selected_df[["Drug", "OrgMolecular_Weight (g/mol)", "PurchMolecular_Weight (g/mol)"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
         confirm = input("\nAre these purchased molecular weights correct? (y/n): ").strip().lower()
         if confirm == 'y':
             break
         else:
             print("Let's re-enter the purchased molecular weights.")
-    # Rename original column for clarity and add unit
-    if 'OrgMolecular_Weight' in selected_df.columns:
-        selected_df.rename(columns={"OrgMolecular_Weight": "OrgMolecular_Weight (g/mol)"}, inplace=True)
 
 def stock_volume(selected_df):
     while True:
         stock_volumes = []
-        for row in selected_df.iterrows():
+        for idx, row in selected_df.iterrows():
             while True:
                 try:
                     value = input(f"Enter desired stock volume (ml) for {row['Drug']}: ").strip()
@@ -92,10 +89,10 @@ def stock_volume(selected_df):
 def cal_potency(selected_df):
     potencies = []
     est_drugweights = []
-    for row in selected_df.iterrows():
+    for idx, row in selected_df.iterrows():
         try:
-            mol_purch = float(row.get('PurchMolecular_Weight (g/mol)', row.get('PurchMolecular_Weight')))
-            mol_org = float(row.get('OrgMolecular_Weight (g/mol)', row.get('OrgMolecular_Weight')))
+            mol_purch = float(row.get('PurchMolecular_Weight (g/mol)'))
+            mol_org = float(row.get('OrgMolecular_Weight (g/mol)'))
             crit_conc = float(row['Critical_Concentration'])
             stock_vol = float(row.get('Stock_Volume (ml)', row.get('Stock_Volume')))
             pot = potency(mol_purch, mol_org)
@@ -114,7 +111,7 @@ def act_drugweight (selected_df):
     print("\n")
     while True:
         drugweights = []
-        for row in selected_df.iterrows():
+        for idx, row in selected_df.iterrows():
             while True:
                 try:
                     value = input(f"Enter actual weight for {row['Drug']}: ").strip()
@@ -136,7 +133,7 @@ def act_drugweight (selected_df):
 def cal_stockdil(selected_df):
     vol_dils = []
     conc_stockdiluent = []
-    for row in selected_df.iterrows():
+    for idx, row in selected_df.iterrows():
         try:
             drugweight_est = float(row.get('Est_DrugWeight (mg)'))
             drugweight_act = float(row.get('Actual_DrugWeight (mg)'))
@@ -164,7 +161,7 @@ def cal_stockdil(selected_df):
 def mgit_tubes (selected_df):
     while True:
         num_mgit = []
-        for row in selected_df.iterrows():
+        for idx, row in selected_df.iterrows():
             while True:
                 try:
                     value = input(f"Enter number of MGIT tubes to be done for {row['Drug']}: ").strip()
@@ -190,7 +187,7 @@ def cal_mgit_ws(selected_df):
     vol_diluents = []
     vol_left = []
 
-    for row in selected_df.iterrows():
+    for idx, row in selected_df.iterrows():
         try:
             cc_val = float(row.get('Critical_Concentration'))
             concentration_mgit = conc_mgit(cc_val)
@@ -245,6 +242,10 @@ def main():
         print("\nUpdated selected drugs with custom critical values:")
         print(tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'))
 
+    # Rename original column for clarity and add unit
+    if 'OrgMolecular_Weight' in selected_df.columns:
+        selected_df.rename(columns={"OrgMolecular_Weight": "OrgMolecular_Weight (g/mol)"}, inplace=True)
+
     # 2) Prompt user to enter purchased molecular weight for each drug
     print("\nNow, please enter the purchased molecular weight for each selected drug.")
     purchased_weights(selected_df)
@@ -270,7 +271,7 @@ def main():
 
     # 5) Instruct user to weigh out the estimated drug weights
     print("\nINSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:")
-    for row in selected_df.iterrows():
+    for idx, row in selected_df.iterrows():
         print(f"  - {row['Drug']}: {round(row['Est_DrugWeight (mg)'],8)} mg")
 
     act_drugweight(selected_df)
