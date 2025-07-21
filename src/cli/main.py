@@ -292,7 +292,7 @@ def main():
     # 7) Output final values of Volume of Working Solution to Aliquot and Volume of Diluent to be added
     print("\n----------------------------\nRESULT\n----------------------------\n Final Values:")
     for idx, row in selected_df.iterrows():
-        print(f"  - {row['Drug']}: Volume of Stock solution to be added for working solution is {round(row['Volume_of_Working_Solution_to_aliquot (ml)'],8)} ml, and volume of diluent to be added is {round(row['Volume_Dilutent_to_Add (ml)'],8)} ml")    
+        print(f"  - {row['Drug']}: Volume of Stock solution to be added for working solution is {round(row['Volume_WorkingSol_to_aliquot (ml)'],8)} ml, and volume of diluent to be added is {round(row['Volume_Dil_to_Add (ml)'],8)} ml")    
 
 if __name__ == "__main__":
     main()
