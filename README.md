@@ -20,35 +20,13 @@ This project provides a Drug Susceptibility Testing (DST) calculator with both a
    ```
    - `uv.lock` is provided for developer convenience and compatibility with tools and platforms that expect it.
 
-## Local Package Installation (Recommended for CLI usage)
+## Using the CLI with uv
 
-To install the project as a local package (editable mode):
-```bash
-pip install -e .
-```
-- This uses `setup.py` and `pyproject.toml` to install the package and dependencies.
-- After this, you can run the CLI tool from anywhere with:
-  ```bash
-  dstcalc
-  ```
+   Run the CLI from the project root using:
 
-## Running the CLI Tool (without local install)
-
-From the project root, you can also run:
-```bash
-python src/cli/main.py
-```
-
-## Running the Shiny Web App
-
-From the project root, run:
-```bash
-PYTHONPATH=src shiny run src/shinyapp/app.py
-```
-If port 8000 is in use, specify another port:
-```bash
-PYTHONPATH=src shiny run --port 8001 src/shinyapp/app.py
-```
+   ```bash
+   uv run python src/cli/main.py
+   ```
 
 ## Running Tests
 

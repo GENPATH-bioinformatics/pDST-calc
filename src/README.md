@@ -11,15 +11,5 @@
     ├── shinyapp/             # Shiny for Python web app
         └── app.py    
 ```
-## Running the CLI Tool
-From the project root:
-```bash
-dstcalc
-```
-## Running the Shiny App
-From the project root:
-```bash
-PYTHONPATH=src shiny run src/shinyapp/app.py
-```
 
 For more details, see the main `README.md` in the project root.
