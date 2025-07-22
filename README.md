@@ -4,21 +4,21 @@ This project provides a Drug Susceptibility Testing (DST) calculator with both a
 
 ## Requirements
 
-- Python 3.8+
-- pip
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/)
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone <repo-url>
+   git clone <repo-url> dstcalc
    cd dstcalc
    ```
 2. Install dependencies (for development or quick setup):
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
-   - `requirements.txt` is provided for developer convenience and compatibility with tools and platforms that expect it.
+   - `uv.lock` is provided for developer convenience and compatibility with tools and platforms that expect it.
 
 ## Local Package Installation (Recommended for CLI usage)
 
@@ -54,7 +54,7 @@ PYTHONPATH=src shiny run --port 8001 src/shinyapp/app.py
 
 If you have test files (e.g., in `tests/`):
 ```bash
-pytest --cov=src
+uv run pytest --cov=src
 ```
 
 ## Troubleshooting
