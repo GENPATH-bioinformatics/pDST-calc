@@ -30,10 +30,13 @@ This log tracks the development progress, major milestones, and key decisions fo
 - Output Summary Tables updated/refined.
 
 ### Notes for Future Work
-- Check calculation logic in `dst_calc.py` functions with Emilyn.
-- Ask Abi about enforcing version control either tox / nox (Multi-env test automation), or pyenv (.python-version).
-- Expand test coverage.
-- Implement feature that if first part is done in prev session, that user can continue to second half by entering certain values.
-- Make step 4 & 7 result table printable.
+[ ] Check calculation logic in `dst_calc.py` functions with Emilyn.
+[x] Ask Abi about enforcing version control either tox / nox (Multi-env test automation), or pyenv (.python-version).
+[ ] Expand test coverage.
+[ ] Implement feature that if first part is done in prev session, that user can continue to second half by entering certain values.
+[ ] Make step 4 & 7 result table printable.
+[ ] Create log files
+[ ] Be explicit about database
+[ ] PDST_DEBUG = 1, to show tables
 ---
 
