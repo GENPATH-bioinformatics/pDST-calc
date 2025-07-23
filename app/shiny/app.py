@@ -1,21 +1,35 @@
-from shiny import App, ui, render
+from shiny import reactive
+from shiny.express import input, render, ui
 import pandas as pd
 from db.src.drug_database import load_drug_data
 
-drug_df = load_drug_data()
+ui.page_opts(title="pDST-Calc", description="Phenotypic Drug Susceptibility Testing Calculator")
 
-app_ui = ui.page_fluid(
-    ui.input_selectize("drugs", "Select Drugs", choices=list(drug_df["Drug"]), multiple=True),
-    ui.output_table("drug_table")
+ui.tags.div(style="margin-bottom: 30px;")
+
+# Read the first column from the CSV file
+drug_options = load_drug_data()
+drug_selection = drug_options.iloc[:, 0].dropna().tolist()
+
+# Create a Markdown stream
+output_stream = ui.MarkdownStream("output_stream")
+
+ui.input_selectize(
+    "drug_selection",
+    "Select Drugs",
+    drug_selection,
+    multiple=True,
 )
 
-def server(input, output, session):
-    @output
-    @render.table
-    def drug_table():
-        selected = input.drugs()
-        if not selected:
-            return pd.DataFrame()
-        return drug_df[drug_df["Drug"].isin(selected)]
+ui.tags.div(style="margin-bottom: 30px;")
 
-app = App(app_ui, server)
+@render.data_frame
+def generate_table():
+    selected = input.drug_selection()
+    if not selected:
+        # Show empty DataFrame or all if nothing selected
+        return render.DataGrid(drug_options.iloc[0:0])
+    filtered = drug_options[drug_options.iloc[:, 0].isin(selected)]
+    return render.DataGrid(filtered)
+
+
