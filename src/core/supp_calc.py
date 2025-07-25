@@ -1,11 +1,9 @@
+import logging
+logger = logging.getLogger("pdst-calc") 
 from core.dst_calc import *
 from tabulate import tabulate
-
-log_base_name = None
-log_index = 1
-
-# Print only
-def print_tabulate(df, *args, **kwargs):
+# Print and log
+def print_and_log_tabulate(df, *args, **kwargs):    
     """
     Print a DataFrame as a formatted table using tabulate.
     Args:
@@ -14,34 +12,11 @@ def print_tabulate(df, *args, **kwargs):
     """
     table_str = tabulate(df, *args, **kwargs)
     print(table_str)
+    logger.info("\n" + table_str + "\n")
 
-# Log only
-def log_tabulate(df, *args, **kwargs):
-    """
-    Log a DataFrame as a formatted table to a log file in the 'logs' directory.
-    Args:
-        df (pd.DataFrame): DataFrame to log.
-        *args, **kwargs: Arguments passed to tabulate.
-    """
-    global log_index, log_base_name
+def print_table(df, *args, **kwargs):
     table_str = tabulate(df, *args, **kwargs)
-    log_filename = f"{log_base_name}_{log_index}.log"
-    os.makedirs("logs", exist_ok=True)
-    with open(f"logs/{log_filename}", 'a') as f:
-        f.write(table_str + '\n')
-        f.write('---\n')
-    log_index += 1
-
-# Print and log
-def print_and_log_tabulate(df, *args, **kwargs):
-    """
-    Print and log a DataFrame as a formatted table.
-    Args:
-        df (pd.DataFrame): DataFrame to print and log.
-        *args, **kwargs: Arguments passed to tabulate.
-    """
-    print_tabulate(df, *args, **kwargs)
-    log_tabulate(df, *args, **kwargs)
+    print(table_str)
 
 def select_drugs(df, pre_supplied=None, error_log=None):
     """
@@ -86,7 +61,8 @@ def select_drugs(df, pre_supplied=None, error_log=None):
             continue
         print("\nSelected drugs:")
         selected_df = df[df['Drug'].isin(selected_drugs)].copy()
-        print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+        print_table(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+        logger.info("\nDrugs selected:\n"+ selected_df.to_string(index=False) + "\n")
         if pre_supplied is not None:
             # Assume auto-confirm for test mode
             return selected_df
@@ -104,11 +80,11 @@ def custom_critical_values(selected_df):
         selected_df (pd.DataFrame): DataFrame of selected drugs.
     """
     for idx, row in selected_df.iterrows():
-        current_value = row['Critical_Concentration']
+        current_value = row['Crit_Conc(mg/ml)']
         prompt = f"Enter critical value for {row['Drug']} (current: {current_value}): "
         new_value = input(prompt).strip()
         if new_value:
-            selected_df.at[idx, 'Critical_Concentration'] = float(new_value)
+            selected_df.at[idx, 'Crit_Conc(mg/ml)'] = float(new_value)
 
 def purchased_weights(selected_df):
     """
@@ -121,22 +97,16 @@ def purchased_weights(selected_df):
         for idx, row in selected_df.iterrows():
             while True:
                 try:
-                    value = input(f"Enter purchased molecular weight for {row['Drug']} (original: {row['OrgMolecular_Weight (g/mol)']}): ").strip()
+                    value = input(f"Enter purchased molecular weight for {row['Drug']} (original: {row['OrgMol_W(g/mol)']}): ").strip()
+                    logger.info(f"\nPurchased molecular weight entered for {row['Drug']}: {value} \n")
                     purch_weight = float(value)
                     purch_weights.append(purch_weight)
                     break
                 except ValueError:
                     print("Invalid input. Please enter a numeric value.")
-        selected_df["PurchMolecular_Weight (g/mol)"] = purch_weights
-        # Show summary and ask for confirmation
-        #print("\nSummary of purchased molecular weights:")
-        log_tabulate(selected_df[["Drug", "OrgMolecular_Weight (g/mol)", "PurchMolecular_Weight (g/mol)"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+        selected_df["PurMol_W(g/mol)"] = purch_weights
+
         break
-        # confirm = input("\nAre these purchased molecular weights correct? (y/n): ").strip().lower()
-        # if confirm == 'y':
-        #     break
-        # else:
-        #     print("Let's re-enter the purchased molecular weights.")
 
 def stock_volume(selected_df):
     """
@@ -150,21 +120,14 @@ def stock_volume(selected_df):
             while True:
                 try:
                     value = input(f"Enter desired stock volume (ml) for {row['Drug']}: ").strip()
+                    logger.info(f"\nDesired stock volume entered for {row['Drug']}: {value} \n")
                     stock_volume = float(value)
                     stock_volumes.append(stock_volume)
                     break
                 except ValueError:
                     print("Invalid input. Please enter a numeric value.")
-        selected_df["Stock_Volume (ml)"] = stock_volumes
-        # Show summary and ask for confirmation
-        #print("\nSummary of desired stock solution volumes:")
-        log_tabulate(selected_df[["Drug", "Stock_Volume (ml)"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+        selected_df["St_Vol(ml)"] = stock_volumes
         break
-        # confirm = input("\nAre these stock solution volumes correct? (y/n): ").strip().lower()
-        # if confirm == 'y':
-        #     break
-        # else:
-        #     print("Let's re-enter the stock solution volumes.")
 
 def cal_potency(selected_df):
     """
@@ -176,10 +139,10 @@ def cal_potency(selected_df):
     est_drugweights = []
     for idx, row in selected_df.iterrows():
         try:
-            mol_purch = float(row.get('PurchMolecular_Weight (g/mol)'))
-            mol_org = float(row.get('OrgMolecular_Weight (g/mol)'))
-            crit_conc = float(row['Critical_Concentration'])
-            stock_vol = float(row.get('Stock_Volume (ml)', row.get('Stock_Volume')))
+            mol_purch = float(row.get('PurMol_W(g/mol)'))
+            mol_org = float(row.get('OrgMol_W(g/mol)'))
+            crit_conc = float(row['Crit_Conc(mg/ml)'])
+            stock_vol = float(row.get('St_Vol(ml)'))
             pot = potency(mol_purch, mol_org)
             est_dw = est_drugweight(crit_conc, stock_vol, pot)
         except Exception as e:
@@ -188,8 +151,8 @@ def cal_potency(selected_df):
         potencies.append(pot)
         est_drugweights.append(est_dw)
     selected_df['Potency'] = potencies
-    selected_df['Est_DrugWeight (mg)'] = est_drugweights
-    log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+    selected_df['Est_DrugW(mg)'] = est_drugweights
+    logger.info("\n" + tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
     
 
 def act_drugweight (selected_df):
@@ -205,21 +168,14 @@ def act_drugweight (selected_df):
             while True:
                 try:
                     value = input(f"Enter actual weight for {row['Drug']}: ").strip()
+                    logger.info(f"\nActual weight entered for {row['Drug']}: {value} \n")
                     drugweight = float(value)
                     drugweights.append(drugweight)
                     break
                 except ValueError:
                     print("Invalid input. Please enter a numeric value.")
-        selected_df["Actual_DrugWeight (mg)"] = drugweights
-        # Show summary and ask for confirmation
-        # print("\nSummary of actual drug weights (mg):")
-        log_tabulate(selected_df[["Drug", "Actual_DrugWeight (mg)"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+        selected_df["Act_DrugW(mg)"] = drugweights
         break
-        # confirm = input("\nAre these drug weights correct? (y/n): ").strip().lower()
-        # if confirm == 'y':
-        #     break
-        # else:
-        #     print("Let's re-enter the drug weights.")    
 
 def cal_stockdil(selected_df):
     """
@@ -231,9 +187,9 @@ def cal_stockdil(selected_df):
     conc_stockdiluent = []
     for idx, row in selected_df.iterrows():
         try:
-            drugweight_est = float(row.get('Est_DrugWeight (mg)'))
-            drugweight_act = float(row.get('Actual_DrugWeight (mg)'))
-            stock_vol = float(row.get('Stock_Volume (ml)'))
+            drugweight_est = float(row.get('Est_DrugW(mg)'))
+            drugweight_act = float(row.get('Act_DrugW(mg)'))
+            stock_vol = float(row.get('St_Vol(ml)'))
             vol_dil = vol_diluent(drugweight_est,drugweight_act,stock_vol)
             conc_stdil= conc_stock(drugweight_act,vol_dil)
         except Exception as e:
@@ -241,17 +197,17 @@ def cal_stockdil(selected_df):
             conc_stdil = None
         vol_dils.append(vol_dil)
         conc_stockdiluent.append(conc_stdil)
-    selected_df['Volume_Dilutent (ml)'] = vol_dils
-    selected_df['Concentration_stock_dilution (ug/ml)'] = conc_stockdiluent
+    selected_df['Vol_Dil(ml)'] = vol_dils
+    selected_df['Conc_st_dil(ug/ml)'] = conc_stockdiluent
 
     summary_cols = [
         'Drug',
-        'Est_DrugWeight (mg)',
-        'Actual_DrugWeight (mg)',
-        'Volume_Dilutent (ml)',
-        'Concentration_stock_dilution (ug/ml)'
+        'Est_DrugW(mg)',
+        'Act_DrugW(mg)',
+        'Vol_Dil(ml)',
+        'Conc_st_dil(ug/ml)'
     ]
-    log_tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+    logger.info("\n" + tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
 
 def mgit_tubes (selected_df):
     """
@@ -265,21 +221,14 @@ def mgit_tubes (selected_df):
             while True:
                 try:
                     value = input(f"Enter number of MGIT tubes to be done for {row['Drug']}: ").strip()
+                    logger.info(f"\nNumber of MGIT tubes entered for {row['Drug']}: {value} \n ")
                     num = float(value)
                     num_mgit.append(num)
                     break
                 except ValueError:
                     print("Invalid input. Please enter a numeric value.")
         selected_df["Total Mgit tubes"] = num_mgit
-        # Show summary and ask for confirmation
-        # print("\nSummary of number of MGIT tubes:")
-        log_tabulate(selected_df[["Drug", "Total Mgit tubes"]], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
         break
-        # confirm = input("\nAre these numbers correct? (y/n): ").strip().lower()
-        # if confirm == 'y':
-        #     break
-        # else:
-        #     print("Let's re-enter the number of MGIT tubes to be done.")
 
 def cal_mgit_ws(selected_df):
     """
@@ -295,14 +244,14 @@ def cal_mgit_ws(selected_df):
 
     for idx, row in selected_df.iterrows():
         try:
-            cc_val = float(row.get('Critical_Concentration'))
+            cc_val = float(row.get('Crit_Conc(mg/ml)'))
             concentration_mgit = conc_mgit(cc_val)
             num_mgit = float(row.get('Total Mgit tubes'))
             volume_ws = vol_workingsol(num_mgit)
-            conc_st = float(row.get('Concentration_stock_dilution (ug/ml)'))
+            conc_st = float(row.get('Conc_st_dil(ug/ml)'))
             vol_stws = vol_ss_to_ws(volume_ws,concentration_mgit,conc_st)
             vol_dil_toadd = vol_final_dil(vol_stws,volume_ws)
-            vol_st = float(row.get('Volume_Dilutent (ml)'))
+            vol_st = float(row.get('Vol_Dil(ml)'))
             vol_st_lft = vol_ssleft(vol_stws,vol_st)
             
         except Exception as e:
@@ -314,8 +263,18 @@ def cal_mgit_ws(selected_df):
         vol_diluents.append(vol_dil_toadd)
         vol_left.append(vol_st_lft)
 
-    selected_df['WorkingSol_Conc_MGIT'] = conc_mgits
-    selected_df['WorkingSol_Volume (ml)'] = vol_ws
-    selected_df['Volume_WorkingSol_to_aliquot (ml)'] = vol_ws_ali
-    selected_df['Volume_Dil_to_Add (ml)'] = vol_diluents
-    selected_df['Volume_Stock_Left (ml)'] = vol_left 
+    selected_df['WSol_Conc_MGIT(ug/ml)'] = conc_mgits
+    selected_df['WSol_Vol(ml)'] = vol_ws
+    selected_df['Vol_WSol_ali(ml)'] = vol_ws_ali
+    selected_df['Vol_Dil_Add(ml)'] = vol_diluents
+    selected_df['Vol_St_Left(ml)'] = vol_left 
+    
+    summary_cols = [
+        'Drug',
+        'WSol_Conc_MGIT(ug/ml)',
+        'WSol_Vol(ml)',
+        'Vol_WSol_ali(ml)',
+        'Vol_Dil_Add(ml)',
+        'Vol_St_Left(ml)'
+    ]
+    logger.info("\n" + tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
