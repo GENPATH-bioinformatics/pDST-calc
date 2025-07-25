@@ -5,9 +5,9 @@ from tabulate import tabulate
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):    
     """
-    Print a DataFrame as a formatted table using tabulate.
+    Print a DataFrame as a formatted table and log it to the logger.
     Args:
-        df (pd.DataFrame): DataFrame to print.
+        df (pd.DataFrame): DataFrame to print and log.
         *args, **kwargs: Arguments passed to tabulate.
     """
     table_str = tabulate(df, *args, **kwargs)
@@ -15,16 +15,22 @@ def print_and_log_tabulate(df, *args, **kwargs):
     logger.info("\n" + table_str + "\n")
 
 def print_table(df, *args, **kwargs):
+    """
+    Print a DataFrame as a formatted table using tabulate.
+    Args:
+        df (pd.DataFrame): DataFrame to print.
+        *args, **kwargs: Arguments passed to tabulate.
+    """
     table_str = tabulate(df, *args, **kwargs)
     print(table_str)
 
-def select_drugs(df, pre_supplied=None, error_log=None):
+def select_drugs(df, input_file=None, error_log=None):
     """
     Allow the user to select drugs from a DataFrame, either interactively or using a pre-supplied string for automated testing.
     Args:
         df (pd.DataFrame): DataFrame containing drug information.
-        pre_supplied (str, optional): Pre-supplied selection string for test automation.
-        error_log (file, optional): File handle for logging errors.
+        input_file (str, optional): Pre-supplied selection string for test automation (e.g., "1,2,3").
+        error_log (file, optional): File handle for logging errors during automated testing.
     Returns:
         pd.DataFrame or None: DataFrame of selected drugs, or None if invalid in test mode.
     """
@@ -33,8 +39,8 @@ def select_drugs(df, pre_supplied=None, error_log=None):
         for idx, drug in enumerate(df['Drug'], 1):
             print(f"{idx}. {drug}")
         print("\nEnter the numbers of the drugs you want to select (comma or space separated). Example: 1,3,5 or 2 4 6")
-        if pre_supplied is not None:
-            selection = pre_supplied
+        if input_file is not None:
+            selection = input_file
             print(f"[AUTO] Your selection: {selection}")
         else:
             selection = input("Your selection: ")
@@ -56,14 +62,14 @@ def select_drugs(df, pre_supplied=None, error_log=None):
             print(msg)
             if error_log is not None:
                 error_log.write(msg + '\n')
-            if pre_supplied is not None:
+            if input_file is not None:
                 return None
             continue
         print("\nSelected drugs:")
         selected_df = df[df['Drug'].isin(selected_drugs)].copy()
         print_table(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
         logger.info("\nDrugs selected:\n"+ selected_df.to_string(index=False) + "\n")
-        if pre_supplied is not None:
+        if input_file is not None:
             # Assume auto-confirm for test mode
             return selected_df
         # Ask for confirmation
@@ -105,7 +111,6 @@ def purchased_weights(selected_df):
                 except ValueError:
                     print("Invalid input. Please enter a numeric value.")
         selected_df["PurMol_W(g/mol)"] = purch_weights
-
         break
 
 def stock_volume(selected_df):
@@ -132,8 +137,10 @@ def stock_volume(selected_df):
 def cal_potency(selected_df):
     """
     Calculate potency and estimated drug weight for each selected drug and log the results.
+    Potency is calculated as purchased molecular weight / original molecular weight.
+    Estimated drug weight accounts for potency and target concentration.
     Args:
-        selected_df (pd.DataFrame): DataFrame of selected drugs.
+        selected_df (pd.DataFrame): DataFrame of selected drugs with molecular weights and critical concentrations.
     """
     potencies = []
     est_drugweights = []
@@ -155,9 +162,10 @@ def cal_potency(selected_df):
     logger.info("\n" + tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
     
 
-def act_drugweight (selected_df):
+def act_drugweight(selected_df):
     """
     Prompt the user to enter the actual weighed drug amount for each selected drug.
+    This is the real weight measured after estimating the required amount.
     Args:
         selected_df (pd.DataFrame): DataFrame of selected drugs.
     """
@@ -179,9 +187,10 @@ def act_drugweight (selected_df):
 
 def cal_stockdil(selected_df):
     """
-    Calculate the volume of diluent and concentration of stock dilution for each selected drug and log the results.
+    Calculate the volume of diluent and concentration of stock dilution for each selected drug.
+    This adjusts the stock solution based on the difference between estimated and actual drug weights.
     Args:
-        selected_df (pd.DataFrame): DataFrame of selected drugs.
+        selected_df (pd.DataFrame): DataFrame of selected drugs with estimated and actual weights.
     """
     vol_dils = []
     conc_stockdiluent = []
@@ -209,9 +218,10 @@ def cal_stockdil(selected_df):
     ]
     logger.info("\n" + tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
 
-def mgit_tubes (selected_df):
+def mgit_tubes(selected_df):
     """
     Prompt the user to enter the number of MGIT tubes for each selected drug.
+    This determines the volume of working solution needed.
     Args:
         selected_df (pd.DataFrame): DataFrame of selected drugs.
     """
@@ -233,8 +243,9 @@ def mgit_tubes (selected_df):
 def cal_mgit_ws(selected_df):
     """
     Calculate MGIT working solution concentrations, volumes, and related values for each selected drug.
+    This includes working solution concentration, volume needed, aliquot volume, diluent volume, and remaining stock.
     Args:
-        selected_df (pd.DataFrame): DataFrame of selected drugs.
+        selected_df (pd.DataFrame): DataFrame of selected drugs with all previous calculations.
     """
     conc_mgits = []
     vol_ws = []
