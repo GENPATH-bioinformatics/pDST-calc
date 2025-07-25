@@ -1,0 +1,9 @@
+
+Table with calculated Potency and Estimated Drug Weight:
++----------------+-------------------------------+---------------------------------+-----------+--------------------------+---------------------+-----------+-----------------------+
+| Drug           | OrgMolecular_Weight (g/mol)   | PurchMolecular_Weight (g/mol)   | Diluent   | Critical_Concentration   | Stock_Volume (ml)   | Potency   | Est_DrugWeight (mg)   |
++================+===============================+=================================+===========+==========================+=====================+===========+=======================+
+| Amikacin (AMK) | 585.6                         | 588                             | Water     | 1                        | 5                   | 1.0041    | 0.421721              |
++----------------+-------------------------------+---------------------------------+-----------+--------------------------+---------------------+-----------+-----------------------+
+INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:
+  - Amikacin (AMK): 0.42172131 mg
