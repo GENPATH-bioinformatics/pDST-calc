@@ -11,6 +11,9 @@ from core.supp_calc import (
 import logging
 import os
 import csv
+import sys
+from datetime import datetime
+from styling import print_header, print_success, print_error, print_warning, print_info, print_progress, print_section_header, print_step
 
 # Expected field names for test input files
 EXPECTED_FIELDS = [
@@ -73,6 +76,7 @@ def setup_logger(session_name="default"):
     return logger
 
 def main():
+    
     # Set up argument parser
     parser = argparse.ArgumentParser(description="DST Calculator CLI - Drug Susceptibility Testing Calculator")
     parser.add_argument('--drug-data', type=str, help='Path to input file with drug data (CSV format)')
@@ -321,4 +325,5 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     print(f"Final results written to: {output_path}\n")
 
 if __name__ == "__main__":
+    print_header()
     main()
