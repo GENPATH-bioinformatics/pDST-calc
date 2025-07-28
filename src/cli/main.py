@@ -13,7 +13,13 @@ import os
 import csv
 import sys
 from datetime import datetime
-from styling import print_header, print_success, print_error, print_warning, print_info, print_progress, print_section_header, print_step
+from styling import (
+    print_header, print_success, print_error, print_warning, print_info, print_progress, 
+    print_section_header, print_step, print_subsection, print_instruction, print_waiting,
+    print_completion, print_table_header, print_table_footer, print_help_text,
+    print_keyboard_shortcuts, print_input_prompt, print_validation_error, print_validation_success,
+    print_choice_prompt, print_summary_box, print_calculation_step, print_result_summary
+)
 
 # Expected field names for test input files
 EXPECTED_FIELDS = [
@@ -58,7 +64,8 @@ def parse_input_file(input_file):
             return [dict(zip(EXPECTED_FIELDS, row)) for row in rows if any(cell.strip() for cell in row)]
 
 def setup_logger(session_name="default"):
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
+    # Create logs directory in project root (not in src/)
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "logs")
     log_dir = os.path.abspath(log_dir)
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"pdst-calc-{session_name}.log")
@@ -76,6 +83,11 @@ def setup_logger(session_name="default"):
     return logger
 
 def main():
+    # Print cool header
+    print_header()
+    
+    # Show help text for first-time users
+    print_help_text()
     
     # Set up argument parser
     parser = argparse.ArgumentParser(description="DST Calculator CLI - Drug Susceptibility Testing Calculator")
@@ -86,13 +98,18 @@ def main():
     parser.add_argument('--session-name', type=str, help='Session name for logging (default: interactive prompt)')
     args = parser.parse_args()
 
-    # Get session name
+    # Get session name with better UX
     if args.session_name:
         session_name = args.session_name
+        print_success(f"Using session name: {session_name}")
     else:
-        session_name = input("Enter a name for this session (e.g., your name or experiment ID): ").strip()
+        print_input_prompt("Enter a name for this session", example="Bee_Experiment_001")
+        session_name = input("Session name: ").strip()
         if not session_name:
             session_name = "default"
+            print_warning("Using default session name")
+        else:
+            print_success(f"Session name set to: {session_name}")
     
     logger = setup_logger(session_name)
     logger.info(f"\nApplication started for session: {session_name}\n")
@@ -188,7 +205,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
                         selected_df.iloc[idx, selected_df.columns.get_loc('Crit_Conc(mg/ml)')] = value
         else:
             custom_critical_values(selected_df)
-            print("\nUpdated selected drugs with custom critical values:")
+            print_success("\nUpdated selected drugs with custom critical values:")
             print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
 
     # Rename original column for clarity and add unit
@@ -325,5 +342,4 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     print(f"Final results written to: {output_path}\n")
 
 if __name__ == "__main__":
-    print_header()
     main()

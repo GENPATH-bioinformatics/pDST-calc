@@ -2,6 +2,7 @@ import logging
 logger = logging.getLogger("pdst-calc") 
 from core.dst_calc import *
 from tabulate import tabulate
+from cli.styling import print_input_prompt, print_validation_error, print_validation_success, print_choice_prompt, print_summary_box, print_calculation_step, print_result_summary, print_success, print_error, print_warning, print_info, print_progress, print_section_header, print_step, print_subsection, print_instruction, print_waiting, print_completion, print_table_header, print_table_footer, print_help_text, print_keyboard_shortcuts
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):    
     """
@@ -41,7 +42,8 @@ def select_drugs(df, input_file=None, error_log=None):
             print("\nAvailable drugs:")
             for idx, drug in enumerate(df['Drug'], 1):
                 print(f"{idx}. {drug}")
-            print("\nEnter the numbers of the drugs you want to select (comma or space separated).Enter 'all' to select all drugs. Example: 1,3,5 or 2 4 6")
+            print("\n")
+            print_input_prompt("Enter the numbers of the drugs you want to select (comma or space separated).", example="1,3,5 or 2 4 6")
             selection = input("Your selection: ")
             if selection == 'all':
                 return df
@@ -76,6 +78,7 @@ def select_drugs(df, input_file=None, error_log=None):
         # Ask for confirmation
         confirm = input("\nDid you select the right drugs? Select 'n' to add or remove. (y to continue, n to reselect): ").strip().lower()
         if confirm == 'y':
+            print_success("Drugs selected successfully")
             return selected_df
         else:
             print("Let's try again.")
