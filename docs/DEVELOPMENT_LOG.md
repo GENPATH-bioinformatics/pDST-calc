@@ -38,5 +38,9 @@ This log tracks the development progress, major milestones, and key decisions fo
 [ ] Create log files
 [ ] Be explicit about database
 [ ] PDST_DEBUG = 1, to show tables
+[ ] with input files, implement that if multiple drugs are chosen in not ascending order, that the values down the line are still corresponding
+[ ] also allow half input file and rest command line
+[ ] Work on user personalised drug database implentation
+[ ] Work on selected drugs in input file format
 ---
 
