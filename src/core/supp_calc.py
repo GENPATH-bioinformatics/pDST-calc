@@ -41,7 +41,7 @@ def select_drugs(df, input_file=None, error_log=None):
         print("\nEnter the numbers of the drugs you want to select (comma or space separated). Example: 1,3,5 or 2 4 6")
         if input_file is not None:
             selection = input_file
-            print(f"[AUTO] Your selection: {selection}")
+            print(f"\n[AUTO] Your selection: {selection}")
         else:
             selection = input("Your selection: ")
         numbers = [int(s) for s in selection.replace(',', ' ').split() if s.isdigit()]

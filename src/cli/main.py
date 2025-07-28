@@ -174,6 +174,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     
     if custom_critical_response == 'y':
         if test_case:
+            print(f"\n[AUTO] Your Critical Concentration selection: {test_case.get('cc_values', '')}")
             # Handle custom critical values from test case
             custom_values = test_case.get('cc_values', '')
             if custom_values:
@@ -183,8 +184,8 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
                         selected_df.iloc[idx, selected_df.columns.get_loc('Crit_Conc(mg/ml)')] = value
         else:
             custom_critical_values(selected_df)
-        print("\nUpdated selected drugs with custom critical values:")
-        print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+            print("\nUpdated selected drugs with custom critical values:")
+            print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
 
     # Rename original column for clarity and add unit
     if 'OrgMolecular_Weight' in selected_df.columns:
@@ -192,6 +193,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
 
     # 2) Prompt user to enter purchased molecular weight for each drug
     if test_case:
+        print(f"\n[AUTO] Your Purchased Molecular Weight selection: {test_case.get('purch_mol_weights', '')}")
         purchased_weights_input = test_case.get('purch_mol_weights', '')
         if purchased_weights_input:
             weights = [float(x.strip()) for x in purchased_weights_input.split(',') if x.strip()]
@@ -211,7 +213,8 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         selected_df = selected_df[new_order]
 
     # 3) Prompt user to enter desired stock solution volume
-    if test_case:
+    if test_case:   
+        print(f"\n[AUTO] Your Stock Solution Volume selection: {test_case.get('stock_vol', '')}")
         stock_volumes_input = test_case.get('stock_vol', '')
         if stock_volumes_input:
             volumes = [float(x.strip()) for x in stock_volumes_input.split(',') if x.strip()]
@@ -225,12 +228,34 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
 
     # 5) Instruct user to weigh out the estimated drug weights
     if not test_case:
-        print("\nINSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:")
-        for idx, row in selected_df.iterrows():
-            print(f"  - {row['Drug']}: {round(row['Est_DrugW(mg)'],8)} mg")
+        # Prepare output file
+        output_filename = input("\nEnter filename for drug weight output (e.g., drug_weights.txt): ").strip()
+        if not output_filename:
+            output_filename = "drug_weights.txt"
+
+        # Create results directory in project root
+        results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+        results_dir = os.path.abspath(results_dir)
+        os.makedirs(results_dir, exist_ok=True)
+
+        output_path = os.path.join(results_dir, output_filename)
+        with open(output_path, 'w') as output_file:
+            output_file.write("----------------------------\n")
+            output_file.write("INSTRUCTION:\n")
+            output_file.write("----------------------------\n\n")
+            output_file.write("Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:\n")
+            print("\nINSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:")
+            for idx, row in selected_df.iterrows():
+                print(f"  - {row['Drug']}: {round(row['Est_DrugW(mg)'],8)} mg")
+                output_file.write(f"  - {row['Drug']}: {round(row['Est_DrugW(mg)'],8)} mg")
+            output_file.write("\n\n----------------------------\n")
+            output_file.write("END\n")
+            output_file.write("----------------------------\n")
+            print(f"\n[AUTO] Your drug weight output filename: {output_filename}")
 
     # Get actual drug weights
     if test_case:
+        print(f"\n[AUTO] Your Weighed Drug selection: {test_case.get('weighed_drug', '')}")
         actual_weights_input = test_case.get('weighed_drug', '')
         if actual_weights_input:
             weights = [float(x.strip()) for x in actual_weights_input.split(',') if x.strip()]
@@ -240,9 +265,10 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
 
     # Calculate new volume of dilutent and new concentration of stock dilution for each drug
     cal_stockdil(selected_df)
-    
+
     # 6) Prompt user to enter the number of MGIT Tubes to be used
     if test_case:
+        print(f"\n[AUTO] Your MGIT Tubes selection: {test_case.get('mgit_tubes', '')}")
         mgit_tubes_input = test_case.get('mgit_tubes', '')
         if mgit_tubes_input:
             tubes = [float(x.strip()) for x in mgit_tubes_input.split(',') if x.strip()]
@@ -257,11 +283,42 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     # 7) Output final values of Volume of Working Solution to Aliquot and Volume of Diluent to be added
     print("\n----------------------------\nRESULT\n----------------------------\n\n Final Values:")
     logger.info("\nFinal Values:\n")
-    for idx, row in selected_df.iterrows():
-        logger.info(f"\n  - {row['Drug']}: Volume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml, and volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml\n")    
-        print(f"  - {row['Drug']}: Volume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml, and volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml")    
-    print("\n----------------------------\nEND\n----------------------------\n")
+    
+    # Prepare output file
+    if test_case:
+        output_filename = test_case.get('final_results_filename', 'final_results.txt')
+        
+        # Create results directory in project root
+        results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+        results_dir = os.path.abspath(results_dir)
+        os.makedirs(results_dir, exist_ok=True)
+    else:
+        output_filename = input("Enter filename for final results (e.g., final_results.txt): ").strip()
+        if not output_filename:
+            output_filename = "final_results.txt"
+    
+        
+    # Write to output file
+    output_path = os.path.join(results_dir, output_filename)
+    with open(output_path, 'w') as output_file:
+        output_file.write("----------------------------\n")
+        output_file.write("RESULT\n")
+        output_file.write("----------------------------\n")
+        output_file.write("\nFinal Values:\n")
+        
+        for idx, row in selected_df.iterrows():
+            result_line = f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml"
+            logger.info(f"\n  - {row['Drug']}:Volume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml, and volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml\n")    
+            print(f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml")
+            output_file.write(result_line + "\n")
+        
+        output_file.write("\n----------------------------\n")
+        output_file.write("END\n")
+        output_file.write("----------------------------\n")
+    
+    print(f"\n----------------------------\nEND\n----------------------------\n")
     logger.info("\nEND\n")
+    print(f"Final results written to: {output_path}\n")
 
 if __name__ == "__main__":
     main()
