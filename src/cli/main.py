@@ -214,7 +214,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
 
     # 3) Prompt user to enter desired stock solution volume
     if test_case:   
-        print(f"\n[AUTO] Your Stock Solution Volume selection: {test_case.get('stock_vol', '')}")
+        print(f"[AUTO] Your Stock Solution Volume selection: {test_case.get('stock_vol', '')}")
         stock_volumes_input = test_case.get('stock_vol', '')
         if stock_volumes_input:
             volumes = [float(x.strip()) for x in stock_volumes_input.split(',') if x.strip()]
@@ -251,11 +251,11 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
             output_file.write("\n\n----------------------------\n")
             output_file.write("END\n")
             output_file.write("----------------------------\n")
-            print(f"\n[AUTO] Your drug weight output filename: {output_filename}")
+            print(f"\nYour drug weight output filename: {output_filename}")
 
     # Get actual drug weights
     if test_case:
-        print(f"\n[AUTO] Your Weighed Drug selection: {test_case.get('weighed_drug', '')}")
+        print(f"[AUTO] Your Weighed Drug selection: {test_case.get('weighed_drug', '')}")
         actual_weights_input = test_case.get('weighed_drug', '')
         if actual_weights_input:
             weights = [float(x.strip()) for x in actual_weights_input.split(',') if x.strip()]
@@ -268,7 +268,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
 
     # 6) Prompt user to enter the number of MGIT Tubes to be used
     if test_case:
-        print(f"\n[AUTO] Your MGIT Tubes selection: {test_case.get('mgit_tubes', '')}")
+        print(f"[AUTO] Your MGIT Tubes selection: {test_case.get('mgit_tubes', '')}")
         mgit_tubes_input = test_case.get('mgit_tubes', '')
         if mgit_tubes_input:
             tubes = [float(x.strip()) for x in mgit_tubes_input.split(',') if x.strip()]
@@ -287,7 +287,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     # Prepare output file
     if test_case:
         output_filename = test_case.get('final_results_filename', 'final_results.txt')
-        
+
         # Create results directory in project root
         results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
         results_dir = os.path.abspath(results_dir)

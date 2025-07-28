@@ -57,6 +57,7 @@ Run one automated test case from a CSV file:
 
 ```bash
 uv run python src/cli/main.py --single-test-input tests/my_test.csv
+(eg. uv run python src/cli/main.py --single-test-input tests/test_2.csv)
 ```
 
 #### Batch Testing
@@ -65,6 +66,7 @@ Run multiple test cases from a CSV file:
 
 ```bash
 uv run python src/cli/main.py --test-input tests/batch_tests.csv --test-output results.log
+
 ```
 
 #### With Custom Session Name

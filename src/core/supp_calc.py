@@ -35,15 +35,16 @@ def select_drugs(df, input_file=None, error_log=None):
         pd.DataFrame or None: DataFrame of selected drugs, or None if invalid in test mode.
     """
     while True:
-        print("\nAvailable drugs:")
-        for idx, drug in enumerate(df['Drug'], 1):
-            print(f"{idx}. {drug}")
-        print("\nEnter the numbers of the drugs you want to select (comma or space separated). Example: 1,3,5 or 2 4 6")
         if input_file is not None:
             selection = input_file
-            print(f"\n[AUTO] Your selection: {selection}")
         else:
+            print("\nAvailable drugs:")
+            for idx, drug in enumerate(df['Drug'], 1):
+                print(f"{idx}. {drug}")
+            print("\nEnter the numbers of the drugs you want to select (comma or space separated).Enter 'all' to select all drugs. Example: 1,3,5 or 2 4 6")
             selection = input("Your selection: ")
+            if selection == 'all':
+                return df
         numbers = [int(s) for s in selection.replace(',', ' ').split() if s.isdigit()]
         selected_drugs = []
         invalid_numbers = []
