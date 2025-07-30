@@ -1,9 +1,12 @@
 [project]
-name = "pdst-calc"
-version = "0.0.1"
+name = "dstcalc"
+version = "0.1.0"
 description = "This tool provides a Drug Susceptibility Testing (DST) calculator with both a command-line interface (CLI) and a Shiny for Python web app."
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [
+    {name = "Bea Loubser"}
+]
 dependencies = [
     "dso-core>=0.9",
     "hypothesis>=6.135.32",
