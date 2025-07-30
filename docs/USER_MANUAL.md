@@ -14,11 +14,9 @@ See the main [README.md](../README.md) for installation instructions and require
 1. Open a terminal and navigate to the project root directory.
 2. Run:
    ```bash
-   python src/cli/main.py
-   ```
-   Or, after local package installation:
-   ```bash
-   dstcalc
+   uv run python app/cli/main.py
+   # or simply:
+   uv run dstcalc
    ```
 3. Follow the prompts to select drugs by number. You can enter numbers separated by commas or spaces (e.g., `1,3,5` or `2 4 6`).
 4. If you enter an invalid number, you will see an error message (e.g., `44 is not in drug selection`).
@@ -28,11 +26,11 @@ See the main [README.md](../README.md) for installation instructions and require
 ## Running the Shiny Web App
 1. From the project root, run:
    ```bash
-   PYTHONPATH=src shiny run src/shinyapp/app.py
+   uv run shiny app/shiny/app.py
    ```
    If port 8000 is in use, specify another port:
    ```bash
-   PYTHONPATH=src shiny run --port 8001 src/shinyapp/app.py
+   uv run shiny --port 8001 app/shiny/app.py
    ```
 2. Open your browser and go to the address shown in the terminal (usually `http://127.0.0.1:8000`).
 3. Use the web interface to select drugs and view their properties.
@@ -43,7 +41,7 @@ See the main [README.md](../README.md) for installation instructions and require
 - Changes will be reflected the next time you run the CLI or Shiny app.
 
 ## Troubleshooting
-- **ModuleNotFoundError:** Ensure you set `PYTHONPATH=src` when running the Shiny app.
+- **ModuleNotFoundError:** Use `uv run` to automatically handle Python path and dependencies.
 - **Port already in use:** Use the `--port` option to specify a different port.
 - **Data not found:** Make sure `drug_data.csv` is in the `data/` directory.
 - **Dependency issues:** Reinstall requirements with `pip install -r requirements.txt` or `pip install -e .`.

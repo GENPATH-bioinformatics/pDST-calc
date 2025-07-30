@@ -1,9 +1,9 @@
 import argparse
 import pandas as pd
-from core.drug_database import load_drug_data
-from core.dst_calc import *
+from lib.src.drug_database import load_drug_data
+from lib.src.dst_calc import *
 from tabulate import tabulate
-from core.supp_calc import (
+from lib.src.supp_calc import (
     print_and_log_tabulate, select_drugs, custom_critical_values, 
     purchased_weights, stock_volume, cal_potency, act_drugweight,
     cal_stockdil, mgit_tubes, cal_mgit_ws
