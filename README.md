@@ -56,6 +56,8 @@ uv run pdst-calc --drug-data data/my_drugs.csv
 Run one automated test case from a CSV file:
 
 ```bash
+uv run python src/cli/main.py --single-test-input tests/my_test.csv
+(eg. uv run python src/cli/main.py --single-test-input tests/test_2.csv)
 uv run pdst-calc --single-test-input tests/my_test.csv
 (eg. uv run pdst-calc --single-test-input tests/test_2.csv)
 ```
@@ -83,6 +85,7 @@ You can combine different options:
 
 ```bash
 # Custom drug data + single test + custom session
+uv run python src/cli/main.py --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
 uv run pdst-calc --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
 
 # Batch testing with error logging
@@ -91,7 +94,7 @@ uv run pdst-calc --test-input tests/all_tests.csv --test-output test_results.log
 
 ## Input File Formats
 
-### Test Input CSV Format
+### Single Test Input CSV Format
 
 Test input files should be semicolon-separated with these columns:
 
@@ -134,6 +137,7 @@ id;logfile_name;selected_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;w
 
 All operations are logged to:
 - **Console output**: Real-time progress and results
+- **Log files**: `~/.pdst-calc/logs/pdst-calc-{session_name}.log` in user's home directory
 - **Log files**: `logs/pdst-calc-{session_name}.log` in the project root
 - **Output files**: `results/{filename}.txt` 
 
@@ -143,7 +147,6 @@ All operations are logged to:
 |----------|-------------|---------|
 | `--drug-data` | Path to custom drug data CSV | `--drug-data data/my_drugs.csv` |
 | `--single-test-input` | Path to single test input CSV | `--single-test-input tests/test.csv` |
-| `--test-input` | Path to batch test input CSV | `--test-input tests/batch.csv` |
 | `--test-output` | Path to error log file | `--test-output results.log` |
 | `--session-name` | Session name for logging | `--session-name "experiment_001"` |
 

@@ -55,8 +55,9 @@ def parse_input_file(input_file):
             return [dict(zip(EXPECTED_FIELDS, row)) for row in rows if any(cell.strip() for cell in row)]
 
 def setup_logger(session_name="default"):
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
-    log_dir = os.path.abspath(log_dir)
+    # Create logs directory in user's home directory
+    home_dir = os.path.expanduser("~")
+    log_dir = os.path.join(home_dir, ".pdst-calc", "logs")
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"pdst-calc-{session_name}.log")
 
@@ -76,7 +77,6 @@ def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description="DST Calculator CLI - Drug Susceptibility Testing Calculator")
     parser.add_argument('--drug-data', type=str, help='Path to input file with drug data (CSV format)')
-    parser.add_argument('--test-input', type=str, help='Path to test input CSV (semicolon separated) for automated testing of multiple cases')
     parser.add_argument('--single-test-input', type=str, help='Path to single test input CSV for one-time automated run')
     parser.add_argument('--test-output', type=str, help='Path to test output/error log file')
     parser.add_argument('--session-name', type=str, help='Session name for logging (default: interactive prompt)')
@@ -121,21 +121,6 @@ def main():
         else:
             logger.error("No test data found in single test input file")
         
-        if error_log:
-            error_log.close()
-            
-    elif args.test_input:
-        # Batch test mode - run multiple test cases
-        logger.info(f"Running in batch test mode with input file: {args.test_input}")
-        test_rows = parse_input_file(args.test_input)
-        if args.test_output:
-            error_log = open(args.test_output, 'w')
-            logger.info(f"Error log will be written to: {args.test_output}")
-
-        # Run for each test case
-        for i, test_case in enumerate(test_rows):
-            logger.info(f"\n--- Running test case {i+1} ---")
-            run_calculation(df, test_case, error_log, logger)
         if error_log:
             error_log.close()
     else:
