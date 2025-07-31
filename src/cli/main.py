@@ -1,24 +1,19 @@
 import argparse
 import pandas as pd
+import logging
+import os
+import csv
+import sys
 from core.drug_database import load_drug_data
 from core.dst_calc import *
-from tabulate import tabulate
 from core.supp_calc import (
     print_and_log_tabulate, select_drugs, custom_critical_values, 
     purchased_weights, stock_volume, cal_potency, act_drugweight,
     cal_stockdil, mgit_tubes, cal_mgit_ws
 )
-import logging
-import os
-import csv
-import sys
-from datetime import datetime
 from styling import (
-    print_header, print_success, print_error, print_warning, print_info, print_progress, 
-    print_section_header, print_step, print_subsection, print_instruction, print_waiting,
-    print_completion, print_table_header, print_table_footer, print_help_text,
-    print_keyboard_shortcuts, print_input_prompt, print_validation_error, print_validation_success,
-    print_choice_prompt, print_summary_box, print_calculation_step, print_result_summary
+    print_header, print_success, print_error, print_warning,
+    print_step, print_completion, print_help_text, print_input_prompt
 )
 
 # Expected field names for test input files
@@ -103,7 +98,7 @@ def main():
         session_name = args.session_name
         print_success(f"Using session name: {session_name}")
     else:
-        print_input_prompt("Enter a name for this session", example="Bee_Experiment_001")
+        print_input_prompt("Enter a name for this session", example="Name_Experiment_Date")
         session_name = input("Session name: ").strip()
         if not session_name:
             session_name = "default"
@@ -115,12 +110,15 @@ def main():
     logger.info(f"\nApplication started for session: {session_name}\n")
 
     # Load drug data
+    print_step("0","Loading Drug Data")
     if args.drug_data:
         logger.info(f"Loading drug data from file: {args.drug_data}")
         df = pd.read_csv(args.drug_data)
+        print_success(f"Drug data loaded from: {args.drug_data}")
     else:
         logger.info("Loading drug data from database")
         df = load_drug_data()
+        print_success("Drug data loaded from database")
 
     # Handle different modes
     test_rows = []
@@ -128,6 +126,7 @@ def main():
     
     if args.single_test_input:
         # Single test input mode - run one test case
+        print_step("0","Single Test Mode")
         logger.info(f"Running single test with input file: {args.single_test_input}")
         test_rows = parse_input_file(args.single_test_input)
         if args.test_output:
@@ -139,8 +138,10 @@ def main():
             test_case = test_rows[0]
             logger.info(f"Running single test case")
             run_calculation(df, test_case, error_log, logger)
+            print_success("Single test completed successfully")
         else:
             logger.error("No test data found in single test input file")
+            print_error("No test data found in single test input file")
         
         if error_log:
             error_log.close()
@@ -161,7 +162,9 @@ def main():
             error_log.close()
     else:
         # Interactive mode
+        print_step("0","Interactive Mode")
         run_calculation(df, None, None, logger)
+        print_success("Interactive session completed successfully")
 
 def run_calculation(df, test_case=None, error_log=None, logger=None):
     """
@@ -173,6 +176,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         logger: Logger instance
     """
     # 1) User selects desired drugs
+    print_step("Step 1","Drug Selection")
     if test_case:
         drugs_input = test_case.get('selected_numerals')
         selected_df = select_drugs(df, input_file=drugs_input, error_log=error_log)
@@ -187,6 +191,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         selected_df.rename(columns={"Critical_Concentration": "Crit_Conc(mg/ml)"}, inplace=True)
 
     # 1.3) Ask if user wants to enter their own critical values
+    print_step("Step 2","Critical Values")
     if test_case:
         custom_critical_response = test_case.get('own_cc', 'n')
     else:
@@ -207,12 +212,15 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
             custom_critical_values(selected_df)
             print_success("\nUpdated selected drugs with custom critical values:")
             print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+    
+    print_success("Critical values configured")
 
     # Rename original column for clarity and add unit
     if 'OrgMolecular_Weight' in selected_df.columns:
         selected_df.rename(columns={"OrgMolecular_Weight": "OrgMol_W(g/mol)"}, inplace=True)
 
     # 2) Prompt user to enter purchased molecular weight for each drug
+    print_step("Step 3","Purchased Molecular Weights")
     if test_case:
         print(f"\n[AUTO] Your Purchased Molecular Weight selection: {test_case.get('purch_mol_weights', '')}")
         purchased_weights_input = test_case.get('purch_mol_weights', '')
@@ -222,6 +230,8 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     else:
         print("\nNow, please enter the purchased molecular weight for each selected drug.")
         purchased_weights(selected_df)
+    
+    print_success("Purchased molecular weights entered")
 
     # Reorder columns so PurMol_W(g/mol) is next to OrgMol_W(g/mol)
     cols = list(selected_df.columns)
@@ -234,6 +244,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         selected_df = selected_df[new_order]
 
     # 3) Prompt user to enter desired stock solution volume
+    print_step("Step 4","Stock Solution Volume")
     if test_case:   
         print(f"[AUTO] Your Stock Solution Volume selection: {test_case.get('stock_vol', '')}")
         stock_volumes_input = test_case.get('stock_vol', '')
@@ -243,16 +254,23 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     else:
         print("\nFinally, enter desired stock solution volume (ml).")
         stock_volume(selected_df)
+    
+    print_success("Stock solution volumes entered")
 
     # 4) Calculate Potency and Estimated Drug Weight for each drug
+    print_step("Step 5","Calculate Potency and Estimated Drug Weight")
     cal_potency(selected_df)
+    print_success("Potency and estimated drug weights calculated")
 
     # 5) Instruct user to weigh out the estimated drug weights
+    print_step("Step 6","Drug Weight Instructions")
     if not test_case:
         # Prepare output file
-        output_filename = input("\nEnter filename for drug weight output (e.g., drug_weights.txt): ").strip()
+        output_filename = input("\nEnter filename for drug weight output (e.g., drug_weights): ").strip()
         if not output_filename:
-            output_filename = "drug_weights.txt"
+            output_filename = "drug_weights"
+        if not output_filename.endswith('.txt'):
+            output_filename += '.txt'
 
         # Create results directory in project root
         results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
@@ -273,8 +291,11 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
             output_file.write("END\n")
             output_file.write("----------------------------\n")
             print(f"\nYour drug weight output filename: {output_filename}")
+    
+    print_success("Drug weight instructions generated")
 
     # Get actual drug weights
+    print_step("Step 7","Actual Drug Weights")
     if test_case:
         print(f"[AUTO] Your Weighed Drug selection: {test_case.get('weighed_drug', '')}")
         actual_weights_input = test_case.get('weighed_drug', '')
@@ -283,11 +304,15 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
             selected_df["Act_DrugW(mg)"] = weights
     else:
         act_drugweight(selected_df)
+    
+    print_success("Actual drug weights entered")
 
     # Calculate new volume of dilutent and new concentration of stock dilution for each drug
     cal_stockdil(selected_df)
+    print_success("Stock dilution calculations completed")
 
     # 6) Prompt user to enter the number of MGIT Tubes to be used
+    print_step("Step 8","MGIT Tubes")
     if test_case:
         print(f"[AUTO] Your MGIT Tubes selection: {test_case.get('mgit_tubes', '')}")
         mgit_tubes_input = test_case.get('mgit_tubes', '')
@@ -297,26 +322,34 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     else:
         print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
         mgit_tubes(selected_df)
+    
+    print_success("MGIT tubes configured")
 
     # Calculate MGIT conc, volume of working solution needed, volume of working solution to aliquot, volume of diluent and volume of stock solution left
     cal_mgit_ws(selected_df)
+    print_success("MGIT working solution calculations completed")
 
     # 7) Output final values of Volume of Working Solution to Aliquot and Volume of Diluent to be added
+    print_step("Step 9","Final Results")
     print("\n----------------------------\nRESULT\n----------------------------\n\n Final Values:")
     logger.info("\nFinal Values:\n")
     
     # Prepare output file
     if test_case:
-        output_filename = test_case.get('final_results_filename', 'final_results.txt')
+        output_filename = test_case.get('final_results_filename', 'final_results')
+        if not output_filename.endswith('.txt'):
+            output_filename += '.txt'
 
         # Create results directory in project root
         results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
         results_dir = os.path.abspath(results_dir)
         os.makedirs(results_dir, exist_ok=True)
     else:
-        output_filename = input("Enter filename for final results (e.g., final_results.txt): ").strip()
+        output_filename = input("Enter filename for final results (e.g., final_results): ").strip()
         if not output_filename:
-            output_filename = "final_results.txt"
+            output_filename = "final_results"
+        if not output_filename.endswith('.txt'):
+            output_filename += '.txt'
     
         
     # Write to output file
@@ -340,6 +373,8 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     print(f"\n----------------------------\nEND\n----------------------------\n")
     logger.info("\nEND\n")
     print(f"Final results written to: {output_path}\n")
+    print_success("Calculation workflow completed successfully!")
+    print_completion("All steps completed successfully")
 
 if __name__ == "__main__":
     main()

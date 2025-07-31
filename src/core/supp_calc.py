@@ -2,7 +2,7 @@ import logging
 logger = logging.getLogger("pdst-calc") 
 from core.dst_calc import *
 from tabulate import tabulate
-from cli.styling import print_input_prompt, print_validation_error, print_validation_success, print_choice_prompt, print_summary_box, print_calculation_step, print_result_summary, print_success, print_error, print_warning, print_info, print_progress, print_section_header, print_step, print_subsection, print_instruction, print_waiting, print_completion, print_table_header, print_table_footer, print_help_text, print_keyboard_shortcuts
+from cli.styling import print_input_prompt, print_success
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):    
     """
