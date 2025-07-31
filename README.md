@@ -29,7 +29,7 @@ The CLI supports multiple modes of operation:
 Run the CLI interactively, answering prompts as you go:
 
 ```bash
-uv run dstcalc
+uv run pdst-calc
 ```
 
 This will prompt you for:
@@ -48,7 +48,7 @@ This will prompt you for:
 Load drug data from a custom CSV file instead of the default database:
 
 ```bash
-uv run dstcalc --drug-data data/my_drugs.csv
+uv run pdst-calc --drug-data data/my_drugs.csv
 ```
 
 #### Single Test Input
@@ -56,8 +56,8 @@ uv run dstcalc --drug-data data/my_drugs.csv
 Run one automated test case from a CSV file:
 
 ```bash
-uv run dstcalc --single-test-input tests/my_test.csv
-(eg. uv run dstcalc --single-test-input tests/test_2.csv)
+uv run pdst-calc --single-test-input tests/my_test.csv
+(eg. uv run pdst-calc --single-test-input tests/test_2.csv)
 ```
 
 #### Batch Testing
@@ -65,7 +65,7 @@ uv run dstcalc --single-test-input tests/my_test.csv
 Run multiple test cases from a CSV file:
 
 ```bash
-uv run dstcalc --test-input tests/batch_tests.csv --test-output results.log
+uv run pdst-calc --test-input tests/batch_tests.csv --test-output results.log
 
 ```
 
@@ -74,7 +74,7 @@ uv run dstcalc --test-input tests/batch_tests.csv --test-output results.log
 Bypass the interactive session name prompt:
 
 ```bash
-uv run dstcalc --session-name "experiment_001"
+uv run pdst-calc --session-name "experiment_001"
 ```
 
 ### 3. Combined Modes
@@ -83,10 +83,10 @@ You can combine different options:
 
 ```bash
 # Custom drug data + single test + custom session
-uv run dstcalc --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
+uv run pdst-calc --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
 
 # Batch testing with error logging
-uv run dstcalc --test-input tests/all_tests.csv --test-output test_results.log --session-name "batch_run"
+uv run pdst-calc --test-input tests/all_tests.csv --test-output test_results.log --session-name "batch_run"
 ```
 
 ## Input File Formats
@@ -150,7 +150,7 @@ All operations are logged to:
 
 If you have test files (e.g., in `tests/`):
 ```bash
-uv run pytest --cov=lib
+uv run pytest --cov=db
 ```
 
 ## Troubleshooting
@@ -162,7 +162,7 @@ uv run pytest --cov=lib
 
 ## Project Structure
 
-- `lib/src/` — Core logic, calculation functions, and data utilities
+- `db/src/` — Core logic, calculation functions, and data utilities
 - `app/cli/` — Command-line interface entry point (`main.py`)
 - `app/shiny/` — Shiny for Python web app
 - `data/` — Drug data CSV and reference files

@@ -1,5 +1,5 @@
 [project]
-name = "dstcalc"
+name = "pdst-calc"
 version = "0.1.0"
 description = "This tool provides a Drug Susceptibility Testing (DST) calculator with both a command-line interface (CLI) and a Shiny for Python web app."
 readme = "README.md"
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dstcalc = "app.cli.main:main"
+pdst-calc = "app.cli.main:main"
 
 # FIXME
 # [project.scripts]
@@ -32,7 +32,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["lib*", "app*"]
+include = ["db*", "app*"]
 
 [tool.ruff]
 line-length = 120

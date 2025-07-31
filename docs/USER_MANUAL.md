@@ -16,7 +16,7 @@ See the main [README.md](../README.md) for installation instructions and require
    ```bash
    uv run python app/cli/main.py
    # or simply:
-   uv run dstcalc
+   uv run pdst-calc
    ```
 3. Follow the prompts to select drugs by number. You can enter numbers separated by commas or spaces (e.g., `1,3,5` or `2 4 6`).
 4. If you enter an invalid number, you will see an error message (e.g., `44 is not in drug selection`).
