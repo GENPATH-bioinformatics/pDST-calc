@@ -1,6 +1,6 @@
 from shiny import App, ui, render
 import pandas as pd
-from core.drug_database import load_drug_data
+from db.src.drug_database import load_drug_data
 
 drug_df = load_drug_data()
 
