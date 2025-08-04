@@ -11,6 +11,25 @@ from lib.supp_calc import (
 import logging
 import os
 import csv
+import re
+
+num_drugs = 0
+
+def clean_filename(filename):
+    if not filename:
+        return "untitled"
+    
+    filename = str(filename)
+    invalid_chars = r'[<>:"|?*\\/\[\]{}()&%$#@!~`^]'
+    cleaned = re.sub(invalid_chars, '_', filename)
+    
+    # Replace multiple underscores with single underscore
+    cleaned = re.sub('_+', '_', cleaned)
+    
+    # Remove leading/trailing underscores and whitespace
+    cleaned = cleaned.strip('_ ')
+    
+    return cleaned
 
 # Expected field names for test input files
 EXPECTED_FIELDS = [
@@ -84,11 +103,13 @@ def main():
 
     # Get session name
     if args.session_name:
-        session_name = args.session_name
+        session_name = clean_filename(args.session_name)
     else:
         session_name = input("Enter a name for this session (e.g., your name or experiment ID): ").strip()
         if not session_name:
             session_name = "default"
+        else:
+            session_name = clean_filename(session_name)
     
     logger = setup_logger(session_name)
     logger.info(f"\nApplication started for session: {session_name}\n")
@@ -142,10 +163,14 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         selected_df = select_drugs(df, input_file=drugs_input, error_log=error_log)
         if selected_df is None:
             logger.error("Failed to select drugs from test input")
+            print("Failed to select drugs from test input")
             return
     else:
         selected_df = select_drugs(df)
 
+    global num_drugs
+    num_drugs = len(selected_df)
+    
     # Rename original column for clarity and add unit
     if 'Critical_Concentration' in selected_df.columns:
         selected_df.rename(columns={"Critical_Concentration": "Crit_Conc(mg/ml)"}, inplace=True)
@@ -162,6 +187,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
             print(f"\n[AUTO] Your Critical Concentration selection: {test_case.get('cc_values', '')}")
             # Handle custom critical values from test case
             custom_values = test_case.get('cc_values', '')
+            if (custom_values != num_drugs):
+                print(f"Number of custom critical values does not match number of selected drugs: {custom_values} != {num_drugs}")
+                return
             if custom_values:
                 values = [float(x.strip()) for x in custom_values.split(',') if x.strip()]
                 for idx, value in enumerate(values):
@@ -183,6 +211,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         if purchased_weights_input:
             weights = [float(x.strip()) for x in purchased_weights_input.split(',') if x.strip()]
             selected_df["PurMol_W(g/mol)"] = weights
+            if (len(weights) != num_drugs):
+                print(f"Number of purchased molecular weights does not match number of selected drugs: {len(weights)} != {num_drugs}")
+                return
     else:
         print("\nNow, please enter the purchased molecular weight for each selected drug.")
         purchased_weights(selected_df)
@@ -203,6 +234,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         stock_volumes_input = test_case.get('stock_vol', '')
         if stock_volumes_input:
             volumes = [float(x.strip()) for x in stock_volumes_input.split(',') if x.strip()]
+            if (len(volumes) != num_drugs):
+                print(f"Number of stock solution volumes does not match number of selected drugs: {len(volumes)} != {num_drugs}")
+                return
             selected_df["St_Vol(ml)"] = volumes
     else:
         print("\nFinally, enter desired stock solution volume (ml).")
@@ -217,6 +251,8 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         output_filename = input("\nEnter filename for drug weight output (e.g., drug_weights.txt): ").strip()
         if not output_filename:
             output_filename = "drug_weights.txt"
+        else:
+            output_filename = clean_filename(output_filename)
 
         # Create results directory in project root
         results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
@@ -244,6 +280,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         actual_weights_input = test_case.get('weighed_drug', '')
         if actual_weights_input:
             weights = [float(x.strip()) for x in actual_weights_input.split(',') if x.strip()]
+            if (len(weights) != num_drugs):
+                print(f"Number of actual weighed drug weights does not match number of selected drugs: {len(weights)} != {num_drugs}")
+                return
             selected_df["Act_DrugW(mg)"] = weights
     else:
         act_drugweight(selected_df)
@@ -257,6 +296,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         mgit_tubes_input = test_case.get('mgit_tubes', '')
         if mgit_tubes_input:
             tubes = [float(x.strip()) for x in mgit_tubes_input.split(',') if x.strip()]
+            if (len(tubes) != num_drugs):
+                print(f"Number of MGIT tubes does not match number of selected drugs: {len(tubes)} != {num_drugs}")
+                return
             selected_df["Total Mgit tubes"] = tubes
     else:
         print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
@@ -271,7 +313,7 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     
     # Prepare output file
     if test_case:
-        output_filename = test_case.get('final_results_filename', 'final_results.txt')
+        output_filename = clean_filename(test_case.get('final_results_filename', 'final_results.txt'))
 
         # Create results directory in project root
         results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
@@ -281,6 +323,8 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         output_filename = input("Enter filename for final results (e.g., final_results.txt): ").strip()
         if not output_filename:
             output_filename = "final_results.txt"
+        else:
+            output_filename = clean_filename(output_filename)
     
         
     # Write to output file
