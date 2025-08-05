@@ -73,19 +73,8 @@ def print_header():
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Logs:{Colors.END}    logs/pdst-calc-*.log                                               {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Results:{Colors.END} results/                                                           {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}╚══════════════════════════════════════════════════════════════════════════════╝{Colors.END}")
-    else:
-        # Fallback for terminals without color support
-        print(ascii_art)
-        print("╔══════════════════════════════════════════════════════════════════════════════╗")
-        print("║  Phenotypic Drug Susceptibility Testing Calculator                          ║")
-        print("║  Version: 1.0.0                                                              ║")
-        print(f"║  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}                                    ║")
-        print(f"║  Command: {' '.join(sys.argv)}                                        ║")
-        print("║  Logs:    logs/pdst-calc-*.log                                          ║")
-        print("║  Results: results/                                                           ║")
-        print("╚══════════════════════════════════════════════════════════════════════════════╝")
     
-    print()  # Empty line for spacing
+    print()
 
 def print_step(step_number, step_title):
     """Print a step with numbering and styling."""
