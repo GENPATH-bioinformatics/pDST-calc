@@ -29,7 +29,7 @@ The CLI supports multiple modes of operation:
 Run the CLI interactively, answering prompts as you go:
 
 ```bash
-uv run python src/cli/main.py
+uv run pdst-calc
 ```
 
 This will prompt you for:
@@ -48,7 +48,7 @@ This will prompt you for:
 Load drug data from a custom CSV file instead of the default database:
 
 ```bash
-uv run python src/cli/main.py --drug-data data/my_drugs.csv
+uv run pdst-calc --drug-data data/my_drugs.csv
 ```
 
 #### Single Test Input
@@ -56,8 +56,8 @@ uv run python src/cli/main.py --drug-data data/my_drugs.csv
 Run one automated test case from a CSV file:
 
 ```bash
-uv run python src/cli/main.py --single-test-input tests/my_test.csv
-(eg. uv run python src/cli/main.py --single-test-input tests/test_2.csv)
+uv run pdst-calc --single-test-input tests/my_test.csv
+(eg. uv run pdst-calc --single-test-input tests/test_2.csv)
 ```
 
 #### Batch Testing
@@ -65,7 +65,7 @@ uv run python src/cli/main.py --single-test-input tests/my_test.csv
 Run multiple test cases from a CSV file:
 
 ```bash
-uv run python src/cli/main.py --test-input tests/batch_tests.csv --test-output results.log
+uv run pdst-calc --test-input tests/batch_tests.csv --test-output results.log
 
 ```
 
@@ -74,7 +74,7 @@ uv run python src/cli/main.py --test-input tests/batch_tests.csv --test-output r
 Bypass the interactive session name prompt:
 
 ```bash
-uv run python src/cli/main.py --session-name "experiment_001"
+uv run pdst-calc --session-name "experiment_001"
 ```
 
 ### 3. Combined Modes
@@ -83,10 +83,10 @@ You can combine different options:
 
 ```bash
 # Custom drug data + single test + custom session
-uv run python src/cli/main.py --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
+uv run pdst-calc --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
 
 # Batch testing with error logging
-uv run python src/cli/main.py --test-input tests/all_tests.csv --test-output test_results.log --session-name "batch_run"
+uv run pdst-calc --test-input tests/all_tests.csv --test-output test_results.log --session-name "batch_run"
 ```
 
 ## Input File Formats
@@ -151,11 +151,11 @@ All operations are logged to:
 
 If you have test files (e.g., in `tests/`):
 ```bash
-uv run pytest --cov=src
+uv run pytest --cov=db
 ```
 
 ## Troubleshooting
-- **ModuleNotFoundError:** Make sure you set `PYTHONPATH=src` when running the Shiny app.
+- **ModuleNotFoundError:** Use `uv run` to automatically handle Python path and dependencies.
 - **Port already in use:** Use a different port with `--port`.
 - **Data not found:** Ensure your `drug_data.csv` is in the correct `data/` directory.
 - **Dependency issues:** Reinstall requirements with `pip install -r requirements.txt` or `pip install -e .`
@@ -163,9 +163,9 @@ uv run pytest --cov=src
 
 ## Project Structure
 
-- `src/core/` — Core logic, calculation functions, and data utilities
-- `src/cli/` — Command-line interface entry point (`main.py`)
-- `src/shinyapp/` — Shiny for Python web app
+- `db/src/` — Core logic, calculation functions, and data utilities
+- `app/cli/` — Command-line interface entry point (`main.py`)
+- `app/shiny/` — Shiny for Python web app
 - `data/` — Drug data CSV and reference files
 - `requirements.txt` — Python dependencies for development and quick setup
 - `setup.py` and `pyproject.toml` — Packaging and distribution configuration

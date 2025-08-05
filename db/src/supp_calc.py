@@ -1,6 +1,6 @@
 import logging
 logger = logging.getLogger("pdst-calc") 
-from core.dst_calc import *
+from db.src.dst_calc import *
 from tabulate import tabulate
 from cli.styling import print_input_prompt, print_success
 # Print and log
