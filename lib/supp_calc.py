@@ -97,11 +97,16 @@ def custom_critical_values(selected_df):
     """
     for idx, row in selected_df.iterrows():
         current_value = row['Crit_Conc(mg/ml)']
-        prompt = f"Enter critical value for {row['Drug']} (current: {current_value}): "
-        new_value = input(prompt).strip()
-        if new_value:
-            selected_df.at[idx, 'Crit_Conc(mg/ml)'] = float(new_value)
-
+        while True:
+            prompt = f"Enter critical value for {row['Drug']} (current: {current_value}): "
+            new_value = input(prompt).strip()
+            if new_value.isdigit() and float(new_value) > 0:
+                selected_df.at[idx, 'Crit_Conc(mg/ml)'] = float(new_value)
+                break
+            else:
+                print("Invalid input. Please enter a positive numeric value.")
+                continue
+            
 def purchased_weights(selected_df):
     """
     Prompt the user to enter purchased molecular weights for each selected drug.
