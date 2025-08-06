@@ -1,9 +1,9 @@
 import logging
-logger = logging.getLogger("pdst-calc") 
+logger = logging.getLogger("pdst-calc")
 from lib.dst_calc import *
 from tabulate import tabulate
 # Print and log
-def print_and_log_tabulate(df, *args, **kwargs):    
+def print_and_log_tabulate(df, *args, **kwargs):
     """
     Print a DataFrame as a formatted table and log it to the logger.
     Args:
@@ -58,6 +58,11 @@ def select_drugs(df, input_file=None, error_log=None):
             print(msg)
             if error_log is not None:
                 error_log.write(msg + '\n')
+        
+        # If there are invalid numbers and we're in test mode, return None
+        if invalid_numbers and input_file is not None:
+            return None
+        
         if not selected_drugs:
             msg = "No valid drugs selected. Please try again.\n"
             print(msg)
@@ -161,7 +166,7 @@ def cal_potency(selected_df):
     selected_df['Potency'] = potencies
     selected_df['Est_DrugW(mg)'] = est_drugweights
     logger.info("\n" + tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
-    
+
 
 def act_drugweight(selected_df):
     """
@@ -210,6 +215,7 @@ def cal_stockdil(selected_df):
     selected_df['Vol_Dil(ml)'] = vol_dils
     selected_df['Conc_st_dil(ug/ml)'] = conc_stockdiluent
 
+    # Only use columns that exist in the DataFrame
     summary_cols = [
         'Drug',
         'Est_DrugW(mg)',
@@ -217,7 +223,9 @@ def cal_stockdil(selected_df):
         'Vol_Dil(ml)',
         'Conc_st_dil(ug/ml)'
     ]
-    logger.info("\n" + tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
+    available_cols = [col for col in summary_cols if col in selected_df.columns]
+    if available_cols:
+        logger.info("\n" + tabulate(selected_df[available_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
 
 def mgit_tubes(selected_df):
     """
@@ -267,8 +275,11 @@ def cal_mgit_ws(selected_df):
             vol_st_lft = vol_ssleft(vol_stws,vol_st)
             
         except Exception as e:
-            vol_dil = None
-            conc_stdil = None
+            concentration_mgit = None
+            volume_ws = None
+            vol_stws = None
+            vol_dil_toadd = None
+            vol_st_lft = None
         conc_mgits.append(concentration_mgit)
         vol_ws.append(volume_ws)
         vol_ws_ali.append(vol_stws)
@@ -279,8 +290,9 @@ def cal_mgit_ws(selected_df):
     selected_df['WSol_Vol(ml)'] = vol_ws
     selected_df['Vol_WSol_ali(ml)'] = vol_ws_ali
     selected_df['Vol_Dil_Add(ml)'] = vol_diluents
-    selected_df['Vol_St_Left(ml)'] = vol_left 
-    
+    selected_df['Vol_St_Left(ml)'] = vol_left
+
+    # Only use columns that exist in the DataFrame
     summary_cols = [
         'Drug',
         'WSol_Conc_MGIT(ug/ml)',
@@ -289,4 +301,6 @@ def cal_mgit_ws(selected_df):
         'Vol_Dil_Add(ml)',
         'Vol_St_Left(ml)'
     ]
-    logger.info("\n" + tabulate(selected_df[summary_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
+    available_cols = [col for col in summary_cols if col in selected_df.columns]
+    if available_cols:
+        logger.info("\n" + tabulate(selected_df[available_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
