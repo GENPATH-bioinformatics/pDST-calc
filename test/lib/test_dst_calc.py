@@ -1,7 +1,7 @@
 import unittest
 from hypothesis import given, strategies as st
 import math
-from lib.src import dst_calc
+from lib import dst_calc
 
 class TestDstCalc(unittest.TestCase):
     @given(st.floats(min_value=0.1, max_value=1000), st.floats(min_value=0.1, max_value=1000))

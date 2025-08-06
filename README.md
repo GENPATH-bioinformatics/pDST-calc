@@ -162,7 +162,7 @@ uv run pytest --cov=lib
 
 ## Project Structure
 
-- `lib/src/` — Core logic, calculation functions, and data utilities
+- `lib/` — Core logic, calculation functions, and data utilities
 - `app/cli/` — Command-line interface entry point (`main.py`)
 - `app/shiny/` — Shiny for Python web app
 - `data/` — Drug data CSV and reference files
