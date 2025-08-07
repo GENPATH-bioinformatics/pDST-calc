@@ -15,9 +15,7 @@ The testing framework includes:
 ### Prerequisites
 
 ```bash
-# Install the package with development dependencies
-pixi install
-# OR using uv directly:
+# Use uv directly:
 uv sync --group dev --group test --group lint
 ```
 
@@ -41,7 +39,7 @@ uv run pytest
 uv run pytest test/lib/test_dst_calc_hypothesis.py test/lib/test_supp_calc_hypothesis.py test/lib/test_drug_database_hypothesis.py
 
 # Run specific module tests
-pytest test/lib/test_dst_calc.py -v
+uv run pytest test/lib/test_dst_calc.py -v
 ```
 
 ## Available Test Commands
@@ -51,7 +49,7 @@ pytest test/lib/test_dst_calc.py -v
 **Fast Unit Tests (Development)**
 ```bash
 # Quick unit tests only (excludes hypothesis property-based tests)
-pytest test/lib/test_drug_database.py test/lib/test_dst_calc.py test/lib/test_supp_calc.py
+uv run pytest test/lib/test_drug_database.py test/lib/test_dst_calc.py test/lib/test_supp_calc.py
 ```
 
 **Comprehensive Testing**
@@ -64,9 +62,9 @@ uv run pytest
 
 **Unit Tests**
 ```bash
-pytest test/lib/test_dst_calc.py          # DST calculation unit tests
-pytest test/lib/test_drug_database.py     # Drug database unit tests
-pytest test/lib/test_supp_calc.py         # Supplementary calculation unit tests
+uv run pytest test/lib/test_dst_calc.py          # DST calculation unit tests
+uv run pytest test/lib/test_drug_database.py     # Drug database unit tests
+uv run pytest test/lib/test_supp_calc.py         # Supplementary calculation unit tests
 ```
 
 **Property-Based Tests (Hypothesis)**
@@ -80,10 +78,10 @@ uv run pytest test/lib/test_supp_calc_hypothesis.py       # Supp calc hypothesis
 
 *Note: Markers work when all dependencies (including hypothesis) are available*
 ```bash
-pytest -m 'not hypothesis'    # Unit tests only
-pytest -m hypothesis          # Hypothesis tests only
-pytest -m integration         # Integration tests only
-pytest -m 'not slow'          # Exclude slow tests
+uv run pytest -m 'not hypothesis'    # Unit tests only
+uv run pytest -m hypothesis          # Hypothesis tests only
+uv run pytest -m integration         # Integration tests only
+uv run pytest -m 'not slow'          # Exclude slow tests
 ```
 
 ## Test Structure
@@ -215,7 +213,7 @@ The testing setup is designed to work in CI environments:
 ### Common Issues
 
 1. **Import errors**: Ensure you're running from the package root directory
-2. **Missing dependencies**: Run `pixi install` or `uv sync --group dev --group test`
+2. **Missing dependencies**: Run `uv sync --group dev --group test`
 3. **Hypothesis slow**: Use unit tests only for development: `pytest test/lib/test_*.py`
 4. **ModuleNotFoundError for hypothesis**: This is expected when running unit tests with filtering - use file-specific commands instead
 
@@ -231,7 +229,7 @@ The testing setup is designed to work in CI environments:
 ### Development Workflow
 1. **During active development**: Use unit tests only for fast feedback
    ```bash
-   pytest test/lib/test_dst_calc.py
+   uv run pytest test/lib/test_dst_calc.py
    ```
 
 2. **Before committing**: Run all tests to ensure comprehensive coverage
@@ -241,7 +239,7 @@ The testing setup is designed to work in CI environments:
 
 3. **Debugging specific issues**: Run individual test methods
    ```bash
-   pytest test/lib/test_dst_calc.py::TestDstCalc::test_potency_calculation -v
+   uv run pytest test/lib/test_dst_calc.py::TestDstCalc::test_potency_calculation -v
    ```
 
 ### Test Organization
