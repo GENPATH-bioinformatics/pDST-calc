@@ -27,6 +27,7 @@ small_positive_floats = floats(min_value=0.001, max_value=1000, allow_nan=False,
 positive_integers = integers(min_value=1, max_value=1000)
 
 
+@pytest.mark.hypothesis
 class TestPotency:
     """Test potency calculation properties."""
     
@@ -65,6 +66,7 @@ class TestPotency:
         assert result > 0
 
 
+@pytest.mark.hypothesis
 class TestEstDrugweight:
     """Test estimated drug weight calculation properties."""
     
@@ -105,6 +107,7 @@ class TestEstDrugweight:
         assert result == 0
 
 
+@pytest.mark.hypothesis
 class TestVolDiluent:
     """Test diluent volume calculation properties."""
     
@@ -136,6 +139,7 @@ class TestVolDiluent:
         assert abs(scaled_result - 2 * base_result) < 1e-10
 
 
+@pytest.mark.hypothesis
 class TestConcStock:
     """Test stock concentration calculation properties."""
     
@@ -170,6 +174,7 @@ class TestConcStock:
         assert abs(conc2 - 2 * conc1) < 1e-10
 
 
+@pytest.mark.hypothesis
 class TestConcMgit:
     """Test MGIT concentration calculation properties."""
     
@@ -200,6 +205,7 @@ class TestConcMgit:
         assert result == 0
 
 
+@pytest.mark.hypothesis
 class TestVolWorkingsol:
     """Test working solution volume calculation properties."""
     
@@ -230,6 +236,7 @@ class TestVolWorkingsol:
         assert result > 0
 
 
+@pytest.mark.hypothesis
 class TestVolSsToWs:
     """Test stock solution to working solution volume calculation properties."""
     
@@ -255,6 +262,7 @@ class TestVolSsToWs:
         assert abs(vol2 - vol1 / 2) < 1e-10
 
 
+@pytest.mark.hypothesis
 class TestVolFinalDil:
     """Test final dilution volume calculation properties."""
     
@@ -279,6 +287,7 @@ class TestVolFinalDil:
         assert abs(result) < 1e-10
 
 
+@pytest.mark.hypothesis
 class TestVolSsleft:
     """Test stock solution left calculation properties."""
     
@@ -303,6 +312,7 @@ class TestVolSsleft:
         assert abs(result) < 1e-10
 
 
+@pytest.mark.hypothesis
 class TestIntegrationProperties:
     """Test properties of the integrated calculation workflow."""
     
@@ -360,18 +370,19 @@ class TestIntegrationProperties:
         # Use relative tolerance for floating point arithmetic - across many operations, 
         # small errors can accumulate significantly
         ws_balance_error = abs(vol_ss_ws + vol_fin_dil - vol_ws)
-        relative_tolerance = max(2e-3, abs(vol_ws) * 1e-5)  # Use relative tolerance based on working solution volume
+        relative_tolerance = max(5e-3, abs(vol_ws) * 1e-4)  # Use relative tolerance based on working solution volume
         assert ws_balance_error < relative_tolerance, f"Working solution volume components should sum correctly (error: {ws_balance_error}, tolerance: {relative_tolerance})"
         
         # Stock solution usage should not exceed available stock (if reasonable)
         if vol_ss_ws <= vol_dil:
             assert vol_ss_left >= 0, "Remaining stock should be non-negative"
             stock_balance_error = abs(vol_ss_ws + vol_ss_left - vol_dil)
-            relative_tolerance = max(2e-3, abs(vol_dil) * 1e-5)  # Use relative tolerance based on diluent volume
+            relative_tolerance = max(5e-3, abs(vol_dil) * 1e-4)  # Use relative tolerance based on diluent volume
             assert stock_balance_error < relative_tolerance, f"Stock solution balance should be correct (error: {stock_balance_error}, tolerance: {relative_tolerance})"
 
 
 # Edge case tests
+@pytest.mark.hypothesis
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
     

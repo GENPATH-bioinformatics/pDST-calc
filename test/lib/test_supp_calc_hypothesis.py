@@ -62,6 +62,7 @@ def create_sample_dataframe(records):
     return df
 
 
+@pytest.mark.hypothesis
 class TestPrintAndLogFunctions:
     """Test printing and logging utility functions."""
     
@@ -110,6 +111,7 @@ class TestPrintAndLogFunctions:
             assert mock_logger.info.called
 
 
+@pytest.mark.hypothesis
 class TestSelectDrugs:
     """Test drug selection functionality."""
     
@@ -184,6 +186,7 @@ class TestSelectDrugs:
         assert result is None
 
 
+@pytest.mark.hypothesis
 class TestCalculationFunctions:
     """Test calculation functions with DataFrame inputs."""
     
@@ -279,6 +282,7 @@ class TestCalculationFunctions:
                 # This is a realistic scenario, so we don't require it to be non-negative
 
 
+@pytest.mark.hypothesis
 class TestInputValidation:
     """Test input validation and error handling."""
     
@@ -346,6 +350,7 @@ class TestInputValidation:
                     assert abs(ws_total - expected_total) < 1e-10
 
 
+@pytest.mark.hypothesis
 class TestIntegrationProperties:
     """Test integration properties across the entire calculation workflow."""
     
@@ -415,6 +420,7 @@ class TestIntegrationProperties:
                 assert df.iloc[i]['Potency'] > 0
 
 
+@pytest.mark.hypothesis
 class TestErrorHandling:
     """Test error handling in calculation functions."""
     
@@ -453,6 +459,7 @@ class TestErrorHandling:
         assert 'Potency' in df.columns
 
 
+@pytest.mark.hypothesis
 class TestDataFrameManipulation:
     """Test DataFrame manipulation properties."""
     

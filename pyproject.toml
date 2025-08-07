@@ -94,7 +94,7 @@ files.extend-exclude = ["*.ipynb"]
 default-groups = ["dev", "lint", "test"]
 
 [tool.pytest.ini_options]
-addopts = "--maxfail=1 --cov=lib --cov-report=term --cov-report=html"
+addopts = "--maxfail=1"
 testpaths = ["test"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]

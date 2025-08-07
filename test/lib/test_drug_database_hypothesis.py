@@ -53,6 +53,7 @@ drug_record = st.fixed_dictionaries({
 })
 
 
+@pytest.mark.hypothesis
 class TestLoadDrugData:
     """Test load_drug_data function properties."""
     
@@ -197,6 +198,7 @@ class TestLoadDrugData:
             os.unlink(temp_path)
 
 
+@pytest.mark.hypothesis
 class TestDataValidationProperties:
     """Test properties of loaded drug data validation."""
     
@@ -249,6 +251,7 @@ class TestDataValidationProperties:
             os.unlink(temp_path)
 
 
+@pytest.mark.hypothesis
 class TestErrorHandling:
     """Test error handling properties."""
     
@@ -299,6 +302,7 @@ class TestErrorHandling:
             os.unlink(temp_path)
 
 
+@pytest.mark.hypothesis
 class TestDefaultFilePath:
     """Test default file path behavior."""
     
@@ -331,6 +335,7 @@ class TestDefaultFilePath:
             pass
 
 
+@pytest.mark.hypothesis
 class TestBoundaryConditions:
     """Test boundary conditions and edge cases."""
     
