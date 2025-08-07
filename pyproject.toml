@@ -22,10 +22,6 @@ dependencies = [
 [project.scripts]
 pdst-calc = "app.cli.main:main"
 
-# FIXME
-# [project.scripts]
-# hello = "example:hello"
-
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -95,10 +91,20 @@ convention = "google"
 files.extend-exclude = ["*.ipynb"]
 
 [tool.uv]
-default-groups = ["dev", "lint"]
+default-groups = ["dev", "lint", "test"]
 
 [tool.pytest.ini_options]
-addopts = "--maxfail=1 --cov=testing_demo"
+addopts = "--maxfail=1"
+testpaths = ["test"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests for individual functions",
+    "integration: Integration tests for workflow",
+    "hypothesis: Property-based tests using Hypothesis",
+    "slow: Tests that take longer to run",
+]
 
 
 [dependency-groups]
@@ -106,6 +112,7 @@ dev = [
     "nbwipers>=0.6.1",
     "pytest>=8",
     "pytest-cov>=6.0.0",
+    "pytest-watch>=4.2.0",
     "pre-commit>=4.1.0",
     "typos>=1.29.4",
     "pandas>=2.3.1",
@@ -114,7 +121,16 @@ dev = [
     "openpyxl>=3.1.5",
     "hypothesis>=6.135.32",
     "tabulate>=0.9.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
 ]
 lint = [
     "ruff>=0.9.3",
+]
+test = [
+    "pytest>=8",
+    "pytest-cov>=6.0.0",
+    "pytest-watch>=4.2.0",
+    "hypothesis>=6.135.32",
 ]

@@ -151,7 +151,7 @@ All operations are logged to:
 
 If you have test files (e.g., in `tests/`):
 ```bash
-uv run pytest --cov=db
+uv run pytest --cov=lib
 ```
 
 ## Troubleshooting
@@ -163,7 +163,7 @@ uv run pytest --cov=db
 
 ## Project Structure
 
-- `db/src/` — Core logic, calculation functions, and data utilities
+- `lib/` — Core logic, calculation functions, and data utilities
 - `app/cli/` — Command-line interface entry point (`main.py`)
 - `app/shiny/` — Shiny for Python web app
 - `data/` — Drug data CSV and reference files

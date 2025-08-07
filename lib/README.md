@@ -1,7 +1,7 @@
-# db/src Directory
+# lib Directory
 
 ```
-───db/src/
+───lib/
     ├── __init__.py           # Package initialization and version
     ├── drug_database.py      # Drug database loading functions
     ├── dst_calc.py           # Core calculation functions
