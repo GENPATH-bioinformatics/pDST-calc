@@ -97,8 +97,8 @@ Test input files should be semicolon-separated with these columns:
 
 ```csv
 id;logfile_name;selected_numerals;reselect_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;results_filename;weighed_drug;mgit_tubes;final_results_filename
-1;test1;1,2;2,3;y;1.0,1.5;300,310;10,10;results1.txt;9.8,10.2;2,2;final1.txt
-2;test2;3;4;n;;320;12;results2.txt;12.1;3;final2.txt
+1;test1;1,2;2,3;y;1.0,1.5;300,310;10,10;results1;9.8,10.2;2,2;final1
+2;test2;3;4;n;;320;12;results2;12.1;3;final2
 ```
 
 **Column Descriptions:**
@@ -135,6 +135,7 @@ id;logfile_name;selected_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;w
 All operations are logged to:
 - **Console output**: Real-time progress and results
 - **Log files**: `logs/pdst-calc-{session_name}.log` in the project root
+- **Output files**: `results/{filename}.txt` 
 
 ## Command Line Arguments
 
