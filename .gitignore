@@ -36,3 +36,11 @@ coverage.xml
 .venv
 ENV/
 venv/
+
+# Logs
+logs/   
+*.log
+
+# Temp files
+output/
+results/

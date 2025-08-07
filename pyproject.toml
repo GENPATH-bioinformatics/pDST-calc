@@ -1,3 +1,120 @@
+[project]
+name = "pdst-calc"
+version = "0.1.0"
+description = "This tool provides a Drug Susceptibility Testing (DST) calculator with both a command-line interface (CLI) and a Shiny for Python web app."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Bea Loubser"}
+]
+dependencies = [
+    "dso-core>=0.9",
+    "hypothesis>=6.135.32",
+    "ipykernel>=6.29.5",
+    "numpy>=2.2.6",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.1",
+    "pytest>=8.4.1",
+    "shiny>=1.4.0",
+    "tabulate>=0.9.0",
+]
+
+[project.scripts]
+pdst-calc = "app.cli.main:main"
+
+# FIXME
+# [project.scripts]
+# hello = "example:hello"
+
 [build-system]
 requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta" 
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["db*", "app*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+  "B",      # flake8-bugbear
+  "BLE",    # flake8-blind-except
+  "C4",     # flake8-comprehensions
+  "D",      # pydocstyle
+  "E",      # Error detected by Pycodestyle
+  "F",      # Errors detected by Pyflakes
+  "I",      # isort
+  "RUF100", # Report unused noqa directives
+  "TID",    # flake8-tidy-imports
+  "UP",     # pyupgrade
+  "W",      # Warning detected by Pycodestyle
+]
+ignore = [
+  # Errors from function calls in argument defaults. These are fine when the result is immutable.
+  "B008",
+  # Missing docstring in public module
+  "D100",
+  # Missing docstring in public package
+  "D104",
+  # __magic__ methods are are often self-explanatory, allow missing docstrings
+  "D105",
+  # Missing docstring in __init__
+  "D107",
+  ## Disable one in each pair of mutually incompatible rules
+  # We don’t want a blank line before a class docstring
+  "D203",
+  # We want docstrings to start immediately after the opening triple quote
+  "D213",
+  # first line should end with a period [Bug: doesn't work with single-line docstrings]
+  "D400",
+  # First line should be in imperative mood; try rephrasing
+  "D401",
+  # line too long -> we accept long comment lines; black gets rid of long code lines
+  "E501",
+  # Do not assign a lambda expression, use a def -> lambda expression assignments are convenient
+  "E731",
+  # allow I, O, l as variable names -> I is the identity matrix
+  "E741",
+]
+unfixable = [ "F841" ]
+
+
+[tool.ruff.lint.per-file-ignores]
+"!pdst_calc/**.py" = ["ANN", "D", "S101", "PLR2004", "T20"]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.typos]
+files.extend-exclude = ["*.ipynb"]
+
+[tool.uv]
+default-groups = ["dev", "lint"]
+
+[tool.pytest.ini_options]
+addopts = "--maxfail=1 --cov=testing_demo"
+
+
+[dependency-groups]
+dev = [
+    "nbwipers>=0.6.1",
+    "pytest>=8",
+    "pytest-cov>=6.0.0",
+    "pre-commit>=4.1.0",
+    "typos>=1.29.4",
+    "pandas>=2.3.1",
+    "shiny>=1.4.0",
+    "numpy>=2.2.6",
+    "openpyxl>=3.1.5",
+    "hypothesis>=6.135.32",
+    "tabulate>=0.9.0",
+]
+lint = [
+    "ruff>=0.9.3",
+]
