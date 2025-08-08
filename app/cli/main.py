@@ -375,9 +375,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
         output_file.write("\nFinal Values:\n")
         
         for idx, row in selected_df.iterrows():
-            result_line = f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml"
-            logger.info(f"\n  - {row['Drug']}:Volume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml, and volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml\n")    
-            print(f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml")
+            result_line = f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml,\n\tand volume of remaining stock solution is {round(row['Vol_St_Left(ml)'],8)} ml"
+            logger.info(f"\n  - {row['Drug']}:Volume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml, and volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml, and volume of remaining stock solution is {round(row['Vol_St_Left(ml)'],8)} ml\n")    
+            print(f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of diluent to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml,\n\tand volume of remaining stock solution is {round(row['Vol_St_Left(ml)'],8)} ml")
             output_file.write(result_line + "\n")
         
         output_file.write("\n----------------------------\n")
