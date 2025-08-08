@@ -100,7 +100,7 @@ def print_help_text():
     
     📁 OUTPUT LOCATIONS:
     • Logs: logs/pdst-calc-{session_name}.log
-    • Results: results/{filename}.txt (automatically adds .txt extension)
+    • Results: results/{filename}.txt
     
     💡 TIPS:
     • Use 'all' to select all drugs at once
