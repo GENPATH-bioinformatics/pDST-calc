@@ -1,0 +1,1 @@
+ uv run shiny run app/shiny/app.py --port 8001

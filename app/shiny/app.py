@@ -254,7 +254,7 @@ with ui.layout_sidebar():
                                 ),
                                 style="overflow-x: auto; max-width: 100%;"
                             ),
-                            ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #d10000; margin-top: 30px; margin-bottom: 15px;")
+                            ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #1e90ff; margin-top: 30px; margin-bottom: 15px; font-weight: bold;")
                         )
                 
             except Exception as e:
