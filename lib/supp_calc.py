@@ -266,8 +266,8 @@ def act_drugweight(selected_df):
                         est_weight = selected_df.at[idx, 'Est_DrugW(mg)']
                         if est_weight is not None:
                             diff_percent = abs(drugweight - est_weight) / est_weight * 100
-                            if diff_percent > 20:  # More than 20% difference
-                                print_warning(f"Actual weight ({drugweight} mg) differs significantly from estimated weight ({est_weight} mg) by {diff_percent:.1f}%. Please verify your measurement.")
+                            if diff_percent > 200:  # More than 200% difference
+                                print_warning(f"Actual weight ({drugweight:.3f} mg) differs significantly from estimated weight ({est_weight:.3f} mg) by {diff_percent:.1f}%. Please verify your measurement.")
                                 confirm = input("Do you want to continue with this value? (y/n): ").strip().lower()
                                 if confirm != 'y':
                                     continue
@@ -344,7 +344,10 @@ def mgit_tubes(selected_df):
         for idx, row in selected_df.iterrows():
             while True:
                 try:
-                    value = input(f"Enter number of MGIT tubes to be done for {row['Drug']}: ").strip()
+                    # Show input prompt
+                    prompt = f"Enter number of MGIT tubes to be done for {row['Drug']}: "
+                    
+                    value = input(prompt).strip()
                     logger.info(f"\nNumber of MGIT tubes entered for {row['Drug']}: {value} \n ")
                     num = float(value)
                     
@@ -357,6 +360,41 @@ def mgit_tubes(selected_df):
                     if num != int(num):
                         print_warning(f"Number of MGIT tubes should be a whole number. You entered {num}. This will be rounded to {int(num)}.")
                         num = int(num)
+                    
+                    # Validate that the number of tubes won't result in negative diluent volume
+                    try:
+                        # Get required values for calculation
+                        cc_val = float(row.get('Crit_Conc(mg/ml)'))
+                        concentration_mgit = conc_mgit(cc_val)
+                        conc_st = float(row.get('Conc_st_dil(ug/ml)'))
+                        
+                        # Calculate working solution volume
+                        volume_ws = vol_workingsol(num)
+                        
+                        # Calculate required stock solution volume
+                        vol_stws = vol_ss_to_ws(volume_ws, concentration_mgit, conc_st)
+                        
+                        # Calculate diluent volume
+                        vol_dil_toadd = vol_final_dil(vol_stws, volume_ws)
+                        
+                        # Check if diluent volume would be negative
+                        if vol_dil_toadd < 0:
+                            print_error(f"Number of MGIT tubes ({num}) is too high for {row['Drug']}. This would result in a negative diluent volume ({vol_dil_toadd:.3f} ml).")
+                            
+                            # Calculate a rough estimate of maximum tubes for guidance
+                            try:
+                                max_tubes_estimate = int((conc_st / concentration_mgit - 0.36) / 0.12)
+                                if max_tubes_estimate > 0:
+                                    print_error(f"Maximum recommended tubes for {row['Drug']}: {max_tubes_estimate}")
+                                else:
+                                    print_error(f"Stock solution for {row['Drug']} is too concentrated for any MGIT tubes.")
+                            except:
+                                print_error(f"Stock solution for {row['Drug']} is too concentrated for the requested number of tubes.")
+                            continue
+                    
+                    except Exception as e:
+                        # If calculation fails, still allow the input but warn
+                        print_warning(f"Could not validate MGIT tube count for {row['Drug']}: {str(e)}")
                     
                     num_mgit.append(num)
                     print_success(f"Number of MGIT tubes set to {num}")
