@@ -3,7 +3,6 @@ logger = logging.getLogger("pdst-calc")
 from lib.dst_calc import *
 from tabulate import tabulate
 from app.cli.styling import print_input_prompt, print_success
-
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):
     """
