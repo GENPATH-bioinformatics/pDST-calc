@@ -69,7 +69,7 @@ def print_header():
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.YELLOW}Phenotypic Drug Susceptibility Testing Calculator{Colors.END}                           {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Version:{Colors.END} 1.0.0                                                              {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Started:{Colors.END} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}                                                {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
-        print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Command:{Colors.END} {' '.join(sys.argv)}                                                    {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
+        print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Command:{Colors.END} {' '.join(sys.argv)}              {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Logs:{Colors.END}    logs/pdst-calc-*.log                                               {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}║{Colors.END}  {Colors.CYAN}Results:{Colors.END} results/                                                           {Colors.BOLD}{Colors.GREEN}║{Colors.END}")
         print(f"{Colors.BOLD}{Colors.GREEN}╚══════════════════════════════════════════════════════════════════════════════╝{Colors.END}")
