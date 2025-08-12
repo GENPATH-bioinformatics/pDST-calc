@@ -147,7 +147,7 @@ with ui.layout_sidebar():
                                     f"purchased_molw_{i}",
                                     "",
                                     value=row_data['OrgMolecular_Weight'],
-                                    min=0,
+                                    min=row_data['OrgMolecular_Weight'],
                                     step=0.01
                                 ),
                                 style="padding: 5px; border: 1px solid #ddd; width: 120px;"
@@ -187,7 +187,7 @@ with ui.layout_sidebar():
                     # Get stock volume
                     stock_vol = input[f"stock_volume_{i}"]()
                     if stock_vol is None or stock_vol <= 0:
-                        return ui.tags.div("Please enter valid stock volumes for all drugs.")
+                        return ui.tags.div("Please enter valid stock volumes for all drugs.", style="color: red;")
                     stock_volumes.append(stock_vol)
                     
                     # Get original molecular weight
@@ -196,13 +196,13 @@ with ui.layout_sidebar():
                     # Get purchased molecular weight
                     purch_molw = input[f"purchased_molw_{i}"]()
                     if purch_molw is None or purch_molw <= 0 or purch_molw < org_molw:
-                        return ui.tags.div("Please enter valid purchased molecular weights for all drugs.")
+                        return ui.tags.div("Please enter valid purchased molecular weights for all drugs.", style="color: red;")
                     purchased_mol_weights.append(purch_molw)
                     
                     # Get custom critical value
                     custom_crit = input[f"custom_critical_{i}"]()
                     if custom_crit is None or custom_crit <= 0:
-                        return ui.tags.div("Please enter valid critical concentrations for all drugs.")
+                        return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: red;")
                     custom_critical_values.append(custom_crit)
                 
                 if calculate_clicked():
@@ -262,6 +262,38 @@ with ui.layout_sidebar():
         
         return ui.tags.div()
     
+    # Function to validate all inputs
+    def validate_inputs():
+        selected = input.drug_selection()
+        if not selected:
+            return False
+        
+        try:
+            drug_data = load_drug_data()
+            
+            for i, drug_name in enumerate(selected):
+                # Get stock volume
+                stock_vol = input[f"stock_volume_{i}"]()
+                if stock_vol is None or stock_vol <= 0:
+                    return False
+                
+                # Get original molecular weight
+                org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
+                
+                # Get purchased molecular weight
+                purch_molw = input[f"purchased_molw_{i}"]()
+                if purch_molw is None or purch_molw <= 0 or purch_molw < org_molw:
+                    return False
+                
+                # Get custom critical value
+                custom_crit = input[f"custom_critical_{i}"]()
+                if custom_crit is None or custom_crit <= 0:
+                    return False
+            
+            return True
+        except:
+            return False
+
     # Action buttons
     @render.ui
     def action_buttons():
@@ -272,13 +304,21 @@ with ui.layout_sidebar():
                 style="text-align: center; margin-top: 30px;"
             )
         else:
-            # Check if calculate button has been clicked to show different button text
-            button_text = "Enter Actual drug weights" if calculate_clicked() else "Calculate drug weights"
-            return ui.tags.div(
-                ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                ui.input_action_button("calculate_btn", button_text, class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
-                style="text-align: center; margin-top: 30px;"
-            )
+            # Only show calculate button if all inputs are valid
+            if validate_inputs():
+                # Check if calculate button has been clicked to show different button text
+                button_text = "Enter Actual drug weights" if calculate_clicked() else "Calculate drug weights"
+                return ui.tags.div(
+                    ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                    ui.input_action_button("calculate_btn", button_text, class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
+                    style="text-align: center; margin-top: 30px;"
+                )
+            else:
+                # Show only back button if validation fails
+                return ui.tags.div(
+                    ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
+                    style="text-align: center; margin-top: 30px;"
+                )
 
 # Reactive functions
 @reactive.effect
