@@ -3,8 +3,7 @@ logger = logging.getLogger("pdst-calc")
 # Use absolute import instead of relative import for standalone package
 try:
     from dst_calc import *
-except ImportError:
-    # Fallback for when used as part of a larger package
+except:
     from .dst_calc import *
 from tabulate import tabulate
 

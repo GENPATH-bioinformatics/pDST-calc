@@ -39,6 +39,7 @@ class DatabaseManager:
                     CREATE TABLE IF NOT EXISTS session (
                         session_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_id INTEGER NOT NULL,
+                        session_name TEXT NOT NULL,
                         session_date TEXT DEFAULT CURRENT_TIMESTAMP,
                         preparation TEXT,  -- JSON string
                         FOREIGN KEY (user_id) REFERENCES users(user_id)

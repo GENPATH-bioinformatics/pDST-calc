@@ -5,7 +5,7 @@ Provides access to drug data from SQLite database.
 
 import pandas as pd
 from typing import Optional, List, Dict, Any
-from .database import db_manager
+from database import db_manager
 
 
 def load_drug_data(filepath=None):
