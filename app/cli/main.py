@@ -13,6 +13,7 @@ import logging
 import os
 import csv
 import re
+import signal
 
 num_drugs = 0
 
@@ -93,7 +94,13 @@ def setup_logger(session_name="default"):
 
     return logger
 
+def signal_handler(signum, frame):
+    print("\n\npDST-calc stopped, Goodbye!")
+    exit(0)
+
 def main():
+    signal.signal(signal.SIGINT, signal_handler)
+
     # Print cool header
     print_header()
     
@@ -108,62 +115,74 @@ def main():
     parser.add_argument('--session-name', type=str, help='Session name for logging (default: interactive prompt)')
     args = parser.parse_args()
 
-    # Get session name
-    if args.session_name:
-        session_name = clean_filename(args.session_name)
-        print_success(f"Using session name: {session_name}")
-    else:
-        print_input_prompt("Enter a name for this session", example="Name_Experiment_Date")
-        session_name = input("Session name: ").strip()
-        if not session_name:
-            session_name = "default"
+    try:
+        # Get session name
+        if args.session_name:
+            session_name = clean_filename(args.session_name)
+            print_success(f"Using session name: {session_name}")
         else:
-            session_name = clean_filename(session_name)
-    
-    logger = setup_logger(session_name)
-    logger.info(f"\nApplication started for session: {session_name}\n")
-
-    # Load drug data
-    print_step("0","Loading Drug Data")
-    if args.drug_data:
-        logger.info(f"Loading drug data from file: {args.drug_data}")
-        df = pd.read_csv(args.drug_data)
-        print_success(f"Drug data loaded from: {args.drug_data}")
-    else:
-        logger.info("Loading drug data from database")
-        df = load_drug_data()
-        print_success("Drug data loaded from database")
-
-    # Handle different modes
-    test_rows = []
-    error_log = None
-    
-    if args.single_test_input:
-        print_step("0","Single Test Mode")
-        # Single test input mode - run one test case
-        logger.info(f"Running single test with input file: {args.single_test_input}")
-        test_rows = parse_input_file(args.single_test_input)
-        if args.test_output:
-            error_log = open(args.test_output, 'w')
-            logger.info(f"Error log will be written to: {args.test_output}")
+            print_input_prompt("Enter a name for this session", example="Name_Experiment_Date")
+            session_name = input("Session name: ").strip()
+            if not session_name:
+                session_name = "default"
+            else:
+                session_name = clean_filename(session_name)
         
-        if test_rows:
-            # Use only the first row for single test
-            test_case = test_rows[0]
-            logger.info(f"Running single test case")
-            run_calculation(df, test_case, error_log, logger)
-            print_success("Single test completed successfully")
+        logger = setup_logger(session_name)
+        logger.info(f"\nApplication started for session: {session_name}\n")
+
+        # Load drug data
+        print_step("0","Loading Drug Data")
+        if args.drug_data:
+            logger.info(f"Loading drug data from file: {args.drug_data}")
+            df = pd.read_csv(args.drug_data)
+            print_success(f"Drug data loaded from: {args.drug_data}")
         else:
-            logger.error("No test data found in single test input file")
-            print_error("No test data found in single test input file")
+            logger.info("Loading drug data from database")
+            df = load_drug_data()
+            print_success("Drug data loaded from database")
+
+        # Handle different modes
+        test_rows = []
+        error_log = None
         
-        if error_log:
-            error_log.close()
-    else:
-        # Interactive mode
-        print_step("0","Interactive Mode")
-        run_calculation(df, None, None, logger)
-        print_success("Interactive session completed successfully")
+        if args.single_test_input:
+            print_step("0","Single Test Mode")
+            # Single test input mode - run one test case
+            logger.info(f"Running single test with input file: {args.single_test_input}")
+            test_rows = parse_input_file(args.single_test_input)
+            if args.test_output:
+                error_log = open(args.test_output, 'w')
+                logger.info(f"Error log will be written to: {args.test_output}")
+            
+            if test_rows:
+                # Use only the first row for single test
+                test_case = test_rows[0]
+                logger.info(f"Running single test case")
+                run_calculation(df, test_case, error_log, logger)
+                print_success("Single test completed successfully")
+            else:
+                logger.error("No test data found in single test input file")
+                print_error("No test data found in single test input file")
+            
+            if error_log:
+                error_log.close()
+        else:
+            # Interactive mode
+            print_step("0","Interactive Mode")
+            run_calculation(df, None, None, logger)
+            print_success("Interactive session completed successfully")
+            
+    except KeyboardInterrupt:
+        print("\n\npDST-calc stopped, Goodbye!")
+        exit(0)
+    except EOFError:
+        print("\n\npDST-calc stopped, Goodbye!")
+        exit(0)
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
+        print("pDST-calc terminated due to an error.")
+        exit(1)
 
 def run_calculation(df, test_case=None, error_log=None, logger=None):
     """
