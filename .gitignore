@@ -44,3 +44,8 @@ logs/
 # Temp files
 output/
 results/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
