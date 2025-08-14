@@ -1,4 +1,5 @@
---
+---
+
 title: 'pDST-Calc: A Python package for Phenotypic Drug Susceptibility Testing in Tuberculosis'
 tags:
   - python
@@ -23,7 +24,7 @@ authors:
     email: gvds@sun.ac.za
     affiliation: 1
 
-  - name: 'Emilyn Costa Conceição#'
+  - name: 'Emilyn Costa Conceição'
     orcid: 0000-0002-7445-6620
     email: emilyncosta@gmail.com
     affiliation: 1,3
