@@ -1,6 +1,11 @@
 import logging
 logger = logging.getLogger("pdst-calc")
-from .dst_calc import *
+# Use absolute import instead of relative import for standalone package
+try:
+    from dst_calc import *
+except ImportError:
+    # Fallback for when used as part of a larger package
+    from .dst_calc import *
 from tabulate import tabulate
 
 # Optional import from app.cli.styling with fallback implementations
