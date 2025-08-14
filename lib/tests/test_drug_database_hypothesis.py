@@ -15,10 +15,8 @@ from hypothesis import given, strategies as st, assume, settings
 from hypothesis.strategies import text, lists, floats, one_of, just
 import sys
 
-# Add the parent directory to sys.path to import lib modules
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
-from lib.drug_database import load_drug_data
+import drug_database
+from drug_database import load_drug_data
 
 
 # Strategies for generating test data
