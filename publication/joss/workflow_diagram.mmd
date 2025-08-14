@@ -1,0 +1,44 @@
+```mermaid
+flowchart TD
+    A[Session Initialization] --> B[Drug Selection<br/>22 WHO-standardized drugs]
+    B --> C{Custom Critical<br/>Concentrations?}
+    C -->|Yes| D[Input Critical<br/>Concentrations]
+    C -->|No| E[Use Default<br/>Concentrations]
+    D --> F[Input Purchased<br/>Molecular Weights]
+    E --> F
+    F --> G[Input Desired<br/>Stock Volumes]
+    
+    %% Calculation Phase 1
+    G --> H[Calculate Drug Potency<br/>mol_purch/mol_org]
+    H --> I[Calculate Estimated<br/>Drug Weight Required]
+    I --> J[Generate Weighing<br/>Instructions]
+    
+    %% Physical Laboratory Work
+    J --> K[Physical Drug Weighing<br/>Laboratory Work]
+    K --> L[Input Actual<br/>Drug Weights]
+    L --> M[Input Number of<br/>MGIT Tubes]
+    
+    %% Calculation Phase 2
+    M --> N[Calculate Diluent<br/>Volume Required]
+    N --> O[Calculate Stock<br/>Solution Concentration]
+    O --> P[Calculate MGIT<br/>Concentration<br/>8.4x dilution factor]
+    P --> Q[Calculate Working<br/>Solution Volume<br/>0.12mL × tubes + 0.36mL]
+    Q --> R[Calculate Stock to<br/>Working Solution Volume]
+    R --> S[Calculate Final<br/>Diluent Volume]
+    
+    %% Output Phase
+    S --> T[Generate Laboratory<br/>Protocols]
+    S --> U[Create Detailed<br/>Calculation Logs]
+    S --> V[Export CSV for<br/>Lab Systems]
+    
+    %% Styling
+    classDef inputPhase fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef calcPhase fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef labWork fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef outputPhase fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    
+    class A,B,C,D,E,F,G inputPhase
+    class H,I,N,O,P,Q,R,S calcPhase
+    class J,K,L,M labWork
+    class T,U,V outputPhase
+```

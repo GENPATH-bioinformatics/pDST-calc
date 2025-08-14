@@ -1,0 +1,40 @@
+pDST-Calc Workflow Diagram
+===========================
+
+Input Phase:
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Drug Selection│    │  Critical Conc. │    │ Purchased MW &  │
+│   (1-22 drugs)  │───▶│   (Optional)    │───▶│  Stock Volume   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+Calculation Phase 1:                                   ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Drug Potency    │    │ Estimated Drug  │    │   Output for    │
+│ Calculation     │───▶│ Weight Required │───▶│ Physical Weighing│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+Physical Laboratory Work:                              ▼
+┌─────────────────┐                           ┌─────────────────┐
+│  Actual Drug    │                           │    MGIT Tube    │
+│ Weights Input   │◀──────────────────────────│   Count Input   │
+└─────────────────┘                           └─────────────────┘
+        │                                              │
+        ▼                                              ▼
+Calculation Phase 2:
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Diluent Volume  │    │ Stock Solution  │    │ Working Solution│
+│ Calculation     │───▶│ Concentration   │───▶│   Preparation   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+Output Phase:                                          ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Laboratory-Ready│    │  Detailed Logs  │    │   CSV Export    │
+│   Protocols     │    │  & Audit Trail  │    │ for Lab Systems │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+
+Key Features:
+• Interactive CLI with input validation
+• Batch processing for high-throughput labs
+• Comprehensive error checking and logging
+• CSV import/export for integration
+• Supports 22 WHO-standardized anti-TB drugs
