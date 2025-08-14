@@ -1,8 +1,30 @@
 import logging
 logger = logging.getLogger("pdst-calc")
-from lib.dst_calc import *
+from .dst_calc import *
 from tabulate import tabulate
-from app.cli.styling import print_input_prompt, print_success, print_error, print_warning
+
+# Optional import from app.cli.styling with fallback implementations
+try:
+    from app.cli.styling import print_input_prompt, print_success, print_error, print_warning
+except ImportError:
+    # Fallback implementations for standalone library use
+    def print_input_prompt(message, example=None):
+        """Fallback implementation for input prompts."""
+        print(f"\n{message}")
+        if example:
+            print(f"Example: {example}")
+    
+    def print_success(message):
+        """Fallback implementation for success messages."""
+        print(f"✓ {message}")
+    
+    def print_error(message):
+        """Fallback implementation for error messages."""
+        print(f"✗ Error: {message}")
+    
+    def print_warning(message):
+        """Fallback implementation for warning messages."""
+        print(f"⚠ Warning: {message}")
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):
     """

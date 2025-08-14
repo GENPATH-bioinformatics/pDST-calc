@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdst-calc-lib"
+version = "0.1.1"
+description = "Drug Susceptibility Testing (DST) calculator library"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Abhinav Sharma"},
+    {name = "Bea Loubser"},
+    {name = "GENPATH-bioinformatics"}
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "tabulate"
+]
+keywords = ["drug-susceptibility", "testing", "DST", "MGIT", "tuberculosis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[project.urls]
+Homepage = "https://github.com/GENPATH-bioinformatics/genpath-pdst-calc"
+Repository = "https://github.com/GENPATH-bioinformatics/genpath-pdst-calc"
+Issues = "https://github.com/GENPATH-bioinformatics/genpath-pdst-calc/issues"
+
+[tool.setuptools]
+py-modules = ["dst_calc", "drug_database", "supp_calc"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*", "app*", "cli*"]

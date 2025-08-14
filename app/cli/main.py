@@ -1,14 +1,33 @@
 import argparse
 import pandas as pd
-from lib.drug_database import load_drug_data
-from lib.dst_calc import *
+# Import from published pdst-calc-lib package
+try:
+    # The published package exposes the modules directly
+    import drug_database
+    import dst_calc
+    import supp_calc
+    from drug_database import load_drug_data
+    from dst_calc import *
+    from supp_calc import (
+        print_and_log_tabulate, select_drugs, custom_critical_values, 
+        purchased_weights, stock_volume, cal_potency, act_drugweight,
+        cal_stockdil, mgit_tubes, cal_mgit_ws
+    )
+except ImportError:
+    # Fallback to relative imports for development
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
+    from drug_database import load_drug_data
+    from dst_calc import *
+    from supp_calc import (
+        print_and_log_tabulate, select_drugs, custom_critical_values, 
+        purchased_weights, stock_volume, cal_potency, act_drugweight,
+        cal_stockdil, mgit_tubes, cal_mgit_ws
+    )
+
 from tabulate import tabulate
-from lib.supp_calc import (
-    print_and_log_tabulate, select_drugs, custom_critical_values, 
-    purchased_weights, stock_volume, cal_potency, act_drugweight,
-    cal_stockdil, mgit_tubes, cal_mgit_ws
-)
-from app.cli.styling import (print_header, print_success, print_error, print_warning, print_step, print_completion, print_help_text, print_input_prompt)
+from styling import (print_header, print_success, print_error, print_warning, print_step, print_completion, print_help_text, print_input_prompt)
 import logging
 import os
 import csv
