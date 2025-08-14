@@ -5,7 +5,7 @@ description = "This tool provides a Drug Susceptibility Testing (DST) calculator
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    {name = "Bea Loubser"}
+    {name = "Bea Loubser"},
     {name = "Abhinav Sharma"}
 ]
 license = "MIT"
