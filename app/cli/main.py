@@ -50,6 +50,10 @@ def clean_filename(filename):
     # Remove leading/trailing underscores and whitespace
     cleaned = cleaned.strip('_ ')
     
+    # Return untitled if the cleaned string is empty
+    if not cleaned:
+        return "untitled"
+    
     return cleaned
 
 # Expected field names for test input files
