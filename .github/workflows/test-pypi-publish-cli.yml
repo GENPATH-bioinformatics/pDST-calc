@@ -57,17 +57,17 @@ jobs:
         
         # Update version in app/cli/pyproject.toml for this build
         python -c "
-import toml
-config = toml.load('app/cli/pyproject.toml')
-config['project']['version'] = '${DEV_VERSION}'
-# Update the library dependency to use the specific version
-for i, dep in enumerate(config['project']['dependencies']):
-    if dep.startswith('pdst-calc-lib'):
-        config['project']['dependencies'][i] = 'pdst-calc-lib==${LIBRARY_VERSION}'
-        break
-with open('app/cli/pyproject.toml', 'w') as f:
-    toml.dump(config, f)
-"
+        import toml
+        config = toml.load('app/cli/pyproject.toml')
+        config['project']['version'] = '${DEV_VERSION}'
+        # Update the library dependency to use the specific version
+        for i, dep in enumerate(config['project']['dependencies']):
+            if dep.startswith('pdst-calc-lib'):
+                config['project']['dependencies'][i] = 'pdst-calc-lib==${LIBRARY_VERSION}'
+                break
+        with open('app/cli/pyproject.toml', 'w') as f:
+            toml.dump(config, f)
+        "
         
         echo "Updated CLI version to: ${DEV_VERSION}"
         echo "Updated library dependency to: pdst-calc-lib==${LIBRARY_VERSION}"
