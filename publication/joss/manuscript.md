@@ -17,7 +17,7 @@ authors:
     equal-contrib: true
     corresponding: true
     affiliation: "1, 2"
-    email: abhinavsharma@sun.ac.za
+    email: abhi18av@outlook.com
 
   - name: "Bea Loubser"
     orcid: 0009-0000-9837-3339
@@ -65,6 +65,14 @@ Most web-based calculators only do one calculation at a time, not full workflow 
 
 # Background
 
+The color-coded flowchart below provides the same workflow information. The diagram uses color coding to distinguish different phases:
+- **Blue (Input Phase)**: Drug selection, critical concentrations, molecular weights
+- **Pink (Calculation Phases)**: Mathematical computations and algorithms
+- **Orange (Laboratory Work)**: Physical weighing and data input
+- **Green (Output Phase)**: Results generation and export
+
+
+
 ```mermaid
 flowchart TD
     A[Session Initialization] --> B[Drug Selection<br/>22 WHO-standardized drugs]
@@ -108,46 +116,6 @@ flowchart TD
     class H,I,N,O,P,Q,R,S calcPhase
     class J,K,L,M labWork
     class T,U,V outputPhase
-```
-
-
-```mermaid
-flowchart TD
-    %% Input Phase
-    A[Drug Selection] --> B[Critical Concentrations]
-    B --> C[Molecular Weights & Volumes]
-
-    %% Calculation Phase 1
-    C --> D[Drug Potency Calculation]
-    D --> E[Estimated Weight Calculation]
-    E --> F[Weighing Instructions]
-
-    %% Laboratory Work
-    F --> G[Physical Drug Weighing]
-    G --> H[Actual Weights Input]
-    H --> I[MGIT Tube Count]
-
-    %% Calculation Phase 2
-    I --> J[Diluent Volume Calculation]
-    J --> K[Stock Solution Concentration]
-    K --> L[Working Solution Preparation]
-
-    %% Output
-    L --> M[Laboratory Protocols]
-    L --> N[Calculation Logs]
-    L --> O[CSV Export]
-
-    %% Styling for phases
-    classDef input fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef calc fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef lab fill:#fff8e1,stroke:#f57c00,stroke-width:2px
-    classDef output fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-
-    class A,B,C input
-    class D,E,J,K,L calc
-    class F,G,H,I lab
-    class M,N,O output
-
 ```
 
 
