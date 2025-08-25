@@ -27,7 +27,7 @@ except ImportError:
     )
 
 from tabulate import tabulate
-from styling import (print_header, print_success, print_error, print_warning, print_step, print_completion, print_help_text, print_input_prompt)
+from .styling import (print_header, print_success, print_error, print_warning, print_step, print_completion, print_help_text, print_input_prompt)
 import logging
 import os
 import csv
