@@ -97,16 +97,6 @@ def print_and_log_tabulate(df, *args, **kwargs):
     print(table_str)
     logger.info("\n" + table_str + "\n")
 
-def print_table(df, *args, **kwargs):
-    """
-    Print a DataFrame as a formatted table using tabulate.
-    Args:
-        df (pd.DataFrame): DataFrame to print.
-        *args, **kwargs: Arguments passed to tabulate.
-    """
-    table_str = tabulate(df, *args, **kwargs)
-    print(table_str)
-
 def select_drugs(df, input_file=None, error_log=None):
     """
     Allow the user to select drugs from a DataFrame, either interactively or using a pre-supplied string for automated testing.

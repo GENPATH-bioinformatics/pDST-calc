@@ -62,22 +62,6 @@ def get_available_drugs() -> List[Dict[str, Any]]:
     except Exception as e:
         raise
 
-
-def get_drug_by_name(name: str) -> Optional[Dict[str, Any]]:
-    """Get a specific drug by name.
-    
-    Args:
-        name: Drug name to search for
-        
-    Returns:
-        Drug dictionary if found, None otherwise
-    """
-    try:
-        return db_manager.get_drug_by_name(name)
-    except Exception as e:
-        raise
-
-
 def add_drug(name: str, default_dilution: str = None, 
              default_molecular_weight: float = None, mol_max: float = None, 
              critical_value: float = None, available: bool = True) -> Optional[int]:
