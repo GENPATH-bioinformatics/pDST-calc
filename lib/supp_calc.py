@@ -3,6 +3,7 @@ logger = logging.getLogger("pdst-calc")
 # Use absolute import instead of relative import for standalone package
 try:
     from dst_calc import *
+
 except:
     from .dst_calc import *
 from tabulate import tabulate
@@ -28,7 +29,6 @@ except ImportError:
     def print_warning(message):
         """Fallback implementation for warning messages."""
         print(f"⚠ Warning: {message}")
-
 
 def format_session_data(selected_df, drugs, include_partial=True):
     """

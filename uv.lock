@@ -280,6 +280,7 @@ wheels = [
 ]
 
 [[package]]
+
 name = "billiard"
 version = "4.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2087,6 +2088,7 @@ name = "pdst-calc"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+
     { name = "bcrypt" },
     { name = "numpy" },
     { name = "openpyxl" },
@@ -2124,6 +2126,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+
     { name = "bcrypt", specifier = ">=4.3.0" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "openpyxl", specifier = ">=3.1.5" },

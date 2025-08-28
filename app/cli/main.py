@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 from datetime import datetime
+
 # Import from published pdst-calc-lib package
 try:
     # The published package exposes the modules directly
@@ -10,11 +11,13 @@ try:
     import auth
     from auth import register_user, login_user
     from drug_database import load_drug_data, get_or_create_session, update_session_data, get_available_drugs, get_user_sessions, get_session_data
+
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
         purchased_weights, stock_volume, cal_potency, act_drugweight,
         cal_stockdil, mgit_tubes, cal_mgit_ws, format_session_data
+
     )
 except ImportError:
     # Fallback to relative imports for development
@@ -24,6 +27,7 @@ except ImportError:
     import auth
     from auth import register_user, login_user
     from drug_database import load_drug_data, get_or_create_session, update_session_data, get_available_drugs, get_user_sessions, get_session_data
+
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
@@ -33,6 +37,7 @@ except ImportError:
 
 from tabulate import tabulate
 from .styling import (print_header, print_success, print_error, print_warning, print_step, print_completion, print_help_text, print_input_prompt)
+
 import logging
 import os
 import csv
@@ -144,7 +149,7 @@ def main():
     parser.add_argument('--test-output', type=str, help='Path to test output/error log file')
     parser.add_argument('--session-name', type=str, help='Session name for logging (default: interactive prompt)')
     args = parser.parse_args()
-
+    
     print_input_prompt("Login or create an account")
     username = input("Username: ").strip()
     password = getpass.getpass("Password: ").strip()
@@ -270,7 +275,7 @@ def main():
             print_step("","Interactive Mode")
             run_calculation(df, session_name, None, None, logger, user_id, resume_preparation)
             print_success("Interactive session completed successfully")
-            
+
     except KeyboardInterrupt:
         print("\n\npDST-calc stopped, Goodbye!")
         exit(0)
@@ -316,6 +321,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
     # 1) User selects desired drugs
     print_step("Step 1","Drug Selection")
+    
     # Build selected_df; if resuming, preselect drugs and prefill columns
     if resume_preparation:
         # Map preparation drug_ids back to names in df
@@ -343,6 +349,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
         print_success("Using prefilled drug selection from session:")
         for idx, row in selected_df.iterrows():
             print(f"  - {row['Drug']}")
+
     else:
         if test_case:
             drugs_input = test_case.get('selected_numerals')
@@ -364,12 +371,14 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
     # 1.3) Ask if user wants to enter their own critical values
     print_step("Step 2","Critical Values")
+
     if resume_preparation:
         print_success("Using prefilled critical values from session:")
         for idx, row in selected_df.iterrows():
             print(f"  - {row['Drug']}: {row.get('Crit_Conc(mg/ml)', 'N/A')} mg/ml")
     else:
         if test_case:
+
             custom_critical_response = test_case.get('own_cc', 'n')
         else:
             response = input("\nWould you like to enter your own critical values for any of the selected drugs? (y/n): ").strip().lower()
@@ -383,6 +392,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
             else:
                 print("\nNow, please enter the critical concentration for each selected drug.")
                 custom_values = input("Critical Concentration: ").strip()
+
             if (custom_values != num_drugs):
                 print(f"Number of custom critical values does not match number of selected drugs: {custom_values} != {num_drugs}")
                 return
@@ -402,6 +412,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
     # 2) Prompt user to enter purchased molecular weight for each drug
     print_step("Step 3","Purchased Molecular Weights")
+
     if not resume_preparation:
         if test_case:
             print(f"\n[AUTO] Your Purchased Molecular Weight selection: {test_case.get('purch_mol_weights', '')}")
@@ -421,7 +432,6 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
             print(f"  - {row['Drug']}: {row.get('PurMol_W(g/mol)', 'N/A')} g/mol")
     # Purchased molecular weights entered (success messages handled in supp_calc.py)
 
-
     # Reorder columns so PurMol_W(g/mol) is next to OrgMol_W(g/mol)
     cols = list(selected_df.columns)
     if 'OrgMol_W(g/mol)' in cols and 'PurMol_W(g/mol)' in cols:
@@ -434,6 +444,8 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
     # 3) Prompt user to enter desired stock solution volume
     print_step("Step 4","Stock Solution Volume")
+
+   
     if not resume_preparation:
         if test_case:   
             print(f"[AUTO] Your Stock Solution Volume selection: {test_case.get('stock_vol', '')}")
@@ -447,11 +459,13 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
         else:
             print("\nFinally, enter desired stock solution volume (ml).")
             stock_volume(selected_df)
+
     else:
         print_success("Using prefilled stock solution volumes from session:")
         for idx, row in selected_df.iterrows():
             print(f"  - {row['Drug']}: {row.get('St_Vol(ml)', 'N/A')} ml")
     
+
 
 
     # 4) Calculate Potency and Estimated Drug Weight for each drug
@@ -465,7 +479,9 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
     # 5) Instruct user to weigh out the estimated drug weights
     print_step("Step 6","Drug Weight Instructions")
+
     if not test_case and not (resume_preparation):
+
         # Prepare output file
         output_filename = input("\nEnter filename for drug weight output (e.g., drug_weights): ").strip()
         if not output_filename:
@@ -523,16 +539,19 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
                 selected_df["Act_DrugW(mg)"] = weights
         else:
             act_drugweight(selected_df)
+
     else:
         print_success("Using prefilled actual drug weights from session:")
         for idx, row in selected_df.iterrows():
             print(f"  - {row['Drug']}: {row.get('Act_DrugW(mg)', 'N/A')} mg")
+
 
     # Calculate new volume of dilutent and new concentration of stock dilution for each drug
     cal_stockdil(selected_df)
 
     # 6) Prompt user to enter the number of MGIT Tubes to be used
     print_step("Step 8","MGIT Tubes")
+
     has_mgit_tubes = 'Total Mgit tubes' in selected_df.columns and selected_df['Total Mgit tubes'].notna().all() and (selected_df['Total Mgit tubes'] > 0).all()
     if not resume_preparation or not has_mgit_tubes:
         if test_case:
@@ -547,6 +566,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
         else:
             print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
             mgit_tubes(selected_df)
+
     else:
         print_success("Using prefilled MGIT tube counts from session:")
         for idx, row in selected_df.iterrows():
@@ -573,6 +593,12 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
         output_filename = test_case.get('final_results_filename', 'final_results')
         if not output_filename.endswith('.txt'):
             output_filename += '.txt'
+
+        # Create results directory in project root
+        results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+        results_dir = os.path.abspath(results_dir)
+        os.makedirs(results_dir, exist_ok=True)
+
     else:
         output_filename = input("Enter filename for final results (e.g., final_results): ").strip()
         if not output_filename:
@@ -593,10 +619,12 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
         output_file.write("\nFinal Values:\n")
         
         for idx, row in selected_df.iterrows():
+
             diluent_name = row.get('Diluent', 'diluent')  # Get the specific diluent name, fallback to 'diluent'
             result_line = f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of {diluent_name} to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml,\n\tand volume of remaining stock solution is {round(row['Vol_St_Left(ml)'],8)} ml"
             logger.info(f"\n  - {row['Drug']}:Volume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml, and volume of {diluent_name} to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml, and volume of remaining stock solution is {round(row['Vol_St_Left(ml)'],8)} ml\n")    
             print(f"  - {row['Drug']}:\n\tVolume of Stock solution to be added for working solution is {round(row['Vol_WSol_ali(ml)'],8)} ml,\n\tand volume of {diluent_name} to be added is {round(row['Vol_Dil_Add(ml)'],8)} ml,\n\tand volume of remaining stock solution is {round(row['Vol_St_Left(ml)'],8)} ml")
+
             output_file.write(result_line + "\n")
         
         output_file.write("\n----------------------------\n")
@@ -606,12 +634,13 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
     print(f"\n----------------------------\nEND\n----------------------------\n")
     logger.info("\nEND\n")
     print(f"Final results written to: {output_path}\n")
-    
+
     # Final session save with complete data
     save_session(selected_df, "final calculation")
     
     print_success("Calculation workflow completed successfully!")
     print_success(f"Session saved to: {session_name}")
+
 
 if __name__ == "__main__":
     main()

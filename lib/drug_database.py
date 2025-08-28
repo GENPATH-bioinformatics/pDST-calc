@@ -101,6 +101,7 @@ def update_drug_availability(drug_id: int, available: bool) -> bool:
     Returns:
         True if successful, False otherwise
     """
+    
     try:
         with db_manager.get_connection() as conn:
             cursor = conn.execute(
@@ -244,7 +245,6 @@ def get_session_data(user_id: int, session_id: int = None) -> List[Dict[str, Any
             return db_manager.get_sessiones_by_user(user_id)
     except Exception as e:
         raise
-
 
 def get_user_sessions(user_id: int) -> List[Dict[str, Any]]:
     """Return all sessions for a given user (convenience wrapper)."""
