@@ -174,32 +174,6 @@ def delete_drug(drug_id: int) -> bool:
         raise
 
 
-def save_session_data(user_id: int, session_name: str, drug_data: Dict[str, Dict[str, Any]]) -> Optional[int]:
-    """Save session data in the specified JSON format.
-    
-    Args:
-        user_id: ID of the user
-        session_name: Name of the session
-        drug_data: Dictionary with drug_id as key and drug parameters as value
-                  Format: {
-                      "drug_id": {
-                          "crit_values": float,
-                          "purch_molw": float,
-                          "stock_vol": float,
-                          "act_w": float,
-                          "mgit_tubes": int
-                      }
-                  }
-    
-    Returns:
-        Session ID if successful, None if failed
-    """
-    try:
-        return db_manager.insert_session(user_id, session_name, drug_data)
-    except Exception as e:
-        raise
-
-
 def update_session_data(session_id: int, drug_data: Dict[str, Dict[str, Any]]) -> bool:
     """Update existing session data.
     
@@ -284,5 +258,26 @@ def get_session_data(user_id: int, session_id: int = None) -> List[Dict[str, Any
         else:
             # Get all sessions for user
             return db_manager.get_sessiones_by_user(user_id)
+    except Exception as e:
+        raise
+
+
+def get_user_sessions(user_id: int) -> List[Dict[str, Any]]:
+    """Return all sessions for a given user (convenience wrapper)."""
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT session_id, session_name, session_date FROM session WHERE user_id = ?",
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    'session_id': r[0],
+                    'session_name': r[1],
+                    'session_date': r[2],
+                }
+                for r in rows
+            ]
     except Exception as e:
         raise

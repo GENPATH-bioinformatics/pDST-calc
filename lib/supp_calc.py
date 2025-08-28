@@ -7,7 +7,6 @@ except:
     from .dst_calc import *
 from tabulate import tabulate
 
-# Optional import from app.cli.styling with fallback implementations
 try:
     from app.cli.styling import print_input_prompt, print_success, print_error, print_warning
 except ImportError:
@@ -33,7 +32,7 @@ except ImportError:
 
 def format_session_data(selected_df, drugs, include_partial=True):
     """
-    Format drug data for session storage:
+    Build a simple session JSON structure keyed by drug_id:
     {
       "drug_id": {
         "Crit_Conc(mg/ml)": float,
@@ -43,13 +42,22 @@ def format_session_data(selected_df, drugs, include_partial=True):
         "Total Mgit tubes": int
       }
     }
-    Args:
-      selected_df: DataFrame with columns (partial data allowed):
-        'Drug', 'Crit_Conc(mg/ml)', 'PurMol_W(g/mol)', 'St_Vol(ml)', 'Act_DrugW(mg)', 'Total Mgit tubes'
-      drugs: list of dicts from DB (each has 'drug_id' and 'name')
-      include_partial: If True, include drugs even if some values are missing
+    - Uses default critical concentration from DB if not customized.
+    - Allows partial values; missing fields are 0.
     """
     name_to_id = {d['name']: str(d['drug_id']) for d in drugs}
+
+    def to_float(v, default=0.0):
+        try:
+            return float(v)
+        except Exception:
+            return default
+
+    def to_int(v, default=0):
+        try:
+            return int(float(v))
+        except Exception:
+            return default
 
     session_data = {}
     for _, row in selected_df.iterrows():
@@ -58,22 +66,20 @@ def format_session_data(selected_df, drugs, include_partial=True):
         if not drug_id:
             continue
 
-        # Get critical concentration - use default from database if not set
+        # Default CC if not set
         crit_conc = row.get('Crit_Conc(mg/ml)')
         if crit_conc is None or (hasattr(crit_conc, 'isna') and crit_conc.isna()):
-            # Find default critical concentration from database
             drug_info = next((d for d in drugs if d['name'] == drug_name), None)
             crit_conc = drug_info['critical_value'] if drug_info else 0.0
 
         drug_data = {
-            'Crit_Conc(mg/ml)': float(crit_conc),
-            'PurMol_W(g/mol)': float(row.get('PurMol_W(g/mol)')),
-            'St_Vol(ml)': float(row.get('St_Vol(ml)')),
-            'Act_DrugW(mg)': float(row.get('Act_DrugW(mg)')),
-            'Total Mgit tubes': int(row.get('Total Mgit tubes')),
+            'Crit_Conc(mg/ml)': to_float(crit_conc),
+            'PurMol_W(g/mol)': to_float(row.get('PurMol_W(g/mol)')),
+            'St_Vol(ml)': to_float(row.get('St_Vol(ml)')),
+            'Act_DrugW(mg)': to_float(row.get('Act_DrugW(mg)')),
+            'Total Mgit tubes': to_int(row.get('Total Mgit tubes')),
         }
 
-        # Only include if we have at least some data or include_partial is True
         if include_partial or any(v != 0.0 for v in drug_data.values()):
             session_data[drug_id] = drug_data
 
