@@ -54,7 +54,7 @@ class DatabaseManager:
                         default_dilution TEXT,
                         default_molecular_weight REAL,
                         mol_max REAL,
-                        critical_value REAL
+                        critical_value REAL,
                         available BOOLEAN
                     )
                 """)
@@ -63,6 +63,46 @@ class DatabaseManager:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_session_user_id ON session(user_id)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_session_date ON session(session_date)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_drugs_name ON drugs(name)")
+                
+                cursor = conn.execute("SELECT COUNT(*) FROM drugs")
+                drug_count = cursor.fetchone()[0]
+                
+                if drug_count == 0:
+                    logger.info("Populating drugs table with default drug data...")
+                    
+                    # Default drug data - all 21 drugs from the standard list
+                    default_drugs = [
+                        ('Amikacin (AMK)', 'Water', 585.6, None, 1.0, True),
+                        ('Bedaquiline (BDQ)', 'DMSO', 555.5, None, 1.0, True),
+                        ('Clofazimine (CFZ)', 'DMSO', 473.39, None, 1.0, True),
+                        ('Cycloserine (CYC)', 'Water', 102.09, None, 1.0, True),
+                        ('Delamanid (DMD)', 'DMSO', 534.48, None, 0.06, True),
+                        ('Ethambutol hydrochloride (EMB hyd)', 'Water', 204.31, None, 5.0, True),
+                        ('Ethionamide (ETH)', 'DMSO', 166.24, None, 5.0, True),
+                        ('Imipenem (IPM)', 'Phosphate pH 7.2', 299.35, None, 1.0, True),
+                        ('Isoniazid CC (INH)-cc', 'Water', 137.14, None, 1.0, True),
+                        ('Isoniazid high (INH)-h', 'Water', 137.14, None, 10.0, True),
+                        ('Isoniazid low (INH)-l', 'Water', 137.14, None, 0.05, True),
+                        ('Levofloxacin (LVX)', '1/2 volume of water then 0.1 mol/L NaOH dropwise to dissolve/Water', 361.37, None, 1.0, True),
+                        ('Linezolid (LZD)', 'Water', 337.35, None, 1.0, True),
+                        ('Meropenem (MRP)', 'Water', 383.46, None, 1.0, True),
+                        ('Moxifloxacin hydrochloride (MFX hyd)', 'Water', 437.89, None, 0.25, True),
+                        ('Para-aminosalicylic Acid (PAS)', 'Water or DMSO', 153.14, None, 4.0, True),
+                        ('Pretomanid (PA-824)', 'DMSO', 359.3, None, 1.0, True),
+                        ('Prothionamide (PTO)', 'DMSO and Water', 180.27, None, 2.5, True),
+                        ('Rifabutin (RBT)', 'DMSO', 847.02, None, 0.5, True),
+                        ('Rifampicin (RIF)', 'Water', 822.94, None, 2.0, True),
+                        ('Streptomycin sulfate salt (STM)', 'Water', 1457.38, None, 1.0, True)
+                    ]
+                    
+                    # Insert all default drugs
+                    for drug_data in default_drugs:
+                        conn.execute("""
+                            INSERT INTO drugs (name, default_dilution, default_molecular_weight, mol_max, critical_value, available)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, drug_data)
+                    
+                    logger.info(f"Successfully inserted {len(default_drugs)} default drugs")
                 
                 conn.commit()
                 logger.info(f"Database initialized successfully at {self.db_path}")
@@ -133,11 +173,12 @@ class DatabaseManager:
             logger.error(f"Error getting user: {e}")
             return None
     
-    def insert_session(self, user_id: int, preparation: Dict[str, Any]) -> Optional[int]:
+    def insert_session(self, user_id: int, session_name: str, preparation: Dict[str, Any]) -> Optional[int]:
         """Insert a new session record.
         
         Args:
             user_id: ID of the user creating the session
+            session_name: Name of the session
             preparation: Preparation data as dictionary (will be stored as JSON)
             
         Returns:
@@ -146,8 +187,8 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 cursor = conn.execute(
-                    "INSERT INTO session (user_id, preparation) VALUES (?, ?)",
-                    (user_id, json.dumps(preparation))
+                    "INSERT INTO session (user_id, session_name, preparation) VALUES (?, ?, ?)",
+                    (user_id, session_name, json.dumps(preparation))
                 )
                 conn.commit()
                 return cursor.lastrowid
@@ -270,7 +311,6 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logger.error(f"Error getting drug: {e}")
             return None
-
 
 # Global database manager instance
 db_manager = DatabaseManager() 

@@ -29,6 +29,56 @@ except ImportError:
     def print_warning(message):
         """Fallback implementation for warning messages."""
         print(f"⚠ Warning: {message}")
+
+
+def format_session_data(selected_df, drugs, include_partial=True):
+    """
+    Format drug data for session storage:
+    {
+      "drug_id": {
+        "Crit_Conc(mg/ml)": float,
+        "PurMol_W(g/mol)": float,
+        "St_Vol(ml)": float,
+        "Act_DrugW(mg)": float,
+        "Total Mgit tubes": int
+      }
+    }
+    Args:
+      selected_df: DataFrame with columns (partial data allowed):
+        'Drug', 'Crit_Conc(mg/ml)', 'PurMol_W(g/mol)', 'St_Vol(ml)', 'Act_DrugW(mg)', 'Total Mgit tubes'
+      drugs: list of dicts from DB (each has 'drug_id' and 'name')
+      include_partial: If True, include drugs even if some values are missing
+    """
+    name_to_id = {d['name']: str(d['drug_id']) for d in drugs}
+
+    session_data = {}
+    for _, row in selected_df.iterrows():
+        drug_name = row['Drug']
+        drug_id = name_to_id.get(drug_name)
+        if not drug_id:
+            continue
+
+        # Get critical concentration - use default from database if not set
+        crit_conc = row.get('Crit_Conc(mg/ml)')
+        if crit_conc is None or (hasattr(crit_conc, 'isna') and crit_conc.isna()):
+            # Find default critical concentration from database
+            drug_info = next((d for d in drugs if d['name'] == drug_name), None)
+            crit_conc = drug_info['critical_value'] if drug_info else 0.0
+
+        drug_data = {
+            'Crit_Conc(mg/ml)': float(crit_conc),
+            'PurMol_W(g/mol)': float(row.get('PurMol_W(g/mol)')),
+            'St_Vol(ml)': float(row.get('St_Vol(ml)')),
+            'Act_DrugW(mg)': float(row.get('Act_DrugW(mg)')),
+            'Total Mgit tubes': int(row.get('Total Mgit tubes')),
+        }
+
+        # Only include if we have at least some data or include_partial is True
+        if include_partial or any(v != 0.0 for v in drug_data.values()):
+            session_data[drug_id] = drug_data
+
+    return session_data
+
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):
     """

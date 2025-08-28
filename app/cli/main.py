@@ -1,29 +1,34 @@
 import argparse
 import pandas as pd
+from datetime import datetime
 # Import from published pdst-calc-lib package
 try:
     # The published package exposes the modules directly
     import drug_database
     import dst_calc
     import supp_calc
-    from drug_database import load_drug_data
+    import auth
+    from auth import register_user, login_user
+    from drug_database import load_drug_data, save_session_data, get_available_drugs
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
         purchased_weights, stock_volume, cal_potency, act_drugweight,
-        cal_stockdil, mgit_tubes, cal_mgit_ws
+        cal_stockdil, mgit_tubes, cal_mgit_ws, format_session_data
     )
 except ImportError:
     # Fallback to relative imports for development
     import sys
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-    from drug_database import load_drug_data
+    import auth
+    from auth import register_user, login_user
+    from drug_database import load_drug_data, save_session_data, get_available_drugs
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
         purchased_weights, stock_volume, cal_potency, act_drugweight,
-        cal_stockdil, mgit_tubes, cal_mgit_ws
+        cal_stockdil, mgit_tubes, cal_mgit_ws, format_session_data
     )
 
 from tabulate import tabulate
@@ -35,6 +40,7 @@ import re
 import signal
 
 num_drugs = 0
+ses_name = None
 
 def clean_filename(filename):
     if not filename:
@@ -138,6 +144,28 @@ def main():
     parser.add_argument('--session-name', type=str, help='Session name for logging (default: interactive prompt)')
     args = parser.parse_args()
 
+    print_input_prompt("Login or create an account")
+    username = input("Username: ").strip()
+    password = input("Password: ").strip()
+
+    user = login_user(username, password)
+    if not user:
+        print_warning("No account found or wrong password. Create account? (y/n)")
+        if input("> ").strip().lower() == "y":
+            uid = register_user(username, password)
+            if not uid:
+                print_error("Could not create user.")
+                exit(1)
+            print_success("User created.")
+            user = {"user_id": uid, "username": username}
+        else:
+            print_error("Login failed.")
+            exit(1)
+    else:
+        print_success(f"Welcome back, {username}!")
+
+    user_id = user["user_id"]
+
     try:
         # Get session name
         if args.session_name:
@@ -182,7 +210,7 @@ def main():
                 # Use only the first row for single test
                 test_case = test_rows[0]
                 logger.info(f"Running single test case")
-                run_calculation(df, test_case, error_log, logger)
+                run_calculation(df, session_name, test_case, error_log, logger, user_id)
                 print_success("Single test completed successfully")
             else:
                 logger.error("No test data found in single test input file")
@@ -193,7 +221,7 @@ def main():
         else:
             # Interactive mode
             print_step("0","Interactive Mode")
-            run_calculation(df, None, None, logger)
+            run_calculation(df, session_name, None, None, logger, user_id)
             print_success("Interactive session completed successfully")
             
     except KeyboardInterrupt:
@@ -207,15 +235,41 @@ def main():
         print("pDST-calc terminated due to an error.")
         exit(1)
 
-def run_calculation(df, test_case=None, error_log=None, logger=None):
+def run_calculation(df, session_name, test_case=None, error_log=None, logger=None, user_id=None):
     """
     Run the main calculation workflow.
     Args:
         df: DataFrame with drug data
+        session_name: Name of the session for saving
         test_case: Dictionary with test inputs (None for interactive mode)
         error_log: File handle for error logging (None for interactive mode)
         logger: Logger instance
+        user_id: ID of the authenticated user
     """
+    # Helper function to save session data incrementally
+    def save_session_incrementally(selected_df, step_name):
+        """Save current session data to database."""
+        if user_id and session_name:
+            try:
+                from supp_calc import format_session_data
+                from drug_database import get_available_drugs, get_or_create_session, update_session_data
+                
+                # Get drug data and format session data
+                drug_data = get_available_drugs()
+                session_data = format_session_data(selected_df, drug_data, include_partial=True)
+                
+                # Get or create session
+                session_id = get_or_create_session(user_id, session_name)
+                if session_id:
+                    # Update session data
+                    success = update_session_data(session_id, session_data)
+                    if success:
+                        logger.info(f"Session data saved after {step_name}")
+                    else:
+                        logger.warning(f"Failed to update session data after {step_name}")
+            except Exception as e:
+                logger.warning(f"Could not save session data after {step_name}: {e}")
+
     # 1) User selects desired drugs
     print_step("Step 1","Drug Selection")
     if test_case:
@@ -305,6 +359,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     else:
         print("\nFinally, enter desired stock solution volume (ml).")
         stock_volume(selected_df)
+    
+    # Save session after stock volumes
+    save_session_incrementally(selected_df, "stock volumes")
 
 
     # 4) Calculate Potency and Estimated Drug Weight for each drug
@@ -378,6 +435,9 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     else:
         print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
         mgit_tubes(selected_df)
+    
+    # Save session after MGIT tubes
+    save_session_incrementally(selected_df, "MGIT tubes")
 
     # Calculate MGIT conc, volume of working solution needed, volume of working solution to aliquot, volume of diluent and volume of stock solution left
     cal_mgit_ws(selected_df)
@@ -429,6 +489,10 @@ def run_calculation(df, test_case=None, error_log=None, logger=None):
     print(f"\n----------------------------\nEND\n----------------------------\n")
     logger.info("\nEND\n")
     print(f"Final results written to: {output_path}\n")
+    
+    # Final session save with complete data
+    save_session_incrementally(selected_df, "final calculation")
+    
     print_success("Calculation workflow completed successfully!")
 
 if __name__ == "__main__":
