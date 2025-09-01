@@ -208,18 +208,6 @@ def perform_final_calculations():
                     vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_mgit_ugml, conc_stock_ugml)
                     vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
                     
-                    print(f"FINAL CALC DEBUG for {drug_name}:")
-                    print(f"  custom_crit_mgml: {custom_crit_mgml}")
-                    print(f"  conc_mgit_ugml: {conc_mgit_ugml}")
-                    print(f"  vol_working_sol_ml: {vol_working_sol_ml}")
-                    print(f"  conc_stock_ugml: {conc_stock_ugml}")
-                    print(f"  vol_stock_to_ws_ml: {vol_stock_to_ws_ml}")
-                    print(f"  vol_diluent_to_add_ml: {vol_diluent_to_add_ml}")
-                    print(f"  stock_vol_ml: {stock_vol_ml}")
-                    print(f"  Formula check: vol_ss_to_ws = ({vol_working_sol_ml} * {conc_mgit_ugml}) / {conc_stock_ugml} = {vol_stock_to_ws_ml}")
-                    print(f"  Formula check: vol_final_dil = {vol_working_sol_ml} - {vol_stock_to_ws_ml} = {vol_diluent_to_add_ml}")
-                    print(f"  Stock volume check: {vol_stock_to_ws_ml} > {stock_vol_ml} = {vol_stock_to_ws_ml > stock_vol_ml}")
-                    
                     # Convert volumes to user's preferred unit
                     stock_vol_user = convert_volume(vol_stock_to_ws_ml, "ml", volume_unit())
                     diluent_vol_user = convert_volume(vol_diluent_to_add_ml, "ml", volume_unit())
@@ -786,7 +774,14 @@ with ui.layout_sidebar():
                 )
         elif current_step() == 3:
             # Validate step 3 inputs
-            if validate_step3_inputs():
+            if final_calculation_done():
+                # After results are shown, replace with New Calculation
+                return ui.tags.div(
+                    ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                    ui.input_action_button("new_calc_btn", "New Calculation", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
+                    style="text-align: center; margin-top: 30px;"
+                )
+            elif validate_step3_inputs():
                 return ui.tags.div(
                     ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
                     ui.input_action_button("calculate_final_btn", "Calculate Final Results", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
@@ -844,6 +839,18 @@ def calculate_final_results():
     if current_step() == 3:
         # Mark that final calculation has been performed
         final_calculation_done.set(True)
+
+@reactive.effect
+@reactive.event(input.new_calc_btn)
+def new_calculation():
+    if current_step() == 3 and final_calculation_done():
+        # Reset all relevant state and return to step 1
+        current_step.set(1)
+        calculate_clicked.set(False)
+        final_calculation_done.set(False)
+        calculation_results.set({})
+        warnings.set([])
+        ui.update_selectize("drug_selection", selected=[])
 
 # Unit selection reactive effects
 @reactive.effect
