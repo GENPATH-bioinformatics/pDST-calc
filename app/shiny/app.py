@@ -227,8 +227,12 @@ def perform_final_calculations():
                             warning_message = f"Warning for {drug_name}: Stock volume to aliquot ({vol_stock_to_ws_ml:.4f} ml) exceeds available stock volume ({stock_vol_ml:.4f} ml). This calculation is not possible with the current parameters."
                         print(f"WARNING TRIGGERED for {drug_name}: {warning_message}")
                     
+                    drug_row = drug_data[drug_data['Drug'] == drug_name]
+                    diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else "Unknown"
+                    
                     final_results.append({
                         'Drug': drug_name,
+                        'Diluent': diluent,
                         'Stock_Vol_Aliquot': stock_vol_user,
                         'Diluent_Vol': diluent_vol_user
                     })
@@ -651,6 +655,7 @@ with ui.layout_sidebar():
                         
                         table_headers = ui.tags.tr(
                             ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                            ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                             ui.tags.th(f"Stock Solution to Aliquot ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
                             ui.tags.th(f"Diluent to Add ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
                             style="background-color: #f8f9fa;"
@@ -660,6 +665,7 @@ with ui.layout_sidebar():
                         for result in final_results:
                             row = ui.tags.tr(
                                 ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                ui.tags.td(result['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                 ui.tags.td(f"{result['Stock_Vol_Aliquot']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                 ui.tags.td(f"{result['Diluent_Vol']:.8f}" if result['Diluent_Vol'] < 0.001 else f"{result['Diluent_Vol']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                 style="background-color: white;"
