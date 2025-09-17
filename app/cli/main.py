@@ -8,8 +8,8 @@ try:
     from app.api import drug_database
     import dst_calc
     import supp_calc
-    import auth
-    from auth import register_user, login_user
+    from app.api import auth
+    from app.api.auth import register_user, login_user
     from app.api.drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
     from app.api.database import db_manager
     from dst_calc import *
@@ -24,8 +24,8 @@ except ImportError:
     import sys
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-    import auth
-    from auth import register_user, login_user
+    from app.api import auth
+    from app.api.auth import register_user, login_user
     from app.api.drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
     from app.api.database import db_manager
     import dst_calc
@@ -415,6 +415,13 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
                 for idx, value in enumerate(values):
                     if idx < len(selected_df):
                         selected_df.iloc[idx, selected_df.columns.get_loc('Crit_Conc(mg/ml)')] = value
+                print("\nUpdated selected drugs with custom critical values:")
+                print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+            else:
+                # Interactive per-drug prompts (like purchased molecular weight)
+                custom_critical_values(selected_df)
+                print("\nUpdated selected drugs with custom critical values:")
+                print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
         else:
             print("\nProceeding with default critical values for selected drugs:")
             print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
