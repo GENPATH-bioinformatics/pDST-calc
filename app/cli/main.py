@@ -10,8 +10,8 @@ try:
     import supp_calc
     import auth
     from auth import register_user, login_user
-    from drug_database import load_drug_data, get_or_create_session, update_session_data, get_available_drugs, get_user_sessions, get_session_data
-
+    from drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
+    from database import db_manager
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
@@ -26,14 +26,20 @@ except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
     import auth
     from auth import register_user, login_user
-    from drug_database import load_drug_data, get_or_create_session, update_session_data, get_available_drugs, get_user_sessions, get_session_data
-
+    from drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
+    from database import db_manager
+    import dst_calc
+    import supp_calc
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
         purchased_weights, stock_volume, cal_potency, act_drugweight,
         cal_stockdil, mgit_tubes, cal_mgit_ws, format_session_data
     )
+
+# Backward-compatible aliases for database write operations
+get_or_create_session = db_manager.get_or_create_session
+update_session_data = db_manager.update_session_data
 
 from tabulate import tabulate
 from .styling import (print_header, print_success, print_error, print_warning, print_step, print_completion, print_help_text, print_input_prompt)
@@ -185,51 +191,59 @@ def main():
                 print_warning(f"Could not list sessions: {e}")
                 session_list = []
 
-            while True:
-                if not session_list:
-                    print("No previous sessions found.")
+            if not session_list:
+                print("No previous sessions found.")
+                # Start a new session immediately
+                resume_preparation = {}
+                print_input_prompt("Enter a name for this session", example="Name_Experiment_Date")
+                session_name = input("Session name: ").strip()
+                if not session_name:
+                    session_name = "default"
                 else:
+                    session_name = clean_filename(session_name)
+            else:
+                while True:
                     for idx, session in enumerate(session_list, 1):
                         print(f"{idx}. {session.get('session_name') or '(unnamed)'} | {session.get('session_date')}")
-                print("\n")
-                print_input_prompt("Enter the number of the session to continue, or press Enter to create a new session", example="1")
-                selection = input("Your selection: ").strip().lower()
-                if selection == "":
-                    # Create new session
-                    resume_preparation = {}
-                    print_input_prompt("Enter a name for this session", example="Name_Experiment_Date")
-                    session_name = input("Session name: ").strip()
-                    if not session_name:
-                        session_name = "default"
-                    else:
-                        session_name = clean_filename(session_name)
-                    break
-                # Must be a number selecting an existing session
-                if not selection.isdigit():
-                    print_error("Please enter a valid number or press Enter for a new session.")
-                    continue
-                sel_idx = int(selection)
-                if sel_idx < 1 or sel_idx > len(session_list):
-                    print_error(f"Selection out of range. Please enter a number between 1 and {len(session_list)} or press Enter for a new session.")
-                    continue
-                
-                # Get the selected session's preparation data
-                selected_session = session_list[sel_idx - 1]
-                session_name = selected_session.get('session_name') or "default"
-                print_success(f"Using session name: {session_name}")
-                
-                # Fetch the actual preparation data for this session
-                try:
-                    sessions = get_session_data(user_id)
-                    for s in sessions:
-                        if s.get('session_id') == selected_session.get('session_id'):
-                            resume_preparation = s.get('preparation', {})
-                            break
-                    else:
+                    print("\n")
+                    print_input_prompt("Enter the number of the session to continue, or press Enter to create a new session", example="1")
+                    selection = input("Your selection: ").strip().lower()
+                    if selection == "":
+                        # Create new session
                         resume_preparation = {}
-                except Exception:
-                    resume_preparation = {}
-                break
+                        print_input_prompt("Enter a name for this session", example="Name_Experiment_Date")
+                        session_name = input("Session name: ").strip()
+                        if not session_name:
+                            session_name = "default"
+                        else:
+                            session_name = clean_filename(session_name)
+                        break
+                    # Must be a number selecting an existing session
+                    if not selection.isdigit():
+                        print_error("Please enter a valid number or press Enter for a new session.")
+                        continue
+                    sel_idx = int(selection)
+                    if sel_idx < 1 or sel_idx > len(session_list):
+                        print_error(f"Selection out of range. Please enter a number between 1 and {len(session_list)} or press Enter for a new session.")
+                        continue
+                    
+                    # Get the selected session's preparation data
+                    selected_session = session_list[sel_idx - 1]
+                    session_name = selected_session.get('session_name') or "default"
+                    print_success(f"Using session name: {session_name}")
+                    
+                    # Fetch the actual preparation data for this session
+                    try:
+                        sessions = get_session_data(user_id)
+                        for s in sessions:
+                            if s.get('session_id') == selected_session.get('session_id'):
+                                resume_preparation = s.get('preparation', {})
+                                break
+                        else:
+                            resume_preparation = {}
+                    except Exception:
+                        resume_preparation = {}
+                    break
         
         logger = setup_logger(session_name)
         logger.info(f"\nApplication started for session: {session_name}\n")
@@ -402,8 +416,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
                     if idx < len(selected_df):
                         selected_df.iloc[idx, selected_df.columns.get_loc('Crit_Conc(mg/ml)')] = value
         else:
-            custom_critical_values(selected_df)
-            print("\nUpdated selected drugs with custom critical values:")
+            print("\nProceeding with default critical values for selected drugs:")
             print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
 
     # Rename original column for clarity and add unit

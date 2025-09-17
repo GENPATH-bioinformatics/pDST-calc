@@ -30,6 +30,18 @@ except ImportError:
         """Fallback implementation for warning messages."""
         print(f"⚠ Warning: {message}")
 
+
+def print_table(df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'):
+    """Pretty-print a pandas DataFrame using tabulate with safe fallbacks."""
+    try:
+        print(tabulate(df, headers=headers, tablefmt=tablefmt, showindex=showindex, stralign=stralign, numalign=numalign))
+    except Exception:
+        # Fallback to pandas string representation
+        try:
+            print(df.to_string(index=showindex))
+        except Exception:
+            print(df)
+
 def format_session_data(selected_df, drugs, include_partial=True):
     """
     Build a simple session JSON structure keyed by drug_id:
