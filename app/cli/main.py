@@ -5,13 +5,13 @@ from datetime import datetime
 # Import from published pdst-calc-lib package
 try:
     # The published package exposes the modules directly
-    import drug_database
+    from app.api import drug_database
     import dst_calc
     import supp_calc
     import auth
     from auth import register_user, login_user
-    from drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
-    from database import db_manager
+    from app.api.drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
+    from app.api.database import db_manager
     from dst_calc import *
     from supp_calc import (
         print_and_log_tabulate, select_drugs, custom_critical_values, 
@@ -26,8 +26,8 @@ except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
     import auth
     from auth import register_user, login_user
-    from drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
-    from database import db_manager
+    from app.api.drug_database import load_drug_data, get_available_drugs, get_user_sessions, get_session_data
+    from app.api.database import db_manager
     import dst_calc
     import supp_calc
     from dst_calc import *

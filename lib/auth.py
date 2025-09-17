@@ -1,5 +1,5 @@
 import bcrypt
-from database import db_manager
+from app.api.database import db_manager
 
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())

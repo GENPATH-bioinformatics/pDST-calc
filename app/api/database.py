@@ -144,10 +144,10 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logger.error(f"Error inserting user: {e}")
             return None
-    
+
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
         """Get user information by username.
-        
+
         Args:
             username: Username to search for
             
@@ -204,6 +204,7 @@ class DatabaseManager:
                 return cursor.rowcount > 0
         except sqlite3.Error:
             return False
+            
     def insert_drug(self, name: str, default_dilution: str = None, 
                    default_molecular_weight: float = None,
                    critical_value: float = None, available: bool = True) -> Optional[int]:
@@ -274,7 +275,7 @@ class DatabaseManager:
                         'default_dilution': row[2],
                         'default_molecular_weight': row[3],
                         'critical_value': row[4],
-                        'available': row[5]
+                        'available': bool(row[5])
                     })
                 return drugs
         except sqlite3.Error as e:
@@ -303,3 +304,5 @@ class DatabaseManager:
 
 # Global database manager instance
 db_manager = DatabaseManager()
+
+
