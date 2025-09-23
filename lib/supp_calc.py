@@ -3,12 +3,11 @@ logger = logging.getLogger("pdst-calc")
 # Use absolute import instead of relative import for standalone package
 try:
     from dst_calc import *
-except ImportError:
-    # Fallback for when used as part of a larger package
+
+except:
     from .dst_calc import *
 from tabulate import tabulate
 
-# Optional import from app.cli.styling with fallback implementations
 try:
     from app.cli.styling import print_input_prompt, print_success, print_error, print_warning
 except ImportError:
@@ -30,6 +29,74 @@ except ImportError:
     def print_warning(message):
         """Fallback implementation for warning messages."""
         print(f"⚠ Warning: {message}")
+
+
+def print_table(df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left'):
+    """Pretty-print a pandas DataFrame using tabulate with safe fallbacks."""
+    try:
+        print(tabulate(df, headers=headers, tablefmt=tablefmt, showindex=showindex, stralign=stralign, numalign=numalign))
+    except Exception:
+        # Fallback to pandas string representation
+        try:
+            print(df.to_string(index=showindex))
+        except Exception:
+            print(df)
+
+def format_session_data(selected_df, drugs, include_partial=True):
+    """
+    Build a simple session JSON structure keyed by drug_id:
+    {
+      "drug_id": {
+        "Crit_Conc(mg/ml)": float,
+        "PurMol_W(g/mol)": float,
+        "St_Vol(ml)": float,
+        "Act_DrugW(mg)": float,
+        "Total Mgit tubes": int
+      }
+    }
+    - Uses default critical concentration from DB if not customized.
+    - Allows partial values; missing fields are 0.
+    """
+    name_to_id = {d['name']: str(d['drug_id']) for d in drugs}
+
+    def to_float(v, default=0.0):
+        try:
+            return float(v)
+        except Exception:
+            return default
+
+    def to_int(v, default=0):
+        try:
+            return int(float(v))
+        except Exception:
+            return default
+
+    session_data = {}
+    for _, row in selected_df.iterrows():
+        drug_name = row['Drug']
+        drug_id = name_to_id.get(drug_name)
+        if not drug_id:
+            continue
+
+        # Default CC if not set
+        crit_conc = row.get('Crit_Conc(mg/ml)')
+        if crit_conc is None or (hasattr(crit_conc, 'isna') and crit_conc.isna()):
+            drug_info = next((d for d in drugs if d['name'] == drug_name), None)
+            crit_conc = drug_info['critical_value'] if drug_info else 0.0
+
+        drug_data = {
+            'Crit_Conc(mg/ml)': to_float(crit_conc),
+            'PurMol_W(g/mol)': to_float(row.get('PurMol_W(g/mol)')),
+            'St_Vol(ml)': to_float(row.get('St_Vol(ml)')),
+            'Act_DrugW(mg)': to_float(row.get('Act_DrugW(mg)')),
+            'Total Mgit tubes': to_int(row.get('Total Mgit tubes')),
+        }
+
+        if include_partial or any(v != 0.0 for v in drug_data.values()):
+            session_data[drug_id] = drug_data
+
+    return session_data
+
 # Print and log
 def print_and_log_tabulate(df, *args, **kwargs):
     """
@@ -41,16 +108,6 @@ def print_and_log_tabulate(df, *args, **kwargs):
     table_str = tabulate(df, *args, **kwargs)
     print(table_str)
     logger.info("\n" + table_str + "\n")
-
-def print_table(df, *args, **kwargs):
-    """
-    Print a DataFrame as a formatted table using tabulate.
-    Args:
-        df (pd.DataFrame): DataFrame to print.
-        *args, **kwargs: Arguments passed to tabulate.
-    """
-    table_str = tabulate(df, *args, **kwargs)
-    print(table_str)
 
 def select_drugs(df, input_file=None, error_log=None):
     """
