@@ -5,30 +5,6 @@ from lib.drug_database import load_drug_data
 from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_mgit, vol_workingsol, vol_ss_to_ws, vol_final_dil
 
 # Unit conversion functions
-def convert_molecular_weight(value, from_unit, to_unit):
-    """Convert molecular weight between different units."""
-    if from_unit == to_unit:
-        return value
-    
-    # Convert to g/mol as base unit
-    if from_unit == "g/mol":
-        base_value = value
-    elif from_unit == "kg/mol":
-        base_value = value * 1000
-    elif from_unit == "mg/mol":
-        base_value = value / 1000
-    else:
-        base_value = value
-    
-    # Convert from base unit to target unit
-    if to_unit == "g/mol":
-        return base_value
-    elif to_unit == "kg/mol":
-        return base_value / 1000
-    elif to_unit == "mg/mol":
-        return base_value * 1000
-    else:
-        return base_value
 
 def convert_volume(value, from_unit, to_unit):
     """Convert volume between different units."""
@@ -38,8 +14,7 @@ def convert_volume(value, from_unit, to_unit):
     # Convert to ml as base unit
     if from_unit == "ml":
         base_value = value
-    elif from_unit == "L":
-        base_value = value * 1000
+    
     elif from_unit == "μl":
         base_value = value / 1000
     else:
@@ -48,41 +23,15 @@ def convert_volume(value, from_unit, to_unit):
     # Convert from base unit to target unit
     if to_unit == "ml":
         return base_value
-    elif to_unit == "L":
-        return base_value / 1000
+    
     elif to_unit == "μl":
         return base_value * 1000
     else:
         return base_value
 
 def convert_concentration(value, from_unit, to_unit):
-    """Convert concentration between different units."""
-    if from_unit == to_unit:
-        return value
-    
-    # Convert to mg/ml as base unit
-    if from_unit == "mg/ml":
-        base_value = value
-    elif from_unit == "g/L":
-        base_value = value
-    elif from_unit == "μg/ml":
-        base_value = value / 1000
-    elif from_unit == "ng/ml":
-        base_value = value / 1000000
-    else:
-        base_value = value
-    
-    # Convert from base unit to target unit
-    if to_unit == "mg/ml":
-        return base_value
-    elif to_unit == "g/L":
-        return base_value
-    elif to_unit == "μg/ml":
-        return base_value * 1000
-    elif to_unit == "ng/ml":
-        return base_value * 1000000
-    else:
-        return base_value
+    # Deprecated: concentration is fixed to mg/ml now. Keep for compatibility.
+    return value
 
 def convert_weight(value, from_unit, to_unit):
     """Convert weight between different units."""
@@ -140,9 +89,9 @@ def perform_initial_calculations():
             if stock_vol and purch_molw and custom_crit:
                 # Convert to standard units for calculations
                 stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
-                # Critical concentration should be in mg/ml for calculations (like CLI)
-                custom_crit_mgml = convert_concentration(custom_crit, concentration_unit(), "mg/ml")
+                purch_molw_gmol = purch_molw
+                # Critical concentration is already in mg/ml
+                custom_crit_mgml = custom_crit
                 
                 # Calculate potency
                 pot = potency(purch_molw_gmol, drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0])
@@ -187,9 +136,9 @@ def perform_final_calculations():
                     custom_crit = input[f"custom_critical_{i}"]()
                     
                     stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                    purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
-                    # Critical concentration should be in mg/ml for calculations (like CLI)
-                    custom_crit_mgml = convert_concentration(custom_crit, concentration_unit(), "mg/ml")
+                    purch_molw_gmol = purch_molw
+                    # Critical concentration is already in mg/ml
+                    custom_crit_mgml = custom_crit
                     
                     # Calculate potency
                     org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
@@ -272,9 +221,7 @@ final_calculation_done = reactive.Value(False)
 warnings = reactive.Value([])
 
 # Unit selection reactive values
-molecular_weight_unit = reactive.Value("g/mol")
 volume_unit = reactive.Value("ml")
-concentration_unit = reactive.Value("mg/ml")
 weight_unit = reactive.Value("mg")
 
 # Add top whitespace
@@ -322,27 +269,15 @@ with ui.layout_sidebar():
         
         ui.tags.p("Select your preferred units:", style="color: #7f8c8d; font-size: 12px; margin-bottom: 10px;")
         
-        ui.input_select(
-            "mol_weight_unit",
-            "Molecular Weight:",
-            choices=["g/mol", "kg/mol", "mg/mol"],
-            selected="g/mol"
-        )
-        
+        # Molecular weight fixed to g/mol
         ui.input_select(
             "vol_unit",
             "Volume:",
-            choices=["ml", "L", "μl"],
+            choices=["ml", "μl"],
             selected="ml"
         )
         
-        ui.input_select(
-            "conc_unit",
-            "Concentration:",
-            choices=["mg/ml", "g/L", "μg/ml", "ng/ml"],
-            selected="mg/ml"
-        )
-        
+        # Concentration fixed to mg/ml
         ui.input_select(
             "weight_unit",
             "Weight:",
@@ -380,9 +315,9 @@ with ui.layout_sidebar():
                 # Create table headers for step 1
                 table_headers = ui.tags.tr(
                     ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                    ui.tags.th(f"Mol. Weight ({molecular_weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                    ui.tags.th("Mol. Weight (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                     ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                    ui.tags.th(f"Crit. Conc. ({concentration_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                    ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
                     style="background-color: #f8f9fa;"
                 )
                 
@@ -395,13 +330,13 @@ with ui.layout_sidebar():
                         row_data = drug_row.iloc[0]
                         row = ui.tags.tr(
                             ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                            ui.tags.td(f"{convert_molecular_weight(row_data['OrgMolecular_Weight'], 'g/mol', molecular_weight_unit()):.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                            ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                             ui.tags.td(row_data['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                             ui.tags.td(
                                 ui.input_numeric(
                                     f"custom_critical_{i}",
                                     "",
-                                    value=convert_concentration(row_data['Critical_Concentration'], 'mg/ml', concentration_unit()),
+                                    value=row_data['Critical_Concentration'],
                                     min=0,
                                     step=0.01
                                 ),
@@ -427,7 +362,7 @@ with ui.layout_sidebar():
                 table_headers = ui.tags.tr(
                     ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
                     ui.tags.th(f"Stock Vol. ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                    ui.tags.th(f"Purch. Mol. Wt. ({molecular_weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                    ui.tags.th("Purch. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                     style="background-color: #f8f9fa;"
                 )
                 
@@ -454,8 +389,8 @@ with ui.layout_sidebar():
                                 ui.input_numeric(
                                     f"purchased_molw_{i}",
                                     "",
-                                    value=convert_molecular_weight(row_data['OrgMolecular_Weight'], 'g/mol', molecular_weight_unit()),
-                                    min=convert_molecular_weight(row_data['OrgMolecular_Weight'], 'g/mol', molecular_weight_unit()),
+                                    value=row_data['OrgMolecular_Weight'],
+                                    min=row_data['OrgMolecular_Weight'],
                                     step=0.01
                                 ),
                                 style="padding: 5px; border: 1px solid #ddd; width: 120px;"
@@ -560,8 +495,8 @@ with ui.layout_sidebar():
                     purch_molw = input[f"purchased_molw_{i}"]()
                     if purch_molw is None or purch_molw <= 0:
                         return ui.tags.div("Please enter valid purchased molecular weights for all drugs.", style="color: red;")
-                    # Convert to g/mol for calculations
-                    purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
+                    # Use g/mol directly
+                    purch_molw_gmol = purch_molw
                     if purch_molw_gmol < org_molw:
                         return ui.tags.div("Please enter valid purchased molecular weights for all drugs.", style="color: red;")
                     purchased_mol_weights.append(purch_molw_gmol)
@@ -570,8 +505,8 @@ with ui.layout_sidebar():
                     custom_crit = input[f"custom_critical_{i}"]()
                     if custom_crit is None or custom_crit <= 0:
                         return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: red;")
-                    # Convert to mg/ml for calculations
-                    custom_crit_mgml = convert_concentration(custom_crit, concentration_unit(), "mg/ml")
+                    # Use mg/ml directly
+                    custom_crit_mgml = custom_crit
                     custom_critical_values.append(custom_crit_mgml)
                 
                 if calculate_clicked():
@@ -860,19 +795,11 @@ def new_calculation():
 
 # Unit selection reactive effects
 @reactive.effect
-@reactive.event(input.mol_weight_unit)
-def update_mol_weight_unit():
-    molecular_weight_unit.set(input.mol_weight_unit())
-
-@reactive.effect
 @reactive.event(input.vol_unit)
 def update_volume_unit():
     volume_unit.set(input.vol_unit())
 
-@reactive.effect
-@reactive.event(input.conc_unit)
-def update_concentration_unit():
-    concentration_unit.set(input.conc_unit())
+# Removed mol_weight_unit and conc_unit reactive handlers (fixed units)
 
 @reactive.effect
 @reactive.event(input.weight_unit)
