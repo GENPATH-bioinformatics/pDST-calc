@@ -38,9 +38,13 @@ ENV/
 venv/
 
 # Logs
-logs/   
 *.log
 
 # Temp files
 output/
 results/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3

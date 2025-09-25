@@ -5,16 +5,27 @@ description = "This tool provides a Drug Susceptibility Testing (DST) calculator
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    {name = "Bea Loubser"}
+    {name = "Bea Loubser"},
+    {name = "Abhinav Sharma"}
 ]
+license = "MIT"
+keywords = ["drug-susceptibility-testing", "dst", "calculator", "tuberculosis", "medical"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+# Core runtime dependencies only
 dependencies = [
-    "dso-core>=0.9",
-    "hypothesis>=6.135.32",
-    "ipykernel>=6.29.5",
+    "bcrypt>=4.3.0",
     "numpy>=2.2.6",
     "openpyxl>=3.1.5",
     "pandas>=2.3.1",
-    "pytest>=8.4.1",
     "shiny>=1.4.0",
     "tabulate>=0.9.0",
 ]
@@ -22,17 +33,13 @@ dependencies = [
 [project.scripts]
 pdst-calc = "app.cli.main:main"
 
-# FIXME
-# [project.scripts]
-# hello = "example:hello"
-
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["db*", "app*"]
+include = ["lib*", "app*"]
 
 [tool.ruff]
 line-length = 120
@@ -95,10 +102,20 @@ convention = "google"
 files.extend-exclude = ["*.ipynb"]
 
 [tool.uv]
-default-groups = ["dev", "lint"]
+default-groups = ["dev", "lint", "test"]
 
 [tool.pytest.ini_options]
-addopts = "--maxfail=1 --cov=testing_demo"
+addopts = "--maxfail=1"
+testpaths = ["test"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests for individual functions",
+    "integration: Integration tests for workflow",
+    "hypothesis: Property-based tests using Hypothesis",
+    "slow: Tests that take longer to run",
+]
 
 
 [dependency-groups]
@@ -106,15 +123,24 @@ dev = [
     "nbwipers>=0.6.1",
     "pytest>=8",
     "pytest-cov>=6.0.0",
+    "pytest-watch>=4.2.0",
     "pre-commit>=4.1.0",
     "typos>=1.29.4",
-    "pandas>=2.3.1",
-    "shiny>=1.4.0",
-    "numpy>=2.2.6",
-    "openpyxl>=3.1.5",
     "hypothesis>=6.135.32",
-    "tabulate>=0.9.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "build>=1.3.0",
+    "twine>=6.1.0",
+    "dso-core>=0.9",
+    "ipykernel>=6.29.5",
 ]
 lint = [
     "ruff>=0.9.3",
+]
+test = [
+    "pytest>=8",
+    "pytest-cov>=6.0.0",
+    "pytest-watch>=4.2.0",
+    "hypothesis>=6.135.32",
 ]

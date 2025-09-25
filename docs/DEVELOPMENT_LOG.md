@@ -10,8 +10,8 @@ This log tracks the development progress, major milestones, and key decisions fo
 - Project directory setup done.
 - Excel formulas and project flow sketched and defined.
 - Drugs data from excel loaded into CSV for easy updates in data/.
-- Drug database import created in "db/src/drug_database.py".
-- Drug calculation functions created in "db/src/dst_calc.py".
+- Drug database import created in "lib/drug_database.py".
+- Drug calculation functions created in "lib/dst_calc.py".
 - CLI tool with interactive drug selection and critical value entry created in "app/cli/main.py".
 - Error handling for invalid selections and missing data.
 - Shiny for Python app skeleton added created in "app/shiny/app.py".

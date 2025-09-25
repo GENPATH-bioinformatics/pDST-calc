@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdst-calc-cli"
+version = "0.1.1"
+description = "Command-line interface for Drug Susceptibility Testing (DST) calculator"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Abhinav Sharma"},
+    {name = "Bea Loubser"},
+    {name = "GENPATH-bioinformatics"}
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pdst-calc-lib>=0.1.0",  # The published library from test-pypi
+    "tabulate>=0.9.0",
+]
+keywords = ["drug-susceptibility", "testing", "DST", "MGIT", "tuberculosis", "cli", "command-line"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Environment :: Console",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[project.urls]
+Homepage = "https://github.com/GENPATH-bioinformatics/genpath-pdst-calc"
+Repository = "https://github.com/GENPATH-bioinformatics/genpath-pdst-calc"
+Issues = "https://github.com/GENPATH-bioinformatics/genpath-pdst-calc/issues"
+
+[project.scripts]
+pdst-calc = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "styling"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*"]

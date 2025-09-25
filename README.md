@@ -56,6 +56,8 @@ uv run pdst-calc --drug-data data/my_drugs.csv
 Run one automated test case from a CSV file:
 
 ```bash
+uv run python src/cli/main.py --single-test-input tests/my_test.csv
+(eg. uv run python src/cli/main.py --single-test-input tests/test_2.csv)
 uv run pdst-calc --single-test-input tests/my_test.csv
 (eg. uv run pdst-calc --single-test-input tests/test_2.csv)
 ```
@@ -83,6 +85,7 @@ You can combine different options:
 
 ```bash
 # Custom drug data + single test + custom session
+uv run python src/cli/main.py --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
 uv run pdst-calc --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
 
 # Batch testing with error logging
@@ -109,14 +112,14 @@ uv run pdst-calc --test-input tests/all_tests.csv --test-output test_results.log
 
 ## Input File Formats
 
-### Test Input CSV Format
+### Single Test Input CSV Format
 
 Test input files should be semicolon-separated with these columns:
 
 ```csv
 id;logfile_name;selected_numerals;reselect_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;results_filename;weighed_drug;mgit_tubes;final_results_filename
-1;test1;1,2;2,3;y;1.0,1.5;300,310;10,10;results1.txt;9.8,10.2;2,2;final1.txt
-2;test2;3;4;n;;320;12;results2.txt;12.1;3;final2.txt
+1;test1;1,2;2,3;y;1.0,1.5;300,310;10,10;results1;9.8,10.2;2,2;final1
+2;test2;3;4;n;;320;12;results2;12.1;3;final2
 ```
 
 **Column Descriptions:**
@@ -152,7 +155,9 @@ id;logfile_name;selected_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;w
 
 All operations are logged to:
 - **Console output**: Real-time progress and results
+- **Log files**: `~/.pdst-calc/logs/pdst-calc-{session_name}.log` in user's home directory
 - **Log files**: `logs/pdst-calc-{session_name}.log` in the project root
+- **Output files**: `results/{filename}.txt` 
 
 ## Command Line Arguments
 
@@ -160,7 +165,6 @@ All operations are logged to:
 |----------|-------------|---------|
 | `--drug-data` | Path to custom drug data CSV | `--drug-data data/my_drugs.csv` |
 | `--single-test-input` | Path to single test input CSV | `--single-test-input tests/test.csv` |
-| `--test-input` | Path to batch test input CSV | `--test-input tests/batch.csv` |
 | `--test-output` | Path to error log file | `--test-output results.log` |
 | `--session-name` | Session name for logging | `--session-name "experiment_001"` |
 
@@ -168,7 +172,7 @@ All operations are logged to:
 
 If you have test files (e.g., in `tests/`):
 ```bash
-uv run pytest --cov=db
+uv run pytest --cov=lib
 ```
 
 ## Troubleshooting
@@ -180,7 +184,7 @@ uv run pytest --cov=db
 
 ## Project Structure
 
-- `db/src/` — Core logic, calculation functions, and data utilities
+- `lib/` — Core logic, calculation functions, and data utilities
 - `app/cli/` — Command-line interface entry point (`main.py`)
 - `app/shiny/` — Shiny for Python web app
 - `data/` — Drug data CSV and reference files
