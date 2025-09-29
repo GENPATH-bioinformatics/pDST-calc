@@ -7,6 +7,12 @@ import os
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from app.api.drug_database import load_drug_data
+import sys
+import os
+
+# Add the project root to Python path so we can import from app.api
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from app.api.drug_database import load_drug_data
 from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_mgit, vol_workingsol, vol_ss_to_ws, vol_final_dil
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
@@ -304,6 +310,70 @@ with ui.navset_card_pill(id="tab", selected="A"):
             # Main content area with additional top padding
             ui.tags.div(style="padding-top: 30px;")
             
+with ui.navset_card_pill(id="tab", selected="A"):
+    with ui.nav_panel("A"):
+        # Main layout with sidebar
+        with ui.layout_sidebar():
+            
+            # Left sidebar panel
+            with ui.sidebar():
+                ui.tags.div(
+                    ui.tags.h3("pDST Calculator", style="color: #2c3e50; margin-bottom: 10px;"),
+                    ui.tags.p("Calculate drug susceptibility testing parameters", style="color: #7f8c8d; margin-bottom: 20px;"),
+                    style="border-bottom: 1px solid #ecf0f1; padding-bottom: 20px;"
+                )
+                
+                ui.tags.h4("Sections", style="color: #2c3e50; margin-bottom: 15px;")
+                
+                # Progress steps
+                @render.ui
+                def progress_steps():
+                    steps = [
+                        "Drug Selection",
+                        "Parameters",
+                        "Final Results"
+                    ]
+                
+                    step_elements = []
+                    for i, step in enumerate(steps):
+                        step_style = "color: #3498db; font-weight: bold;" if current_step() == i + 1 else "color: #7f8c8d;"
+                        step_elements.append(
+                    ui.tags.div(
+                        ui.tags.p(step, style=step_style),
+                        style="margin-bottom: 8px;"
+                    )
+                        )
+                    
+                    return ui.tags.div(*step_elements)
+                
+                ui.tags.div(style="margin-top: 30px;")
+                
+                # Unit Selection Section
+                ui.tags.div(style="margin-top: 30px;")
+                ui.tags.h4("Unit Preferences", style="color: #2c3e50; margin-bottom: 15px;")
+                
+                ui.tags.p("Select your preferred units:", style="color: #7f8c8d; font-size: 12px; margin-bottom: 10px;")
+                
+                # Molecular weight fixed to g/mol
+                ui.input_select(
+                    "vol_unit",
+                    "Volume:",
+                    choices=["ml", "μl"],
+                    selected="ml"
+                )
+                
+                # Concentration fixed to mg/ml
+                ui.input_select(
+                    "weight_unit",
+                    "Weight:",
+                    choices=["mg", "g", "μg"],
+                    selected="mg"
+                )
+                
+            
+            # Main content area with additional top padding
+            ui.tags.div(style="padding-top: 30px;")
+            
 
             
             # Step 1: Drug Selection
@@ -390,12 +460,9 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             drug_row = drug_data[drug_data['Drug'] == drug_name]
                             if not drug_row.empty:
                                 row_data = drug_row.iloc[0]
-                                current_custom = input[f"custom_critical_{i}"]()
-                                if current_custom is None:
-                                    current_custom = row_data['Critical_Concentration']
                                 row = ui.tags.tr(
                                     ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                    ui.tags.td(f"{current_custom:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(f"{row_data['Critical_Concentration']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                     ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                     ui.tags.td(
                                         ui.input_numeric(
@@ -529,7 +596,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             custom_crit = input[f"custom_critical_{i}"]()
                             if custom_crit is None or custom_crit <= 0:
                                 return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: green;")
-                                
                             # Use mg/ml directly
                             custom_crit_mgml = custom_crit
                             custom_critical_values.append(custom_crit_mgml)
@@ -676,24 +742,35 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         
                         # Get purchased molecular weight
                         purch_molw = input[f"purchased_molw_{i}"]()
-                        if purch_molw is None or purch_molw <= 0 or purch_molw < org_molw:
+                        if purch_molw is None or purch_molw <= 0:
+                            return False
+                        # Convert to g/mol for comparison
+                        purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
+                        if purch_molw_gmol < org_molw:
                             return False
                         
-                        # Get custom critical value (mg/ml); fallback to DB default when not present in step 2
-                        try:
-                            custom_crit = input[f"custom_critical_{i}"]()
-                        except Exception:
-                            custom_crit = None
-                        if custom_crit is None:
-                            default_crit = drug_data[drug_data['Drug'] == drug_name]['Critical_Concentration'].iloc[0]
-                            custom_crit = default_crit
-                        if custom_crit <= 0:
+                        # Get custom critical value
+                        custom_crit = input[f"custom_critical_{i}"]()
+                        if custom_crit is None or custom_crit <= 0:
                             return False
                     
                     return True
                 except:
                     return False
 
+            def validate_step3_inputs():
+                """Validate that all actual weights and MGIT tubes have been entered."""
+                selected = input.drug_selection()
+                if not selected:
+                    return False
+                
+                for i in range(len(selected)):
+                    actual_weight = input[f"actual_weight_{i}"]()
+                    mgit_tubes = input[f"mgit_tubes_{i}"]()
+                    if actual_weight is None or actual_weight <= 0 or mgit_tubes is None or mgit_tubes <= 0:
+                        return False
+                
+                return True
             def validate_step3_inputs():
                 """Validate that all actual weights and MGIT tubes have been entered."""
                 selected = input.drug_selection()
@@ -730,9 +807,9 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         else:
                             # Show Calculate button initially
                             return ui.tags.div(
-                                ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
                                 ui.input_action_button("calculate_btn", "Calculate", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
-                                style="text-align: center; margin-top: 30px;"
+                            style="text-align: center; margin-top: 30px;"
                             )
                     else:
                         # Show only back button if validation fails
@@ -865,6 +942,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
 =======
         pass
 >>>>>>> 2f64a0c (Added tabs)
+
+    with ui.nav_panel("C"):
+        pass
+
+    with ui.nav_panel("B"):
+        pass
 
     with ui.nav_panel("C"):
         pass
