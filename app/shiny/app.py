@@ -390,9 +390,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             drug_row = drug_data[drug_data['Drug'] == drug_name]
                             if not drug_row.empty:
                                 row_data = drug_row.iloc[0]
+                                current_custom = input[f"custom_critical_{i}"]()
+                                if current_custom is None:
+                                    current_custom = row_data['Critical_Concentration']
                                 row = ui.tags.tr(
                                     ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                    ui.tags.td(f"{row_data['Critical_Concentration']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(f"{current_custom:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                     ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                     ui.tags.td(
                                         ui.input_numeric(
