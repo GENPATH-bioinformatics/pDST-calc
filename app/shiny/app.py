@@ -758,6 +758,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     return ui.tags.div()
 
     with ui.nav_panel("B"):
+<<<<<<< HEAD
         # Account / Authentication
         ui.tags.h2("Account", style="color: #2c3e50; margin-bottom: 20px;")
 
@@ -855,6 +856,9 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     )
                 )
             return ui.tags.div()  # none
+=======
+        pass
+>>>>>>> 2f64a0c (Added tabs)
 
     with ui.nav_panel("C"):
         pass
