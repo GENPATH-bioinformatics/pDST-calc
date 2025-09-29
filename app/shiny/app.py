@@ -8,6 +8,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from app.api.drug_database import load_drug_data
 from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_mgit, vol_workingsol, vol_ss_to_ws, vol_final_dil
+from app.api.auth import register_user, login_user
+from app.api.database import db_manager
 
 # Unit conversion functions
 
@@ -228,6 +230,12 @@ warnings = reactive.Value([])
 # Unit selection reactive values
 volume_unit = reactive.Value("ml")
 weight_unit = reactive.Value("mg")
+
+# Auth/user session state
+current_user = reactive.Value(None)
+auth_message = reactive.Value("")
+auth_view = reactive.Value("none")  # one of: none | register | login
+current_session = reactive.Value(None)  # {'session_id': int, 'session_name': str}
 
 # Add top whitespace
 ui.tags.div(style="margin-top: 50px;")
@@ -750,7 +758,103 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     return ui.tags.div()
 
     with ui.nav_panel("B"):
-        pass
+        # Account / Authentication
+        ui.tags.h2("Account", style="color: #2c3e50; margin-bottom: 20px;")
+
+        @render.ui
+        def account_status():
+            user = current_user()
+            message = auth_message()
+            status_block = []
+            if user:
+                status_block.append(ui.tags.p(f"Signed in as: {user.get('username')}", style="color: #27ae60;"))
+                status_block.append(ui.input_action_button("logout_btn", "Logout", class_="btn-secondary"))
+            else:
+                status_block.append(ui.tags.p("Not signed in", style="color: #7f8c8d;"))
+            if message:
+                status_block.append(ui.tags.p(message, style="color: #2c3e50; margin-top: 10px;"))
+            return ui.tags.div(*status_block, style="margin-bottom: 20px;")
+
+        # Users table
+        @render.ui
+        def users_table():
+            try:
+                with db_manager.get_connection() as conn:
+                    users_cur = conn.execute("SELECT user_id, username FROM users ORDER BY user_id ASC")
+                    users_rows = users_cur.fetchall()
+                    header = ui.tags.tr(
+                        ui.tags.th("User ID", style="padding: 6px; border: 1px solid #ddd;"),
+                        ui.tags.th("Username", style="padding: 6px; border: 1px solid #ddd;"),
+                        ui.tags.th("# Sessions", style="padding: 6px; border: 1px solid #ddd;"),
+                        ui.tags.th("Recent Sessions (3)", style="padding: 6px; border: 1px solid #ddd;")
+                    )
+                    body_rows = []
+                    for user_id, username in users_rows:
+                        sess_cur = conn.execute(
+                            "SELECT session_name FROM session WHERE user_id = ? ORDER BY session_date DESC LIMIT 3",
+                            (user_id,)
+                        )
+                        recent_names = [row[0] for row in sess_cur.fetchall()]
+                        count_cur = conn.execute(
+                            "SELECT COUNT(*) FROM session WHERE user_id = ?",
+                            (user_id,)
+                        )
+                        total_count = count_cur.fetchone()[0]
+                        body_rows.append(
+                            ui.tags.tr(
+                                ui.tags.td(str(user_id), style="padding: 6px; border: 1px solid #ddd;"),
+                                ui.tags.td(username, style="padding: 6px; border: 1px solid #ddd;"),
+                                ui.tags.td(str(total_count), style="padding: 6px; border: 1px solid #ddd;"),
+                                ui.tags.td(
+                                    ", ".join(recent_names) if recent_names else "-",
+                                    style="padding: 6px; border: 1px solid #ddd;"
+                                )
+                            )
+                        )
+                return ui.tags.div(
+                    ui.tags.h3("Registered Users", style="color: #2c3e50; margin-bottom: 10px;"),
+                    ui.tags.table(header, *body_rows, style="border-collapse: collapse; margin-bottom: 20px;")
+                )
+            except Exception:
+                return ui.tags.div(ui.tags.p("Unable to load users."))
+
+        # Toggle buttons for forms
+        ui.input_action_button("show_register", "Sign up", class_="btn-primary", style="margin-right: 10px;")
+        ui.input_action_button("show_login", "Login", class_="btn-success")
+
+        # Conditional form render and session creation (visible only when logged in)
+        @render.ui
+        def auth_forms():
+            view = auth_view()
+            if view == "register":
+                return ui.tags.div(
+                    ui.tags.h3("Register", style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;"),
+                    ui.input_text("reg_username", "Username", placeholder="Enter a username"),
+                    ui.input_password("reg_password", "Password"),
+                    ui.input_password("reg_password2", "Confirm Password"),
+                    ui.input_action_button("register_btn", "Create Account", class_="btn-primary", style="margin-top: 10px;")
+                )
+            if view == "login":
+                return ui.tags.div(
+                    ui.tags.h3("Login", style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;"),
+                    ui.input_text("login_username", "Username"),
+                    ui.input_password("login_password", "Password"),
+                    ui.input_action_button("login_btn", "Sign In", class_="btn-success", style="margin-top: 10px;")
+                )
+            # Show start session UI when a user is signed in
+            user = current_user()
+            if user:
+                cs = current_session()
+                return ui.tags.div(
+                    ui.tags.h3("Start a Session", style="color: #2c3e50; margin-top: 20px; margin-bottom: 10px;"),
+                    ui.input_text("session_name", "Session name", placeholder="e.g. 2025-09-29 prep"),
+                    ui.input_action_button("start_session_btn", "Start session", class_="btn-primary", style="margin-top: 10px; margin-right: 10px;"),
+                    ui.tags.p(
+                        f"Current session: {cs.get('session_name')}" if cs else "No active session",
+                        style="color: #7f8c8d; margin-top: 10px;"
+                    )
+                )
+            return ui.tags.div()  # none
 
     with ui.nav_panel("C"):
         pass
@@ -792,6 +896,28 @@ def reset_selection():
 def calculate_results():
     if current_step() == 2:
         calculate_clicked.set(True)
+        # Persist input state to session if active
+        try:
+            cs = current_session()
+            user = current_user()
+            if cs and user:
+                selected = input.drug_selection() or []
+                preparation = {
+                    'selected_drugs': selected,
+                    'volume_unit': volume_unit(),
+                    'weight_unit': weight_unit(),
+                    'step': 2,
+                    'inputs': {}
+                }
+                for i, drug_name in enumerate(selected):
+                    preparation['inputs'][drug_name] = {
+                        'custom_critical': input.get(f"custom_critical_{i}")(),
+                        'purchased_molw': input.get(f"purchased_molw_{i}")(),
+                        'stock_volume': input.get(f"stock_volume_{i}")()
+                    }
+                db_manager.update_session_data(cs['session_id'], preparation)
+        except Exception:
+            pass
 
 @reactive.effect
 @reactive.event(input.calculate_final_btn)
@@ -799,6 +925,28 @@ def calculate_final_results():
     if current_step() == 3:
         # Mark that final calculation has been performed
         final_calculation_done.set(True)
+        # Persist final inputs/results to session if active
+        try:
+            cs = current_session()
+            user = current_user()
+            if cs and user:
+                selected = input.drug_selection() or []
+                preparation = {
+                    'selected_drugs': selected,
+                    'volume_unit': volume_unit(),
+                    'weight_unit': weight_unit(),
+                    'step': 3,
+                    'inputs': {},
+                    'results': calculation_results.get()
+                }
+                for i, drug_name in enumerate(selected):
+                    preparation['inputs'][drug_name] = {
+                        'actual_weight': input.get(f"actual_weight_{i}")(),
+                        'mgit_tubes': input.get(f"mgit_tubes_{i}")()
+                    }
+                db_manager.update_session_data(cs['session_id'], preparation)
+        except Exception:
+            pass
 
 @reactive.effect
 @reactive.event(input.new_calc_btn)
@@ -824,6 +972,89 @@ def update_volume_unit():
 @reactive.event(input.weight_unit)
 def update_weight_unit():
     weight_unit.set(input.weight_unit())
+
+# Auth handlers
+@reactive.effect
+@reactive.event(input.show_register)
+def toggle_register():
+    auth_view.set("register")
+    auth_message.set("")
+
+@reactive.effect
+@reactive.event(input.show_login)
+def toggle_login():
+    auth_view.set("login")
+    auth_message.set("")
+
+@reactive.effect
+@reactive.event(input.register_btn)
+def handle_register():
+    username = (input.reg_username() or "").strip()
+    pw1 = input.reg_password() or ""
+    pw2 = input.reg_password2() or ""
+    if not username or not pw1 or not pw2:
+        auth_message.set("Please fill in all registration fields.")
+        return
+    if pw1 != pw2:
+        auth_message.set("Passwords do not match.")
+        return
+    user_id = register_user(username, pw1)
+    if user_id:
+        # Auto-login after successful registration
+        user = login_user(username, pw1)
+        current_user.set(user)
+        auth_message.set("Account created and signed in.")
+        auth_view.set("none")
+    else:
+        auth_message.set("Username already exists or registration failed.")
+
+@reactive.effect
+@reactive.event(input.login_btn)
+def handle_login():
+    username = (input.login_username() or "").strip()
+    password = input.login_password() or ""
+    if not username or not password:
+        auth_message.set("Please provide username and password.")
+        return
+    user = login_user(username, password)
+    if user:
+        current_user.set(user)
+        auth_message.set("Signed in successfully.")
+        auth_view.set("none")
+    else:
+        current_user.set(None)
+        auth_message.set("Invalid credentials.")
+
+@reactive.effect
+@reactive.event(input.logout_btn)
+def handle_logout():
+    current_user.set(None)
+    auth_message.set("Signed out.")
+    auth_view.set("none")
+
+# Start session -> create or get session and redirect to calculator (Tab A)
+@reactive.effect
+@reactive.event(input.start_session_btn)
+def start_session():
+    user = current_user()
+    name = (input.session_name() or "").strip()
+    if not user:
+        auth_message.set("Please sign in first.")
+        return
+    if not name:
+        auth_message.set("Please provide a session name.")
+        return
+    try:
+        session_id = db_manager.get_or_create_session(user['user_id'], name)
+        if session_id:
+            current_session.set({'session_id': session_id, 'session_name': name})
+            auth_message.set(f"Session '{name}' started.")
+            # Switch to calculator tab A
+            ui.update_navs("tab", selected="A")
+        else:
+            auth_message.set("Failed to start session.")
+    except Exception:
+        auth_message.set("Error starting session.")
 
 # Warning-related reactive effects
 @reactive.effect
