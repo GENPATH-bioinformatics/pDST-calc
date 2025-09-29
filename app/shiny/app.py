@@ -232,514 +232,528 @@ weight_unit = reactive.Value("mg")
 # Add top whitespace
 ui.tags.div(style="margin-top: 50px;")
 
-# Main layout with sidebar
-with ui.layout_sidebar():
-    
-    # Left sidebar panel
-    with ui.sidebar():
-        ui.tags.div(
-            ui.tags.h3("pDST Calculator", style="color: #2c3e50; margin-bottom: 10px;"),
-            ui.tags.p("Calculate drug susceptibility testing parameters", style="color: #7f8c8d; margin-bottom: 20px;"),
-            style="border-bottom: 1px solid #ecf0f1; padding-bottom: 20px;"
-        )
-        
-        ui.tags.h4("Sections", style="color: #2c3e50; margin-bottom: 15px;")
-        
-        # Progress steps
-        @render.ui
-        def progress_steps():
-            steps = [
-                "Drug Selection",
-                "Parameters",
-                "Final Results"
-            ]
-        
-            step_elements = []
-            for i, step in enumerate(steps):
-                step_style = "color: #3498db; font-weight: bold;" if current_step() == i + 1 else "color: #7f8c8d;"
-                step_elements.append(
-            ui.tags.div(
-                ui.tags.p(step, style=step_style),
-                style="margin-bottom: 8px;"
-            )
-                )
+with ui.navset_card_pill(id="tab", selected="A"):
+    with ui.nav_panel("A"):
+        # Main layout with sidebar
+        with ui.layout_sidebar():
             
-            return ui.tags.div(*step_elements)
-        
-        ui.tags.div(style="margin-top: 30px;")
-        
-        # Unit Selection Section
-        ui.tags.div(style="margin-top: 30px;")
-        ui.tags.h4("Unit Preferences", style="color: #2c3e50; margin-bottom: 15px;")
-        
-        ui.tags.p("Select your preferred units:", style="color: #7f8c8d; font-size: 12px; margin-bottom: 10px;")
-        
-        # Molecular weight fixed to g/mol
-        ui.input_select(
-            "vol_unit",
-            "Volume:",
-            choices=["ml", "μl"],
-            selected="ml"
-        )
-        
-        # Concentration fixed to mg/ml
-        ui.input_select(
-            "weight_unit",
-            "Weight:",
-            choices=["mg", "g", "μg"],
-            selected="mg"
-        )
-        
-    
-    # Main content area with additional top padding
-    ui.tags.div(style="padding-top: 30px;")
-    
+            # Left sidebar panel
+            with ui.sidebar():
+                ui.tags.div(
+                    ui.tags.h3("pDST Calculator", style="color: #2c3e50; margin-bottom: 10px;"),
+                    ui.tags.p("Calculate drug susceptibility testing parameters", style="color: #7f8c8d; margin-bottom: 20px;"),
+                    style="border-bottom: 1px solid #ecf0f1; padding-bottom: 20px;"
+                )
+                
+                ui.tags.h4("Sections", style="color: #2c3e50; margin-bottom: 15px;")
+                
+                # Progress steps
+                @render.ui
+                def progress_steps():
+                    steps = [
+                        "Drug Selection",
+                        "Parameters",
+                        "Final Results"
+                    ]
+                
+                    step_elements = []
+                    for i, step in enumerate(steps):
+                        step_style = "color: #3498db; font-weight: bold;" if current_step() == i + 1 else "color: #7f8c8d;"
+                        step_elements.append(
+                    ui.tags.div(
+                        ui.tags.p(step, style=step_style),
+                        style="margin-bottom: 8px;"
+                    )
+                        )
+                    
+                    return ui.tags.div(*step_elements)
+                
+                ui.tags.div(style="margin-top: 30px;")
+                
+                # Unit Selection Section
+                ui.tags.div(style="margin-top: 30px;")
+                ui.tags.h4("Unit Preferences", style="color: #2c3e50; margin-bottom: 15px;")
+                
+                ui.tags.p("Select your preferred units:", style="color: #7f8c8d; font-size: 12px; margin-bottom: 10px;")
+                
+                # Molecular weight fixed to g/mol
+                ui.input_select(
+                    "vol_unit",
+                    "Volume:",
+                    choices=["ml", "μl"],
+                    selected="ml"
+                )
+                
+                # Concentration fixed to mg/ml
+                ui.input_select(
+                    "weight_unit",
+                    "Weight:",
+                    choices=["mg", "g", "μg"],
+                    selected="mg"
+                )
+                
+            
+            # Main content area with additional top padding
+            ui.tags.div(style="padding-top: 30px;")
+            
 
-    
-    # Step 1: Drug Selection
-    with ui.tags.div(id="step1"):
-        ui.tags.h2("Select Drugs", style="color: #2c3e50; margin-bottom: 20px;")
-        ui.input_selectize(
-            "drug_selection",
-            "Select the drugs you want to calculate parameters for:",
-            drug_selection,
-            multiple=True,
-        )
-        
-        # Display selected drugs in a table
-        @render.ui
-        def selected_drugs_table():
-            selected = input.drug_selection()
-            if not selected:
-                return ui.tags.div("No drugs selected yet.")
             
-            # Get the full drug data
-            drug_data = load_drug_data()
-            
-            if current_step() == 1:
-                # Create table headers for step 1
-                table_headers = ui.tags.tr(
-                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                    ui.tags.th("Mol. Weight (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                    ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                    ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                    style="background-color: #f8f9fa;"
+            # Step 1: Drug Selection
+            with ui.tags.div(id="step1"):
+                ui.tags.h2("Select Drugs", style="color: #2c3e50; margin-bottom: 20px;")
+                ui.input_selectize(
+                    "drug_selection",
+                    "Select the drugs you want to calculate parameters for:",
+                    drug_selection,
+                    multiple=True,
                 )
                 
-                # Create table rows for each selected drug
-                table_rows = []
-                for i, drug_name in enumerate(selected):
-                    # Find the drug data in the dataframe
-                    drug_row = drug_data[drug_data['Drug'] == drug_name]
-                    if not drug_row.empty:
-                        row_data = drug_row.iloc[0]
-                        row = ui.tags.tr(
-                            ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                            ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                            ui.tags.td(row_data['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"custom_critical_{i}",
-                                    "",
-                                    value=row_data['Critical_Concentration'],
-                                    min=0,
-                                    step=0.01
-                                ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 100px;"
-                            ),
-                            style="background-color: white;"
+                # Display selected drugs in a table
+                @render.ui
+                def selected_drugs_table():
+
+                    selected = input.drug_selection()
+                    if not selected:
+                        return ui.tags.div("No drugs selected yet.")
+                    
+                    # Get the full drug data
+                    drug_data = load_drug_data()
+                    
+                    if current_step() == 1:
+                        # Create table headers for step 1
+                        table_headers = ui.tags.tr(
+                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                            ui.tags.th("Mol. Weight (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                            ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                            style="background-color: #f8f9fa;"
                         )
-                        table_rows.append(row)
-                
-                return ui.tags.div(
-                    ui.tags.h3("Selected Drugs", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                    ui.tags.div(
-                        ui.tags.table(
-                            table_headers,
-                            *table_rows,
-                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                        ),
-                        style="overflow-x: auto; max-width: 100%;"
-                    )
-                )
-            elif current_step() == 2:
-                # Create table headers for step 2
-                table_headers = ui.tags.tr(
-                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                    ui.tags.th(f"Stock Vol. ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                    ui.tags.th("Purch. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                    style="background-color: #f8f9fa;"
-                )
-                
-                # Create table rows for each selected drug
-                table_rows = []
-                for i, drug_name in enumerate(selected):
-                    # Find the drug data in the dataframe for step 2
-                    drug_row = drug_data[drug_data['Drug'] == drug_name]
-                    if not drug_row.empty:
-                        row_data = drug_row.iloc[0]
-                        row = ui.tags.tr(
-                            ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"stock_volume_{i}",
-                                    "",
-                                    value=0,
-                                    min=0,
-                                    step=0.1
+                        
+                        # Create table rows for each selected drug
+                        table_rows = []
+                        for i, drug_name in enumerate(selected):
+                            # Find the drug data in the dataframe
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                row_data = drug_row.iloc[0]
+                                row = ui.tags.tr(
+                                    ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                    ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(row_data['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(
+                                        ui.input_numeric(
+                                            f"custom_critical_{i}",
+                                            "",
+                                            value=row_data['Critical_Concentration'],
+                                            min=0,
+                                            step=0.01
+                                        ),
+                                        style="padding: 5px; border: 1px solid #ddd; width: 100px;"
+                                    ),
+                                    style="background-color: white;"
+                                )
+                                table_rows.append(row)
+                        
+                        return ui.tags.div(
+                            ui.tags.div(
+                                ui.tags.table(
+                                    table_headers,
+                                    *table_rows,
+                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
                                 ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 100px;"
-                            ),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"purchased_molw_{i}",
-                                    "",
-                                    value=row_data['OrgMolecular_Weight'],
-                                    min=row_data['OrgMolecular_Weight'],
-                                    step=0.01
-                                ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
-                            ),
-                            style="background-color: white;"
+                                style="overflow-x: auto; max-width: 100%;"
+                            )
                         )
-                        table_rows.append(row)
-                
-                return ui.tags.div(
-                    ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                    ui.tags.div(
-                        ui.tags.table(
-                            table_headers,
-                            *table_rows,
-                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                        ),
-                        style="overflow-x: auto; max-width: 100%;"
-                    )
-                )
-            else:
-                # Create table headers for step 3
-                table_headers = ui.tags.tr(
-                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                    ui.tags.th(f"Est. Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                    ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                    ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                    style="background-color: #f8f9fa;"
-                )
-                
-                # Create table rows for each selected drug
-                table_rows = []
-                for i, drug_name in enumerate(selected):
-                    # Get estimated weight from previous calculation
-                    est_weight = get_estimated_weight(i)
-                    row = ui.tags.tr(
-                        ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                        ui.tags.td(f"{est_weight:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                        ui.tags.td(
-                            ui.input_numeric(
-                                f"actual_weight_{i}",
-                                "",
-                                value=round(est_weight, 4),
-                                min=0,
-                                step=0.001
-                            ),
-                            style="padding: 5px; border: 1px solid #ddd; width: 120px;"
-                        ),
-                        ui.tags.td(
-                            ui.input_numeric(
-                                f"mgit_tubes_{i}",
-                                "",
-                                value=0,
-                                min=1,
-                                step=1
-                            ),
-                            style="padding: 5px; border: 1px solid #ddd; width: 100px;"
-                        ),
-                        style="background-color: white;"
-                    )
-                    table_rows.append(row)
-                
-                return ui.tags.div(
-                    ui.tags.h3("Enter Actual Weights and MGIT Tubes", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                    ui.tags.div(
-                        ui.tags.table(
-                            table_headers,
-                            *table_rows,
-                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                        ),
-                        style="overflow-x: auto; max-width: 100%;"
-                    )
-                )
-    
-    # Results section for step 2
-    @render.ui
-    def results_section():
-        selected = input.drug_selection()
-        if not selected:
-            return ui.tags.div()
+                    elif current_step() == 2:
+                        # Create table headers for step 2
+                        table_headers = ui.tags.tr(
+                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                            ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                            ui.tags.th("Org. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th("Purch. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th(f"Stock Vol. ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                            style="background-color: #f8f9fa;"
+                        )
+                        
+                        # Create table rows for each selected drug
+                        table_rows = []
+                        for i, drug_name in enumerate(selected):
+                            # Find the drug data in the dataframe for step 2
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                row_data = drug_row.iloc[0]
+                                row = ui.tags.tr(
+                                    ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                    ui.tags.td(f"{row_data['Critical_Concentration']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(
+                                        ui.input_numeric(
+                                            f"purchased_molw_{i}",
+                                            "",
+                                            value=0,
+                                            min=row_data['OrgMolecular_Weight'],
+                                            step=0.01
+                                        ),
+                                        style="padding: 5px; border: 1px solid #ddd; width: 120px;"
+                                    ),
+                                    ui.tags.td(
+                                        ui.input_numeric(
+                                            f"stock_volume_{i}",
+                                            "",
+                                            value=0,
+                                            min=0,
+                                            step=0.1
+                                        ),
+                                        style="padding: 5px; border: 1px solid #ddd; width: 100px;"
+                                    ),
+                                    style="background-color: white;"
+                                )
+                                table_rows.append(row)
+                        
+                        return ui.tags.div(
+                            ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                            ui.tags.div(
+                                ui.tags.table(
+                                    table_headers,
+                                    *table_rows,
+                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                ),
+                                style="overflow-x: auto; max-width: 100%;"
+                            )
+                        )
+                    else:
+                        # Create table headers for step 3
+                        table_headers = ui.tags.tr(
+                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                            ui.tags.th(f"Est. Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                            style="background-color: #f8f9fa;"
+                        )
+                        
+                        # Create table rows for each selected drug
+                        table_rows = []
+                        for i, drug_name in enumerate(selected):
+                            # Get estimated weight from previous calculation
+                            est_weight = get_estimated_weight(i)
+                            row = ui.tags.tr(
+                                ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                ui.tags.td(f"{est_weight:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                ui.tags.td(
+                                    ui.input_numeric(
+                                        f"actual_weight_{i}",
+                                        "",
+                                        value=0,
+                                        min=0,
+                                        step=0.001
+                                    ),
+                                    style="padding: 5px; border: 1px solid #ddd; width: 120px;"
+                                ),
+                                ui.tags.td(
+                                    ui.input_numeric(
+                                        f"mgit_tubes_{i}",
+                                        "",
+                                        value=0,
+                                        min=1,
+                                        step=1
+                                    ),
+                                    style="padding: 5px; border: 1px solid #ddd; width: 100px;"
+                                ),
+                                style="background-color: white;"
+                            )
+                            table_rows.append(row)
+                        
+                        return ui.tags.div(
+                            ui.tags.h3("Enter Actual Weights and MGIT Tubes", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                            ui.tags.div(
+                                ui.tags.table(
+                                    table_headers,
+                                    *table_rows,
+                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                ),
+                                style="overflow-x: auto; max-width: 100%;"
+                            )
+                        )
             
-        if current_step() == 2:
-            # Get input values
-            try:
-                stock_volumes = []
-                purchased_mol_weights = []
-                custom_critical_values = []
-                drug_data = load_drug_data()
+            # Results section for step 2
+            @render.ui
+            def results_section():
+                selected = input.drug_selection()
+                if not selected:
+                    return ui.tags.div()
+                    
+                if current_step() == 2:
+                    # Get input values
+                    try:
+                        stock_volumes = []
+                        purchased_mol_weights = []
+                        custom_critical_values = []
+                        drug_data = load_drug_data()
+                        
+                        for i, drug_name in enumerate(selected):
+                            
+                            # Get original molecular weight
+                            org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
+                            
+                            # Get purchased molecular weight
+                            purch_molw = input[f"purchased_molw_{i}"]()
+                            if purch_molw is None or purch_molw <= 0:
+                                return ui.tags.div("Please enter valid purchased molecular weights for all drugs.", style="color: green;")
+                            elif purch_molw < org_molw:
+                                return ui.tags.div("Purchased molecular weight cannot be smaller than original molecular weight.", style="color: red;")
+                            # Use g/mol directly
+                            purch_molw_gmol = purch_molw
+                            purchased_mol_weights.append(purch_molw_gmol)
+                            
+                            # Get stock volume
+                            stock_vol = input[f"stock_volume_{i}"]()
+                            if stock_vol is None or stock_vol <= 0:
+                                return ui.tags.div("Please enter valid stock volumes for all drugs.", style="color: green;")
+
+                            # Convert to ml for calculations
+                            stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
+                            stock_volumes.append(stock_vol_ml)
+                            
+                            # Get custom critical value
+                            custom_crit = input[f"custom_critical_{i}"]()
+                            if custom_crit is None or custom_crit <= 0:
+                                return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: green;")
+                            # Use mg/ml directly
+                            custom_crit_mgml = custom_crit
+                            custom_critical_values.append(custom_crit_mgml)
+                        
+                        if calculate_clicked():
+                            # Calculate results
+                            results_data = []
+                            estimated_weights = []
+                            
+                            for i, drug_name in enumerate(selected):
+                                drug_row = drug_data[drug_data['Drug'] == drug_name]
+                                if not drug_row.empty:
+                                    row_data = drug_row.iloc[0]
+                                
+                                    # Calculate potency
+                                    pot = potency(purchased_mol_weights[i], row_data['OrgMolecular_Weight'])
+                                
+                                    # Calculate estimated drug weight
+                                    est_dw = est_drugweight(custom_critical_values[i], stock_volumes[i], pot)
+                                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
+                                    estimated_weights.append(est_dw_user_unit)
+                                
+                                    results_data.append({
+                                        'Drug': drug_name,
+                                        'Potency': f"{pot:.5f}",
+                                        'Est_DrugWeight': est_dw_user_unit
+                                    })
+                            
+                            # Store estimated weights for step 3
+                            calculation_results.set({'estimated_weights': estimated_weights})
+                        
+                            # Create results table
+                            if results_data:
+                                table_headers = ui.tags.tr(
+                                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    ui.tags.th("Potency", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                                    ui.tags.th(f"Est. Drug Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
+                                    style="background-color: #f8f9fa;"
+                                )
+                            
+                                table_rows = []
+                                for result in results_data:
+                                    row = ui.tags.tr(
+                                        ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                        ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                        ui.tags.td(round(float(result['Est_DrugWeight']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                        style="background-color: white;"
+                                    )
+                                    table_rows.append(row)
+
+                                return ui.tags.div(
+                                    ui.tags.h3("Calculation Results", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                                    ui.tags.div(
+                                        ui.tags.table(
+                                            table_headers,
+                                            *table_rows,
+                                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                        ),
+                                        style="overflow-x: auto; max-width: 100%;"
+                                    ),
+                                    ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #1e90ff; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 20px;")
+                                )
+                        
+                    except Exception as e:
+                        return ui.tags.div(f"Error in calculation: {str(e)}")
                 
-                for i, drug_name in enumerate(selected):
-                    # Get stock volume
-                    stock_vol = input[f"stock_volume_{i}"]()
-                    if stock_vol is None or stock_vol <= 0:
-                        return ui.tags.div("Please enter valid stock volumes for all drugs.", style="color: red;")
-                    # Convert to ml for calculations
-                    stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                    stock_volumes.append(stock_vol_ml)
-                    
-                    # Get original molecular weight
-                    org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
-                    
-                    # Get purchased molecular weight
-                    purch_molw = input[f"purchased_molw_{i}"]()
-                    if purch_molw is None or purch_molw <= 0:
-                        return ui.tags.div("Please enter valid purchased molecular weights for all drugs.", style="color: red;")
-                    # Use g/mol directly
-                    purch_molw_gmol = purch_molw
-                    if purch_molw_gmol < org_molw:
-                        return ui.tags.div("Please enter valid purchased molecular weights for all drugs.", style="color: red;")
-                    purchased_mol_weights.append(purch_molw_gmol)
-                    
-                    # Get custom critical value
-                    custom_crit = input[f"custom_critical_{i}"]()
-                    if custom_crit is None or custom_crit <= 0:
-                        return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: red;")
-                    # Use mg/ml directly
-                    custom_crit_mgml = custom_crit
-                    custom_critical_values.append(custom_crit_mgml)
+                elif current_step() == 3:
+                    # Show final results with warnings only after calculation is performed
+                    warning_list = warnings()
+                    if warning_list:
+                        warning_ui = ui.tags.div(
+                            ui.tags.h4("⚠️ Warnings Detected", style="color: #e74c3c; margin-bottom: 15px;"),
+                            *[ui.tags.p(warning, style="color: #2c3e50; margin-bottom: 10px; padding: 10px; background-color: #fdf2f2; border-left: 4px solid #e74c3c; border-radius: 4px;") for warning in warning_list],
+                            style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;"
+                        )
+                    else:
+                        warning_ui = ui.tags.div()
+                    if final_calculation_done():
+                        try:
+                            final_results = perform_final_calculations()
+                            
+                            if final_results:
+                                
+                                table_headers = ui.tags.tr(
+                                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                                    ui.tags.th(f"Stock Solution to Aliquot ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
+                                    ui.tags.th(f"Diluent to Add ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
+                                    style="background-color: #f8f9fa;"
+                                )
+                                
+                                table_rows = []
+                                for result in final_results:
+                                    row = ui.tags.tr(
+                                        ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                        ui.tags.td(result['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                        ui.tags.td(f"{result['Stock_Vol_Aliquot']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                        ui.tags.td(f"{result['Diluent_Vol']:.8f}" if result['Diluent_Vol'] < 0.001 else f"{result['Diluent_Vol']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                        style="background-color: white;"
+                                    )
+                                    table_rows.append(row)
+                                
+                                return ui.tags.div(
+                                    warning_ui,  # Show warnings at the top
+                                    ui.tags.h3("Final Results", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                                    ui.tags.div(
+                                        ui.tags.table(
+                                            table_headers,
+                                            *table_rows,
+                                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                        ),
+                                        style="overflow-x: auto; max-width: 100%;"
+                                    ),
+                                    ui.tags.div("Final values calculated successfully! Use these volumes to prepare your working solutions.", style="color: #27ae60; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
+                                )
+                        except Exception as e:
+                            return ui.tags.div(f"Error in final calculations: {str(e)}", style="color: red;")
+                    else:
+                        return ui.tags.div(
+                            warning_ui,  # Show warnings if any
+                            ui.tags.h3("Enter Final Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                            ui.tags.p("Please enter the actual weights and number of MGIT tubes for each selected drug, then click 'Calculate Final Results'.", style="color: #7f8c8d; margin-bottom: 20px;")
+                        )
                 
-                if calculate_clicked():
-                    # Calculate results
-                    results_data = []
-                    estimated_weights = []
+                return ui.tags.div()
+            
+            # Function to validate all inputs
+            def validate_inputs():
+                selected = input.drug_selection()
+                if not selected:
+                    return False
+                
+                try:
+                    drug_data = load_drug_data()
                     
                     for i, drug_name in enumerate(selected):
-                        drug_row = drug_data[drug_data['Drug'] == drug_name]
-                        if not drug_row.empty:
-                            row_data = drug_row.iloc[0]
+                        # Get stock volume
+                        stock_vol = input[f"stock_volume_{i}"]()
+                        if stock_vol is None or stock_vol <= 0:
+                            return False
                         
-                            # Calculate potency
-                            pot = potency(purchased_mol_weights[i], row_data['OrgMolecular_Weight'])
+                        # Get original molecular weight
+                        org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
                         
-                            # Calculate estimated drug weight
-                            est_dw = est_drugweight(custom_critical_values[i], stock_volumes[i], pot)
-                            est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
-                            estimated_weights.append(est_dw_user_unit)
+                        # Get purchased molecular weight
+                        purch_molw = input[f"purchased_molw_{i}"]()
+                        if purch_molw is None or purch_molw <= 0:
+                            return False
+                        # Convert to g/mol for comparison
+                        purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
+                        if purch_molw_gmol < org_molw:
+                            return False
                         
-                            results_data.append({
-                                'Drug': drug_name,
-                                'Potency': f"{pot:.5f}",
-                                'Est_DrugWeight': est_dw_user_unit
-                            })
+                        # Get custom critical value
+                        custom_crit = input[f"custom_critical_{i}"]()
+                        if custom_crit is None or custom_crit <= 0:
+                            return False
                     
-                    # Store estimated weights for step 3
-                    calculation_results.set({'estimated_weights': estimated_weights})
-                
-                    # Create results table
-                    if results_data:
-                        table_headers = ui.tags.tr(
-                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                            ui.tags.th("Potency", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                            ui.tags.th(f"Est. Drug Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
-                            style="background-color: #f8f9fa;"
-                        )
-                    
-                        table_rows = []
-                        for result in results_data:
-                            row = ui.tags.tr(
-                                ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                ui.tags.td(round(float(result['Est_DrugWeight']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                style="background-color: white;"
-                            )
-                            table_rows.append(row)
+                    return True
+                except:
+                    return False
 
-                        return ui.tags.div(
-                            ui.tags.h3("Calculation Results", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                            ui.tags.div(
-                                ui.tags.table(
-                                    table_headers,
-                                    *table_rows,
-                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                                ),
-                                style="overflow-x: auto; max-width: 100%;"
-                            ),
-                            ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #1e90ff; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 20px;")
-                        )
-                
-            except Exception as e:
-                return ui.tags.div(f"Error in calculation: {str(e)}")
-        
-        elif current_step() == 3:
-            # Show final results with warnings only after calculation is performed
-            warning_list = warnings()
-            if warning_list:
-                warning_ui = ui.tags.div(
-                    ui.tags.h4("⚠️ Warnings Detected", style="color: #e74c3c; margin-bottom: 15px;"),
-                    *[ui.tags.p(warning, style="color: #2c3e50; margin-bottom: 10px; padding: 10px; background-color: #fdf2f2; border-left: 4px solid #e74c3c; border-radius: 4px;") for warning in warning_list],
-                    style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;"
-                )
-            else:
-                warning_ui = ui.tags.div()
-            if final_calculation_done():
-                try:
-                    final_results = perform_final_calculations()
-                    
-                    if final_results:
-                        
-                        table_headers = ui.tags.tr(
-                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                            ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                            ui.tags.th(f"Stock Solution to Aliquot ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
-                            ui.tags.th(f"Diluent to Add ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
-                            style="background-color: #f8f9fa;"
-                        )
-                        
-                        table_rows = []
-                        for result in final_results:
-                            row = ui.tags.tr(
-                                ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                ui.tags.td(result['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                ui.tags.td(f"{result['Stock_Vol_Aliquot']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                ui.tags.td(f"{result['Diluent_Vol']:.8f}" if result['Diluent_Vol'] < 0.001 else f"{result['Diluent_Vol']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                style="background-color: white;"
-                            )
-                            table_rows.append(row)
-                        
-                        return ui.tags.div(
-                            warning_ui,  # Show warnings at the top
-                            ui.tags.h3("Final Results", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                            ui.tags.div(
-                                ui.tags.table(
-                                    table_headers,
-                                    *table_rows,
-                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                                ),
-                                style="overflow-x: auto; max-width: 100%;"
-                            ),
-                            ui.tags.div("Final values calculated successfully! Use these volumes to prepare your working solutions.", style="color: #27ae60; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
-                        )
-                except Exception as e:
-                    return ui.tags.div(f"Error in final calculations: {str(e)}", style="color: red;")
-            else:
-                return ui.tags.div(
-                    warning_ui,  # Show warnings if any
-                    ui.tags.h3("Enter Final Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                    ui.tags.p("Please enter the actual weights and number of MGIT tubes for each selected drug, then click 'Calculate Final Results'.", style="color: #7f8c8d; margin-bottom: 20px;")
-                )
-        
-        return ui.tags.div()
-    
-    # Function to validate all inputs
-    def validate_inputs():
-        selected = input.drug_selection()
-        if not selected:
-            return False
-        
-        try:
-            drug_data = load_drug_data()
-            
-            for i, drug_name in enumerate(selected):
-                # Get stock volume
-                stock_vol = input[f"stock_volume_{i}"]()
-                if stock_vol is None or stock_vol <= 0:
+            def validate_step3_inputs():
+                """Validate that all actual weights and MGIT tubes have been entered."""
+                selected = input.drug_selection()
+                if not selected:
                     return False
                 
-                # Get original molecular weight
-                org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
+                for i in range(len(selected)):
+                    actual_weight = input[f"actual_weight_{i}"]()
+                    mgit_tubes = input[f"mgit_tubes_{i}"]()
+                    if actual_weight is None or actual_weight <= 0 or mgit_tubes is None or mgit_tubes <= 0:
+                        return False
                 
-                # Get purchased molecular weight
-                purch_molw = input[f"purchased_molw_{i}"]()
-                if purch_molw is None or purch_molw <= 0:
-                    return False
-                # Convert to g/mol for comparison
-                purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
-                if purch_molw_gmol < org_molw:
-                    return False
-                
-                # Get custom critical value
-                custom_crit = input[f"custom_critical_{i}"]()
-                if custom_crit is None or custom_crit <= 0:
-                    return False
-            
-            return True
-        except:
-            return False
+                return True
 
-    def validate_step3_inputs():
-        """Validate that all actual weights and MGIT tubes have been entered."""
-        selected = input.drug_selection()
-        if not selected:
-            return False
-        
-        for i in range(len(selected)):
-            actual_weight = input[f"actual_weight_{i}"]()
-            mgit_tubes = input[f"mgit_tubes_{i}"]()
-            if actual_weight is None or actual_weight <= 0 or mgit_tubes is None or mgit_tubes <= 0:
-                return False
-        
-        return True
-
-    # Action buttons
-    @render.ui
-    def action_buttons():
-        if current_step() == 1:
-            return ui.tags.div(
-                ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db; margin-right: 10px;"),
-                ui.input_action_button("reset_btn", "Reset", class_="btn-secondary"),
-                style="text-align: center; margin-top: 30px;"
-            )
-        elif current_step() == 2:
-            # Only show calculate button if all inputs are valid
-            if validate_inputs():
-                if calculate_clicked():
-                    # Show Next button after calculation
+            # Action buttons
+            @render.ui
+            def action_buttons():
+                if current_step() == 1:
                     return ui.tags.div(
-                        ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                        ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
+                        ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db; margin-right: 10px;"),
+                        ui.input_action_button("reset_btn", "Reset", class_="btn-secondary"),
                         style="text-align: center; margin-top: 30px;"
                     )
+                elif current_step() == 2:
+                    # Only show calculate button if all inputs are valid
+                    if validate_inputs():
+                        if calculate_clicked():
+                            # Show Next button after calculation
+                            return ui.tags.div(
+                                ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                                ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
+                                style="text-align: center; margin-top: 30px;"
+                            )
+                        else:
+                            # Show Calculate button initially
+                            return ui.tags.div(
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                                ui.input_action_button("calculate_btn", "Calculate", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
+                            style="text-align: center; margin-top: 30px;"
+                            )
+                    else:
+                        # Show only back button if validation fails
+                        return ui.tags.div(
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
+                elif current_step() == 3:
+                    # Validate step 3 inputs
+                    if final_calculation_done():
+                        # After results are shown, replace with New Calculation
+                        return ui.tags.div(
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                            ui.input_action_button("new_calc_btn", "New Calculation", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
+                    elif validate_step3_inputs():
+                        return ui.tags.div(
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                            ui.input_action_button("calculate_final_btn", "Calculate Final Results", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
+                    else:
+                        return ui.tags.div(
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
                 else:
-                    # Show Calculate button initially
-                    return ui.tags.div(
-                    ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                        ui.input_action_button("calculate_btn", "Calculate", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
-                    style="text-align: center; margin-top: 30px;"
-                    )
-            else:
-                # Show only back button if validation fails
-                return ui.tags.div(
-                    ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
-                    style="text-align: center; margin-top: 30px;"
-                )
-        elif current_step() == 3:
-            # Validate step 3 inputs
-            if final_calculation_done():
-                # After results are shown, replace with New Calculation
-                return ui.tags.div(
-                    ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                    ui.input_action_button("new_calc_btn", "New Calculation", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
-                    style="text-align: center; margin-top: 30px;"
-                )
-            elif validate_step3_inputs():
-                return ui.tags.div(
-                    ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                    ui.input_action_button("calculate_final_btn", "Calculate Final Results", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
-                    style="text-align: center; margin-top: 30px;"
-                )
-            else:
-                return ui.tags.div(
-                    ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
-                    style="text-align: center; margin-top: 30px;"
-                )
-        else:
-            return ui.tags.div()
+                    return ui.tags.div()
+
+    with ui.nav_panel("B"):
+        pass
+
+    with ui.nav_panel("C"):
+        pass
 
 # Reactive functions
 @reactive.effect
