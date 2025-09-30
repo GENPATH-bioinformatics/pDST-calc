@@ -74,47 +74,6 @@ def clean_filename(filename):
     
     return cleaned
 
-# Expected field names for test input files
-EXPECTED_FIELDS = [
-    "id",
-    "logfile_name", 
-    "selected_numerals",
-    "reselect_numerals",
-    "own_cc",
-    "cc_values",
-    "purch_mol_weights",
-    "stock_vol",
-    "results_filename",
-    "weighed_drug",
-    "mgit_tubes",
-    "final_results_filename"
-]
-
-def parse_input_file(input_file):
-    """
-    Parse a semicolon-separated CSV input file for automated CLI testing.
-    If the first row does not contain the expected field names, treat it as data.
-    Args:
-        input_file (str): Path to the input CSV file.
-    Returns:
-        list[dict]: List of rows as dictionaries, one per test case.
-    """
-    with open(input_file, newline='') as csvfile:
-        # Peek at the first row
-        first_line = csvfile.readline()
-        csvfile.seek(0)
-        
-        # Check if the first row contains all expected fields
-        has_header = all(field in first_line for field in EXPECTED_FIELDS)
-        
-        if has_header:
-            reader = csv.DictReader(csvfile, delimiter=';')
-            return list(reader)
-        else:
-            # No header: treat as data, use expected_fields as keys
-            reader = csv.reader(csvfile, delimiter=';')
-            rows = list(reader)
-            return [dict(zip(EXPECTED_FIELDS, row)) for row in rows if any(cell.strip() for cell in row)]
 
 def setup_logger(session_name="default"):
     # Create logs directory in user's home directory
@@ -150,9 +109,6 @@ def main():
     
     # Set up argument parser
     parser = argparse.ArgumentParser(description="DST Calculator CLI - Drug Susceptibility Testing Calculator")
-    parser.add_argument('--drug-data', type=str, help='Path to input file with drug data (CSV format)')
-    parser.add_argument('--single-test-input', type=str, help='Path to single test input CSV for one-time automated run')
-    parser.add_argument('--test-output', type=str, help='Path to test output/error log file')
     parser.add_argument('--session-name', type=str, help='Session name for logging (default: interactive prompt)')
     args = parser.parse_args()
     
@@ -250,45 +206,14 @@ def main():
 
         # Load drug data
         print_step("Loading Drug Data", "")
-        if args.drug_data:
-            logger.info(f"Loading drug data from file: {args.drug_data}")
-            df = pd.read_csv(args.drug_data)
-            print_success(f"Drug data loaded from: {args.drug_data}")
-        else:
-            logger.info("Loading drug data from database")
-            df = load_drug_data()
-            print_success("Drug data loaded from database")
+        logger.info("Loading drug data from database")
+        df = load_drug_data()
+        print_success("Drug data loaded from database")
 
-        # Handle different modes
-        test_rows = []
-        error_log = None
-        
-        if args.single_test_input:
-            print_step("","Single Test Mode")
-            # Single test input mode - run one test case
-            logger.info(f"Running single test with input file: {args.single_test_input}")
-            test_rows = parse_input_file(args.single_test_input)
-            if args.test_output:
-                error_log = open(args.test_output, 'w')
-                logger.info(f"Error log will be written to: {args.test_output}")
-            
-            if test_rows:
-                # Use only the first row for single test
-                test_case = test_rows[0]
-                logger.info(f"Running single test case")
-                run_calculation(df, session_name, test_case, error_log, logger, user_id)
-                print_success("Single test completed successfully")
-            else:
-                logger.error("No test data found in single test input file")
-                print_error("No test data found in single test input file")
-            
-            if error_log:
-                error_log.close()
-        else:
-            # Interactive mode
-            print_step("","Interactive Mode")
-            run_calculation(df, session_name, None, None, logger, user_id, resume_preparation)
-            print_success("Interactive session completed successfully")
+        # Interactive mode only
+        print_step("","Interactive Mode")
+        run_calculation(df, session_name, logger=logger, user_id=user_id, resume_preparation=resume_preparation)
+        print_success("Interactive session completed successfully")
 
     except KeyboardInterrupt:
         print("\n\npDST-calc stopped, Goodbye!")
@@ -301,14 +226,12 @@ def main():
         print("pDST-calc terminated due to an error.")
         exit(1)
                 
-def run_calculation(df, session_name, test_case=None, error_log=None, logger=None, user_id=None, resume_preparation=None):
+def run_calculation(df, session_name, logger=None, user_id=None, resume_preparation=None):
     """
     Run the main calculation workflow.
     Args:
         df: DataFrame with drug data
         session_name: Name of the session for saving
-        test_case: Dictionary with test inputs (None for interactive mode)
-        error_log: File handle for error logging (None for interactive mode)
         logger: Logger instance
         user_id: ID of the authenticated user
     """
@@ -365,15 +288,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
             print(f"  - {row['Drug']}")
 
     else:
-        if test_case:
-            drugs_input = test_case.get('selected_numerals')
-            selected_df = select_drugs(df, input_file=drugs_input, error_log=error_log)
-            if selected_df is None:
-                logger.error("Failed to select drugs from test input")
-                print("Failed to select drugs from test input")
-                return
-        else:
-            selected_df = select_drugs(df)
+        selected_df = select_drugs(df)
 
 
     global num_drugs
@@ -391,37 +306,12 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
         for idx, row in selected_df.iterrows():
             print(f"  - {row['Drug']}: {row.get('Crit_Conc(mg/ml)', 'N/A')} mg/ml")
     else:
-        if test_case:
-
-            custom_critical_response = test_case.get('own_cc', 'n')
-        else:
-            response = input("\nWould you like to enter your own critical values for any of the selected drugs? (y/n): ").strip().lower()
-            custom_critical_response = response
-    
-        if custom_critical_response == 'y':
-            if test_case:
-                print(f"\n[AUTO] Your Critical Concentration selection: {test_case.get('cc_values', '')}")
-                # Handle custom critical values from test case
-                custom_values = test_case.get('cc_values', '')
-            else:
-                print("\nNow, please enter the critical concentration for each selected drug.")
-                custom_values = input("Critical Concentration: ").strip()
-
-            if (custom_values != num_drugs):
-                print(f"Number of custom critical values does not match number of selected drugs: {custom_values} != {num_drugs}")
-                return
-            if custom_values:
-                values = [float(x.strip()) for x in custom_values.split(',') if x.strip()]
-                for idx, value in enumerate(values):
-                    if idx < len(selected_df):
-                        selected_df.iloc[idx, selected_df.columns.get_loc('Crit_Conc(mg/ml)')] = value
-                print("\nUpdated selected drugs with custom critical values:")
-                print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
-            else:
-                # Interactive per-drug prompts (like purchased molecular weight)
-                custom_critical_values(selected_df)
-                print("\nUpdated selected drugs with custom critical values:")
-                print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
+        response = input("\nWould you like to enter your own critical values for any of the selected drugs? (y/n): ").strip().lower()
+        if response == 'y':
+            # Interactive per-drug prompts (like purchased molecular weight)
+            custom_critical_values(selected_df)
+            print("\nUpdated selected drugs with custom critical values:")
+            print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
         else:
             print("\nProceeding with default critical values for selected drugs:")
             print_and_log_tabulate(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
@@ -434,18 +324,8 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
     print_step("Step 3","Purchased Molecular Weights")
 
     if not resume_preparation:
-        if test_case:
-            print(f"\n[AUTO] Your Purchased Molecular Weight selection: {test_case.get('purch_mol_weights', '')}")
-            purchased_weights_input = test_case.get('purch_mol_weights', '')
-            if purchased_weights_input:
-                weights = [float(x.strip()) for x in purchased_weights_input.split(',') if x.strip()]
-                selected_df["PurMol_W(g/mol)"] = weights
-                if (len(weights) != num_drugs):
-                    print(f"Number of purchased molecular weights does not match number of selected drugs: {len(weights)} != {num_drugs}")
-                    return
-        else:
-            print("\nNow, please enter the purchased molecular weight for each selected drug.")
-            purchased_weights(selected_df)
+        print("\nNow, please enter the purchased molecular weight for each selected drug.")
+        purchased_weights(selected_df)
     else:
         print_success("Using prefilled purchased molecular weights from session:")
         for idx, row in selected_df.iterrows():
@@ -467,18 +347,8 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
    
     if not resume_preparation:
-        if test_case:   
-            print(f"[AUTO] Your Stock Solution Volume selection: {test_case.get('stock_vol', '')}")
-            stock_volumes_input = test_case.get('stock_vol', '')
-            if stock_volumes_input:
-                volumes = [float(x.strip()) for x in stock_volumes_input.split(',') if x.strip()]
-                if (len(volumes) != num_drugs):
-                    print(f"Number of stock solution volumes does not match number of selected drugs: {len(volumes)} != {num_drugs}")
-                    return
-                selected_df["St_Vol(ml)"] = volumes
-        else:
-            print("\nFinally, enter desired stock solution volume (ml).")
-            stock_volume(selected_df)
+        print("\nFinally, enter desired stock solution volume (ml).")
+        stock_volume(selected_df)
 
     else:
         print_success("Using prefilled stock solution volumes from session:")
@@ -500,7 +370,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
     # 5) Instruct user to weigh out the estimated drug weights
     print_step("Step 6","Drug Weight Instructions")
 
-    if not test_case and not (resume_preparation):
+    if not (resume_preparation):
 
         # Prepare output file
         output_filename = input("\nEnter filename for drug weight output (e.g., drug_weights): ").strip()
@@ -548,17 +418,7 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
     print_step("Step 7","Actual Drug Weights")
     has_actual_weights = 'Act_DrugW(mg)' in selected_df.columns and selected_df['Act_DrugW(mg)'].notna().all() and (selected_df['Act_DrugW(mg)'] > 0).all()
     if not resume_preparation or not has_actual_weights:
-        if test_case:
-            print(f"[AUTO] Your Weighed Drug selection: {test_case.get('weighed_drug', '')}")
-            actual_weights_input = test_case.get('weighed_drug', '')
-            if actual_weights_input:
-                weights = [float(x.strip()) for x in actual_weights_input.split(',') if x.strip()]
-                if (len(weights) != num_drugs):
-                    print(f"Number of actual weighed drug weights does not match number of selected drugs: {len(weights)} != {num_drugs}")
-                    return
-                selected_df["Act_DrugW(mg)"] = weights
-        else:
-            act_drugweight(selected_df)
+        act_drugweight(selected_df)
 
     else:
         print_success("Using prefilled actual drug weights from session:")
@@ -574,18 +434,8 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
 
     has_mgit_tubes = 'Total Mgit tubes' in selected_df.columns and selected_df['Total Mgit tubes'].notna().all() and (selected_df['Total Mgit tubes'] > 0).all()
     if not resume_preparation or not has_mgit_tubes:
-        if test_case:
-            print(f"[AUTO] Your MGIT Tubes selection: {test_case.get('mgit_tubes', '')}")
-            mgit_tubes_input = test_case.get('mgit_tubes', '')
-            if mgit_tubes_input:
-                tubes = [float(x.strip()) for x in mgit_tubes_input.split(',') if x.strip()]
-                if (len(tubes) != num_drugs):
-                    print(f"Number of MGIT tubes does not match number of selected drugs: {len(tubes)} != {num_drugs}")
-                    return
-                selected_df["Total Mgit tubes"] = tubes
-        else:
-            print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
-            mgit_tubes(selected_df)
+        print("\nNow that we have a completed STOCK SOLUTION, enter the number of MGIT tubes you would like to fill.")
+        mgit_tubes(selected_df)
 
     else:
         print_success("Using prefilled MGIT tube counts from session:")
@@ -609,25 +459,14 @@ def run_calculation(df, session_name, test_case=None, error_log=None, logger=Non
     os.makedirs(results_dir, exist_ok=True)
     
     # Prepare output file
-    if test_case:
-        output_filename = test_case.get('final_results_filename', 'final_results')
-        if not output_filename.endswith('.txt'):
-            output_filename += '.txt'
-
-        # Create results directory in project root
-        results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
-        results_dir = os.path.abspath(results_dir)
-        os.makedirs(results_dir, exist_ok=True)
-
+    output_filename = input("Enter filename for final results (e.g., final_results): ").strip()
+    if not output_filename:
+        output_filename = "final_results"
     else:
-        output_filename = input("Enter filename for final results (e.g., final_results): ").strip()
-        if not output_filename:
-            output_filename = "final_results"
-        else:
-            output_filename = clean_filename(output_filename)
-        
-        if not output_filename.endswith('.txt'):
-            output_filename += '.txt'
+        output_filename = clean_filename(output_filename)
+    
+    if not output_filename.endswith('.txt'):
+        output_filename += '.txt'
     
         
     # Write to output file
