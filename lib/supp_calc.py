@@ -111,26 +111,21 @@ def print_and_log_tabulate(df, *args, **kwargs):
 
 def select_drugs(df, input_file=None, error_log=None):
     """
-    Allow the user to select drugs from a DataFrame, either interactively or using a pre-supplied string for automated testing.
+    Allow the user to select drugs from a DataFrame interactively.
     Args:
         df (pd.DataFrame): DataFrame containing drug information.
-        input_file (str, optional): Pre-supplied selection string for test automation (e.g., "1,2,3").
-        error_log (file, optional): File handle for logging errors during automated testing.
     Returns:
-        pd.DataFrame or None: DataFrame of selected drugs, or None if invalid in test mode.
+        pd.DataFrame or None: DataFrame of selected drugs, or None if invalid.
     """
     while True:
-        if input_file is not None:
-            selection = input_file
-        else:
-            print("\nAvailable drugs:")
-            for idx, drug in enumerate(df['Drug'], 1):
-                print(f"{idx}. {drug}")
-            print("\n")
-            print_input_prompt("Enter the numbers of the drugs you want to select (comma or space separated).", example="1,3,5 or 2 4 6")
-            selection = input("Your selection: ")
-            if selection == 'all':
-                return df
+        print("\nAvailable drugs:")
+        for idx, drug in enumerate(df['Drug'], 1):
+            print(f"{idx}. {drug}")
+        print("\n")
+        print_input_prompt("Enter the numbers of the drugs you want to select (comma or space separated).", example="1,3,5 or 2 4 6")
+        selection = input("Your selection: ")
+        if selection == 'all':
+            return df
         # Parse the selection string
         try:
             numbers = []
@@ -161,25 +156,14 @@ def select_drugs(df, input_file=None, error_log=None):
             if error_log is not None:
                 error_log.write(msg + '\n')
         
-        # If there are invalid numbers and we're in test mode, return None
-        if invalid_numbers and input_file is not None:
-            return None
-        
         if not selected_drugs:
             msg = "No valid drugs selected. Please try again."
             print_error(msg)
-            if error_log is not None:
-                error_log.write(msg + '\n')
-            if input_file is not None:
-                return None
             continue
         print("\nSelected drugs:")
         selected_df = df[df['Drug'].isin(selected_drugs)].copy()
         print_table(selected_df, headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left')
         logger.info("\nDrugs selected:\n"+ selected_df.to_string(index=False) + "\n")
-        if input_file is not None:
-            # Assume auto-confirm for test mode
-            return selected_df
         # Ask for confirmation
         while True:
             confirm = input("\nDid you select the right drugs? Select 'n' to add or remove. (y to continue, n to reselect): ").strip().lower()
