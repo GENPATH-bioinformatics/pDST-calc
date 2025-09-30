@@ -241,7 +241,107 @@ current_session = reactive.Value(None)  # {'session_id': int, 'session_name': st
 ui.tags.div(style="margin-top: 50px;")
             
 with ui.navset_card_pill(id="tab", selected="A"):
+
     with ui.nav_panel("A"):
+        
+        ui.tags.h2("Account", style="color: #2c3e50; margin-bottom: 20px;")
+
+        @render.ui
+        def account_status():
+            user = current_user()
+            message = auth_message()
+            status_block = []
+            if user:
+                status_block.append(ui.tags.p(f"Signed in as: {user.get('username')}", style="color: #27ae60;"))
+                status_block.append(ui.input_action_button("logout_btn", "Logout", class_="btn-secondary"))
+            else:
+                status_block.append(ui.tags.p("Not signed in", style="color: #7f8c8d;"))
+            if message:
+                status_block.append(ui.tags.p(message, style="color: #2c3e50; margin-top: 10px;"))
+            return ui.tags.div(*status_block, style="margin-bottom: 20px;")
+
+        # Users table
+        @render.ui
+        def users_table():
+            try:
+                with db_manager.get_connection() as conn:
+                    users_cur = conn.execute("SELECT user_id, username FROM users ORDER BY user_id ASC")
+                    users_rows = users_cur.fetchall()
+                    header = ui.tags.tr(
+                        ui.tags.th("User ID", style="padding: 6px; border: 1px solid #ddd;"),
+                        ui.tags.th("Username", style="padding: 6px; border: 1px solid #ddd;"),
+                        ui.tags.th("# Sessions", style="padding: 6px; border: 1px solid #ddd;"),
+                        ui.tags.th("Recent Sessions (3)", style="padding: 6px; border: 1px solid #ddd;")
+                    )
+                    body_rows = []
+                    for user_id, username in users_rows:
+                        sess_cur = conn.execute(
+                            "SELECT session_name FROM session WHERE user_id = ? ORDER BY session_date DESC LIMIT 3",
+                            (user_id,)
+                        )
+                        recent_names = [row[0] for row in sess_cur.fetchall()]
+                        count_cur = conn.execute(
+                            "SELECT COUNT(*) FROM session WHERE user_id = ?",
+                            (user_id,)
+                        )
+                        total_count = count_cur.fetchone()[0]
+                        body_rows.append(
+                            ui.tags.tr(
+                                ui.tags.td(str(user_id), style="padding: 6px; border: 1px solid #ddd;"),
+                                ui.tags.td(username, style="padding: 6px; border: 1px solid #ddd;"),
+                                ui.tags.td(str(total_count), style="padding: 6px; border: 1px solid #ddd;"),
+                                ui.tags.td(
+                                    ", ".join(recent_names) if recent_names else "-",
+                                    style="padding: 6px; border: 1px solid #ddd;"
+                                )
+                            )
+                        )
+                return ui.tags.div(
+                    ui.tags.h3("Registered Users", style="color: #2c3e50; margin-bottom: 10px;"),
+                    ui.tags.table(header, *body_rows, style="border-collapse: collapse; margin-bottom: 20px;")
+                )
+            except Exception:
+                return ui.tags.div(ui.tags.p("Unable to load users."))
+
+        # Toggle buttons for forms
+        ui.input_action_button("show_register", "Sign up", class_="btn-primary", style="margin-right: 10px;")
+        ui.input_action_button("show_login", "Login", class_="btn-success")
+
+        # Conditional form render and session creation (visible only when logged in)
+        @render.ui
+        def auth_forms():
+            view = auth_view()
+            if view == "register":
+                return ui.tags.div(
+                    ui.tags.h3("Register", style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;"),
+                    ui.input_text("reg_username", "Username", placeholder="Enter a username"),
+                    ui.input_password("reg_password", "Password"),
+                    ui.input_password("reg_password2", "Confirm Password"),
+                    ui.input_action_button("register_btn", "Create Account", class_="btn-primary", style="margin-top: 10px;")
+                )
+            if view == "login":
+                return ui.tags.div(
+                    ui.tags.h3("Login", style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;"),
+                    ui.input_text("login_username", "Username"),
+                    ui.input_password("login_password", "Password"),
+                    ui.input_action_button("login_btn", "Sign In", class_="btn-success", style="margin-top: 10px;")
+                )
+            # Show start session UI when a user is signed in
+            user = current_user()
+            if user:
+                cs = current_session()
+                return ui.tags.div(
+                    ui.tags.h3("Start a Session", style="color: #2c3e50; margin-top: 20px; margin-bottom: 10px;"),
+                    ui.input_text("session_name", "Session name", placeholder="e.g. 2025-09-29 prep"),
+                    ui.input_action_button("start_session_btn", "Start session", class_="btn-primary", style="margin-top: 10px; margin-right: 10px;"),
+                    ui.tags.p(
+                        f"Current session: {cs.get('session_name')}" if cs else "No active session",
+                        style="color: #7f8c8d; margin-top: 10px;"
+                    )
+                )
+            return ui.tags.div()  # none
+
+    with ui.nav_panel("B"):
         # Main layout with sidebar
         with ui.layout_sidebar():
             
@@ -772,105 +872,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 else:
                     return ui.tags.div()
 
-    with ui.nav_panel("B"):
-        
-        ui.tags.h2("Account", style="color: #2c3e50; margin-bottom: 20px;")
-
-        @render.ui
-        def account_status():
-            user = current_user()
-            message = auth_message()
-            status_block = []
-            if user:
-                status_block.append(ui.tags.p(f"Signed in as: {user.get('username')}", style="color: #27ae60;"))
-                status_block.append(ui.input_action_button("logout_btn", "Logout", class_="btn-secondary"))
-            else:
-                status_block.append(ui.tags.p("Not signed in", style="color: #7f8c8d;"))
-            if message:
-                status_block.append(ui.tags.p(message, style="color: #2c3e50; margin-top: 10px;"))
-            return ui.tags.div(*status_block, style="margin-bottom: 20px;")
-
-        # Users table
-        @render.ui
-        def users_table():
-            try:
-                with db_manager.get_connection() as conn:
-                    users_cur = conn.execute("SELECT user_id, username FROM users ORDER BY user_id ASC")
-                    users_rows = users_cur.fetchall()
-                    header = ui.tags.tr(
-                        ui.tags.th("User ID", style="padding: 6px; border: 1px solid #ddd;"),
-                        ui.tags.th("Username", style="padding: 6px; border: 1px solid #ddd;"),
-                        ui.tags.th("# Sessions", style="padding: 6px; border: 1px solid #ddd;"),
-                        ui.tags.th("Recent Sessions (3)", style="padding: 6px; border: 1px solid #ddd;")
-                    )
-                    body_rows = []
-                    for user_id, username in users_rows:
-                        sess_cur = conn.execute(
-                            "SELECT session_name FROM session WHERE user_id = ? ORDER BY session_date DESC LIMIT 3",
-                            (user_id,)
-                        )
-                        recent_names = [row[0] for row in sess_cur.fetchall()]
-                        count_cur = conn.execute(
-                            "SELECT COUNT(*) FROM session WHERE user_id = ?",
-                            (user_id,)
-                        )
-                        total_count = count_cur.fetchone()[0]
-                        body_rows.append(
-                            ui.tags.tr(
-                                ui.tags.td(str(user_id), style="padding: 6px; border: 1px solid #ddd;"),
-                                ui.tags.td(username, style="padding: 6px; border: 1px solid #ddd;"),
-                                ui.tags.td(str(total_count), style="padding: 6px; border: 1px solid #ddd;"),
-                                ui.tags.td(
-                                    ", ".join(recent_names) if recent_names else "-",
-                                    style="padding: 6px; border: 1px solid #ddd;"
-                                )
-                            )
-                        )
-                return ui.tags.div(
-                    ui.tags.h3("Registered Users", style="color: #2c3e50; margin-bottom: 10px;"),
-                    ui.tags.table(header, *body_rows, style="border-collapse: collapse; margin-bottom: 20px;")
-                )
-            except Exception:
-                return ui.tags.div(ui.tags.p("Unable to load users."))
-
-        # Toggle buttons for forms
-        ui.input_action_button("show_register", "Sign up", class_="btn-primary", style="margin-right: 10px;")
-        ui.input_action_button("show_login", "Login", class_="btn-success")
-
-        # Conditional form render and session creation (visible only when logged in)
-        @render.ui
-        def auth_forms():
-            view = auth_view()
-            if view == "register":
-                return ui.tags.div(
-                    ui.tags.h3("Register", style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;"),
-                    ui.input_text("reg_username", "Username", placeholder="Enter a username"),
-                    ui.input_password("reg_password", "Password"),
-                    ui.input_password("reg_password2", "Confirm Password"),
-                    ui.input_action_button("register_btn", "Create Account", class_="btn-primary", style="margin-top: 10px;")
-                )
-            if view == "login":
-                return ui.tags.div(
-                    ui.tags.h3("Login", style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;"),
-                    ui.input_text("login_username", "Username"),
-                    ui.input_password("login_password", "Password"),
-                    ui.input_action_button("login_btn", "Sign In", class_="btn-success", style="margin-top: 10px;")
-                )
-            # Show start session UI when a user is signed in
-            user = current_user()
-            if user:
-                cs = current_session()
-                return ui.tags.div(
-                    ui.tags.h3("Start a Session", style="color: #2c3e50; margin-top: 20px; margin-bottom: 10px;"),
-                    ui.input_text("session_name", "Session name", placeholder="e.g. 2025-09-29 prep"),
-                    ui.input_action_button("start_session_btn", "Start session", class_="btn-primary", style="margin-top: 10px; margin-right: 10px;"),
-                    ui.tags.p(
-                        f"Current session: {cs.get('session_name')}" if cs else "No active session",
-                        style="color: #7f8c8d; margin-top: 10px;"
-                    )
-                )
-            return ui.tags.div()  # none
-
     with ui.nav_panel("C"):
         pass
 
@@ -1066,8 +1067,8 @@ def start_session():
         if session_id:
             current_session.set({'session_id': session_id, 'session_name': name})
             auth_message.set(f"Session '{name}' started.")
-            # Switch to calculator tab A
-            ui.update_navs("tab", selected="A")
+            # Switch to calculator tab B
+            ui.update_navs("tab", selected="B")
         else:
             auth_message.set("Failed to start session.")
     except Exception:
