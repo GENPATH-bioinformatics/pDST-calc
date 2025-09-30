@@ -34,7 +34,7 @@ def vol_diluent(est_drugweight, act_drugweight, desired_totalvol):
     Returns:
         float: Volume of diluent (mL).
     """
-    return (est_drugweight / act_drugweight) * desired_totalvol
+    return (act_drugweight / est_drugweight) * desired_totalvol
 
 def conc_stock(act_drugweight, vol_diluent):
     """
