@@ -984,8 +984,6 @@ def new_calculation():
 def update_volume_unit():
     volume_unit.set(input.vol_unit())
 
-# Removed mol_weight_unit and conc_unit reactive handlers (fixed units)
-
 @reactive.effect
 @reactive.event(input.weight_unit)
 def update_weight_unit():
@@ -1050,7 +1048,6 @@ def handle_logout():
     auth_message.set("Signed out.")
     auth_view.set("none")
 
-# Start session -> create or get session and redirect to calculator (Tab A)
 @reactive.effect
 @reactive.event(input.start_session_btn)
 def start_session():
