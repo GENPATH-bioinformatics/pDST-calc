@@ -387,9 +387,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             drug_row = drug_data[drug_data['Drug'] == drug_name]
                             if not drug_row.empty:
                                 row_data = drug_row.iloc[0]
+                                current_custom = input[f"custom_critical_{i}"]()
+                                if current_custom is None:
+                                    current_custom = row_data['Critical_Concentration']
                                 row = ui.tags.tr(
                                     ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                    ui.tags.td(f"{row_data['Critical_Concentration']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(f"{current_custom:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                     ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                     ui.tags.td(
                                         ui.input_numeric(
@@ -669,16 +672,18 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         
                         # Get purchased molecular weight
                         purch_molw = input[f"purchased_molw_{i}"]()
-                        if purch_molw is None or purch_molw <= 0:
-                            return False
-                        # Convert to g/mol for comparison
-                        purch_molw_gmol = convert_molecular_weight(purch_molw, molecular_weight_unit(), "g/mol")
-                        if purch_molw_gmol < org_molw:
+                        if purch_molw is None or purch_molw <= 0 or purch_molw < org_molw:
                             return False
                         
-                        # Get custom critical value
-                        custom_crit = input[f"custom_critical_{i}"]()
-                        if custom_crit is None or custom_crit <= 0:
+                        # Get custom critical value (mg/ml); fallback to DB default when not present in step 2
+                        try:
+                            custom_crit = input[f"custom_critical_{i}"]()
+                        except Exception:
+                            custom_crit = None
+                        if custom_crit is None:
+                            default_crit = drug_data[drug_data['Drug'] == drug_name]['Critical_Concentration'].iloc[0]
+                            custom_crit = default_crit
+                        if custom_crit <= 0:
                             return False
                     
                     return True
