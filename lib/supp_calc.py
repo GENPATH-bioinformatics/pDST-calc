@@ -17,15 +17,15 @@ except ImportError:
         print(f"\n{message}")
         if example:
             print(f"Example: {example}")
-    
+
     def print_success(message):
         """Fallback implementation for success messages."""
         print(f"✓ {message}")
-    
+
     def print_error(message):
         """Fallback implementation for error messages."""
         print(f"✗ Error: {message}")
-    
+
     def print_warning(message):
         """Fallback implementation for warning messages."""
         print(f"⚠ Warning: {message}")
@@ -155,7 +155,7 @@ def select_drugs(df, input_file=None, error_log=None):
             print_error(msg)
             if error_log is not None:
                 error_log.write(msg + '\n')
-        
+                
         if not selected_drugs:
             msg = "No valid drugs selected. Please try again."
             print_error(msg)
@@ -198,7 +198,7 @@ def custom_critical_values(selected_df):
             except ValueError:
                 print_error("Invalid input. Please enter a positive numeric value.")
                 continue
-            
+
 def purchased_weights(selected_df):
     """
     Prompt the user to enter purchased molecular weights for each selected drug.
@@ -213,12 +213,12 @@ def purchased_weights(selected_df):
                     value = input(f"Enter purchased molecular weight for {row['Drug']} (original: {row['OrgMol_W(g/mol)']}): ").strip()
                     logger.info(f"\nPurchased molecular weight entered for {row['Drug']}: {value} \n")
                     purch_weight = float(value)
-                    
+
                     # Validate that purchased molecular weight is not negative or zero
                     if purch_weight <= 0:
                         print_error("Purchased molecular weight must be greater than 0.")
                         continue
-                    
+
                     # Check if purchased weight is smaller than original weight
                     org_weight = float(row['OrgMol_W(g/mol)'])
                     if purch_weight < org_weight:
@@ -226,7 +226,7 @@ def purchased_weights(selected_df):
                         confirm = input("Do you want to continue with this value? (y/n): ").strip().lower()
                         if confirm != 'y':
                             continue
-                    
+
                     purch_weights.append(purch_weight)
                     print_success(f"Purchased molecular weight set to {purch_weight}")
                     break
@@ -249,12 +249,12 @@ def stock_volume(selected_df):
                     value = input(f"Enter desired stock volume (ml) for {row['Drug']}: ").strip()
                     logger.info(f"\nDesired stock volume entered for {row['Drug']}: {value} \n")
                     stock_volume = float(value)
-                    
+
                     # Validate that stock volume is not negative or zero
                     if stock_volume <= 0:
                         print_error("Stock volume must be greater than 0.")
                         continue
-                    
+
                     stock_volumes.append(stock_volume)
                     print_success(f"Stock volume set to {stock_volume} ml")
                     break
@@ -279,7 +279,7 @@ def cal_potency(selected_df):
             mol_org = float(row.get('OrgMol_W(g/mol)'))
             crit_conc = float(row['Crit_Conc(mg/ml)'])
             stock_vol = float(row.get('St_Vol(ml)'))
-            
+
             # Validate inputs before calculation
             if mol_purch <= 0 or mol_org <= 0 or crit_conc <= 0 or stock_vol <= 0:
                 print_error(f"Invalid values for {row['Drug']}: mol_purch={mol_purch}, mol_org={mol_org}, crit_conc={crit_conc}, stock_vol={stock_vol}")
@@ -288,14 +288,14 @@ def cal_potency(selected_df):
             else:
                 pot = potency(mol_purch, mol_org)
                 est_dw = est_drugweight(crit_conc, stock_vol, pot)
-                
+
                 # Validate calculated values
                 if pot is not None and (pot <= 0 or pot > 10):
                     print_warning(f"Potency for {row['Drug']} is {pot:.3f}, which seems unusual. Please verify your molecular weight values.")
-                
+
                 if est_dw is not None and est_dw <= 0:
                     print_error(f"Estimated drug weight for {row['Drug']} is {est_dw:.3f} mg, which is invalid. Please check your input values.")
-                
+
         except Exception as e:
             print_error(f"Error calculating values for {row['Drug']}: {str(e)}")
             pot = None
@@ -323,12 +323,12 @@ def act_drugweight(selected_df):
                     value = input(f"Enter actual weight for {row['Drug']}: ").strip()
                     logger.info(f"\nActual weight entered for {row['Drug']}: {value} \n")
                     drugweight = float(value)
-                    
+
                     # Validate that actual drug weight is not negative or zero
                     if drugweight <= 0:
                         print_error("Actual drug weight must be greater than 0.")
                         continue
-                    
+
                     # Check if actual weight is significantly different from estimated weight
                     if 'Est_DrugW(mg)' in selected_df.columns:
                         est_weight = selected_df.at[idx, 'Est_DrugW(mg)']
@@ -339,7 +339,7 @@ def act_drugweight(selected_df):
                                 confirm = input("Do you want to continue with this value? (y/n): ").strip().lower()
                                 if confirm != 'y':
                                     continue
-                    
+
                     drugweights.append(drugweight)
                     print_success(f"Actual weight set to {drugweight} mg")
                     break
@@ -362,7 +362,7 @@ def cal_stockdil(selected_df):
             drugweight_est = float(row.get('Est_DrugW(mg)'))
             drugweight_act = float(row.get('Act_DrugW(mg)'))
             stock_vol = float(row.get('St_Vol(ml)'))
-            
+
             # Validate inputs before calculation
             if drugweight_est <= 0 or drugweight_act <= 0 or stock_vol <= 0:
                 print_error(f"Invalid values for {row['Drug']}: est_weight={drugweight_est}, act_weight={drugweight_act}, stock_vol={stock_vol}")
@@ -371,14 +371,14 @@ def cal_stockdil(selected_df):
             else:
                 vol_dil = vol_diluent(drugweight_est,drugweight_act,stock_vol)
                 conc_stdil= conc_stock(drugweight_act,vol_dil)
-                
+
                 # Validate calculated values
                 if vol_dil is not None and vol_dil < 0:
                     print_error(f"Volume of diluent for {row['Drug']} is negative ({vol_dil:.3f} ml). This indicates an error in the calculation.")
-                
+
                 if conc_stdil is not None and conc_stdil <= 0:
                     print_error(f"Stock dilution concentration for {row['Drug']} is {conc_stdil:.3f} ug/ml, which is invalid.")
-                
+
         except Exception as e:
             print_error(f"Error calculating stock dilution for {row['Drug']}: {str(e)}")
             vol_dil = None
@@ -414,41 +414,41 @@ def mgit_tubes(selected_df):
                 try:
                     # Show input prompt
                     prompt = f"Enter number of MGIT tubes to be done for {row['Drug']}: "
-                    
+
                     value = input(prompt).strip()
                     logger.info(f"\nNumber of MGIT tubes entered for {row['Drug']}: {value} \n ")
                     num = float(value)
-                    
+
                     # Validate that number of MGIT tubes is not negative or zero
                     if num <= 0:
                         print_error("Number of MGIT tubes must be greater than 0.")
                         continue
-                    
+
                     # Check if number is not a whole number
                     if num != int(num):
                         print_warning(f"Number of MGIT tubes should be a whole number. You entered {num}. This will be rounded to {int(num)}.")
                         num = int(num)
-                    
+
                     # Validate that the number of tubes won't result in negative diluent volume
                     try:
                         # Get required values for calculation
                         cc_val = float(row.get('Crit_Conc(mg/ml)'))
                         concentration_mgit = conc_mgit(cc_val)
                         conc_st = float(row.get('Conc_st_dil(ug/ml)'))
-                        
+
                         # Calculate working solution volume
                         volume_ws = vol_workingsol(num)
-                        
+
                         # Calculate required stock solution volume
                         vol_stws = vol_ss_to_ws(volume_ws, concentration_mgit, conc_st)
-                        
+
                         # Calculate diluent volume
                         vol_dil_toadd = vol_final_dil(vol_stws, volume_ws)
-                        
+
                         # Check if diluent volume would be negative
                         if vol_dil_toadd < 0:
                             print_error(f"Number of MGIT tubes ({num}) is too high for {row['Drug']}. This would result in a negative diluent volume ({vol_dil_toadd:.3f} ml).")
-                            
+
                             # Calculate a rough estimate of maximum tubes for guidance
                             try:
                                 max_tubes_estimate = int((conc_st / concentration_mgit - 0.36) / 0.12)
@@ -459,11 +459,11 @@ def mgit_tubes(selected_df):
                             except:
                                 print_error(f"Stock solution for {row['Drug']} is too concentrated for the requested number of tubes.")
                             continue
-                    
+
                     except Exception as e:
                         # If calculation fails, still allow the input but warn
                         print_warning(f"Could not validate MGIT tube count for {row['Drug']}: {str(e)}")
-                    
+
                     num_mgit.append(num)
                     print_success(f"Number of MGIT tubes set to {num}")
                     break
@@ -496,23 +496,23 @@ def cal_mgit_ws(selected_df):
             vol_dil_toadd = vol_final_dil(vol_stws,volume_ws)
             vol_st = float(row.get('Vol_Dil(ml)'))
             vol_st_lft = vol_ssleft(vol_stws,vol_st)
-            
+
             # Validate calculated values
             if concentration_mgit is not None and concentration_mgit <= 0:
                 print_error(f"MGIT working solution concentration for {row['Drug']} is {concentration_mgit:.3f} ug/ml, which is invalid.")
-            
+
             if volume_ws is not None and volume_ws <= 0:
                 print_error(f"Working solution volume for {row['Drug']} is {volume_ws:.3f} ml, which is invalid.")
-            
+
             if vol_stws is not None and vol_stws < 0:
                 print_error(f"Volume of stock solution to working solution for {row['Drug']} is negative ({vol_stws:.3f} ml).")
-            
+
             if vol_dil_toadd is not None and vol_dil_toadd < 0:
                 print_error(f"Volume of diluent to add for {row['Drug']} is negative ({vol_dil_toadd:.3f} ml).")
-            
+
             if vol_st_lft is not None and vol_st_lft < 0:
                 print_warning(f"Volume of stock solution left for {row['Drug']} is negative ({vol_st_lft:.3f} ml). This may indicate insufficient stock solution.")
-            
+
         except Exception as e:
             print_error(f"Error calculating MGIT working solution for {row['Drug']}: {str(e)}")
             concentration_mgit = None
