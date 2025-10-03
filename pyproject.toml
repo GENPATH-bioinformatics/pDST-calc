@@ -22,6 +22,7 @@ classifiers = [
 ]
 # Core runtime dependencies only
 dependencies = [
+    "bcrypt>=4.3.0",
     "numpy>=2.2.6",
     "openpyxl>=3.1.5",
     "pandas>=2.3.1",

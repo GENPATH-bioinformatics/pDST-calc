@@ -18,17 +18,16 @@ from hypothesis.strategies import text, lists, floats, integers, sampled_from
 from unittest.mock import patch
 from io import StringIO
 
-# Add the parent directory to sys.path to import lib modules
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
-from lib.supp_calc import (
+import supp_calc
+from supp_calc import (
     print_and_log_tabulate, print_table, select_drugs,
     custom_critical_values, purchased_weights, stock_volume,
     cal_potency, act_drugweight, cal_stockdil, mgit_tubes, cal_mgit_ws
 )
 
 # Import dst_calc functions for integration testing
-from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock
+import dst_calc
+from dst_calc import potency, est_drugweight, vol_diluent, conc_stock
 
 
 # Strategies for generating test data
@@ -99,7 +98,7 @@ class TestPrintAndLogFunctions:
         
         # Mock both print and logger
         with patch('sys.stdout', new_callable=StringIO) as mock_stdout, \
-             patch('lib.supp_calc.logger') as mock_logger:
+             patch('supp_calc.logger') as mock_logger:
             
             print_and_log_tabulate(df)
             

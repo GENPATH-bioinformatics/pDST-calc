@@ -12,10 +12,8 @@ from hypothesis.strategies import floats, integers
 import sys
 from pathlib import Path
 
-# Add the parent directory to sys.path to import lib modules
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
-from lib.dst_calc import (
+import dst_calc
+from dst_calc import (
     potency, est_drugweight, vol_diluent, conc_stock,
     conc_mgit, vol_workingsol, vol_ss_to_ws, vol_final_dil, vol_ssleft
 )
