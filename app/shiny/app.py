@@ -779,11 +779,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         ),
                                         style="overflow-x: auto; max-width: 100%;"
                                     ),
-                                            ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #1e90ff; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 20px;"),
-                                            ui.tags.div(
-                                                shiny_ui.download_button("download_instruction_sheet", "Download Instruction Sheet", class_="btn-info", style="margin-top: 15px;"),
-                                                style="margin-bottom: 20px;"
-                                            )
+                                            ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #1e90ff; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 20px;")
                                         )
                         
                     except Exception as e:
@@ -836,11 +832,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         ),
                                         style="overflow-x: auto; max-width: 100%;"
                                     ),
-                                    ui.tags.div("Final values calculated successfully! Use these volumes to prepare your working solutions.", style="color: #27ae60; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 16px;"),
-                                    ui.tags.div(
-                                        shiny_ui.download_button("download_final_results", "Download Final Results", class_="btn-success", style="margin-top: 15px;"),
-                                        style="margin-bottom: 20px;"
-                                    )
+                                    ui.tags.div("Final values calculated successfully! Use these volumes to prepare your working solutions.", style="color: #27ae60; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
                                 )
                         except Exception as e:
                             return ui.tags.div(f"Error in final calculations: {str(e)}", style="color: red;")
@@ -975,8 +967,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
 
     with ui.nav_panel("C"):
         pass
-
-
 
 # Reactive functions
 @reactive.effect
@@ -1409,133 +1399,6 @@ def start_session():
     except Exception:
         auth_message.set("Error starting session.")
 
-# Download handler for final results
-@render.download(filename="final_results.csv")
-def download_final_results():
-    selected = input.drug_selection()
-    if not selected:
-        yield ""
-        return
-    
-    try:
-        drug_data = load_drug_data()
-        
-        # Build CSV header with all calculation columns
-        csv_content = "Drug,Diluent,Org. Mol. Weight (g/mol),Purchased Mol. Weight (g/mol),"
-        csv_content += "Critical Concentration (mg/ml),Desired Stock Volume (ml),Potency,"
-        csv_content += "Est. Drug Weight (mg),Actual Drug Weight (mg),Volume of Diluent (ml),"
-        csv_content += "Stock Concentration (ug/ml),MGIT Tubes,MGIT Concentration (ug/ml),"
-        csv_content += "Working Solution Volume (ml),Aliquot for Stock Solution (ml),Diluent to Add (ml),"
-        csv_content += "Stock Solution Left (ml)\n"
-        
-        for i, drug_name in enumerate(selected):
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            if not drug_row.empty:
-                row_data = drug_row.iloc[0]
-                
-                # Get all input values
-                custom_crit = input[f"custom_critical_{i}"]()
-                purch_molw = input[f"purchased_molw_{i}"]()
-                stock_vol = input[f"stock_volume_{i}"]()
-                actual_weight = input[f"actual_weight_{i}"]()
-                mgit_tubes_count = input[f"mgit_tubes_{i}"]()
-                
-                if all([custom_crit, purch_molw, stock_vol, actual_weight, mgit_tubes_count]):
-                    # Convert to standard units for calculations
-                    stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                    actual_weight_mg = convert_weight(actual_weight, weight_unit(), "mg")
-                    
-                    # Calculate all values
-                    pot = potency(purch_molw, row_data['OrgMolecular_Weight'])
-                    est_dw = est_drugweight(custom_crit, stock_vol_ml, pot)
-                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
-                    
-                    # Stock dilution calculations
-                    vol_dil = vol_diluent(est_dw, actual_weight_mg, stock_vol_ml)
-                    conc_stock_ugml = conc_stock(actual_weight_mg, vol_dil)
-                    
-                    # MGIT working solution calculations
-                    conc_mgit_ugml = conc_mgit(custom_crit)
-                    vol_working_sol_ml = vol_workingsol(mgit_tubes_count)
-                    vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_mgit_ugml, conc_stock_ugml)
-                    vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
-                    vol_st_lft = vol_st_lft = stock_vol_ml + vol_dil - vol_stock_to_ws_ml
-                    
-                    # Convert final volumes to user's preferred unit
-                    stock_vol_user = convert_volume(vol_stock_to_ws_ml, "ml", volume_unit())
-                    diluent_vol_user = convert_volume(vol_diluent_to_add_ml, "ml", volume_unit())
-                    vol_st_lft_user = convert_volume(vol_st_lft, "ml", volume_unit())
-                    
-                    # Build row
-                    csv_content += f"{drug_name},"
-                    csv_content += f"{row_data.get('Diluent', '')},"
-                    csv_content += f"{row_data['OrgMolecular_Weight']:.4f},"
-                    csv_content += f"{purch_molw:.4f},"
-                    csv_content += f"{custom_crit:.4f},"
-                    csv_content += f"{stock_vol:.4f},"
-                    csv_content += f"{pot:.6f},"
-                    csv_content += f"{est_dw_user_unit:.6f},"
-                    csv_content += f"{actual_weight:.6f},"
-                    csv_content += f"{vol_dil:.6f},"
-                    csv_content += f"{conc_stock_ugml:.6f},"
-                    csv_content += f"{mgit_tubes_count:.0f},"
-                    csv_content += f"{conc_mgit_ugml:.6f},"
-                    csv_content += f"{vol_working_sol_ml:.6f},"
-                    csv_content += f"{stock_vol_user:.6f},"
-                    csv_content += f"{diluent_vol_user:.6f},"
-                    csv_content += f"{vol_st_lft_user:.6f}\n"
-        
-        yield csv_content
-    except Exception as e:
-        print(f"Error generating final results: {e}")
-        yield ""
-
-# Download handler for instruction sheet
-@render.download(filename="instruction_sheet.csv")
-def download_instruction_sheet():
-    selected = input.drug_selection()
-    if not selected:
-        yield ""
-        return
-    
-    try:
-        drug_data = load_drug_data()
-        
-        # Build CSV header
-        csv_content = "Drug,Diluent,Org. Mol. Weight (g/mol),Purchased Mol. Weight (g/mol),Critical Concentration (mg/ml),Desired Stock Volume (ml),Potency,Est. Drug Weight (mg),Actual Drug Weight (mg)\n"
-        
-        for i, drug_name in enumerate(selected):
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            if not drug_row.empty:
-                row_data = drug_row.iloc[0]
-                
-                # Get values from inputs
-                custom_crit = input[f"custom_critical_{i}"]()
-                purch_molw = input[f"purchased_molw_{i}"]()
-                stock_vol = input[f"stock_volume_{i}"]()
-                
-                if custom_crit and purch_molw and stock_vol:
-                    # Calculate potency and estimated weight
-                    pot = potency(purch_molw, row_data['OrgMolecular_Weight'])
-                    stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                    est_dw = est_drugweight(custom_crit, stock_vol_ml, pot)
-                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
-                    
-                    # Build row
-                    csv_content += f"{drug_name},"
-                    csv_content += f"{row_data.get('Diluent', '')},"
-                    csv_content += f"{row_data['OrgMolecular_Weight']:.4f},"
-                    csv_content += f"{purch_molw:.4f},"
-                    csv_content += f"{custom_crit:.4f},"
-                    csv_content += f"{stock_vol:.4f},"
-                    csv_content += f"{pot:.6f},"
-                    csv_content += f"{est_dw_user_unit:.6f},"
-                    csv_content += "\n"  # Empty actual drug weight column
-        
-        yield csv_content
-    except Exception as e:
-        print(f"Error generating instruction sheet: {e}")
-        yield ""
 
 # Warning-related reactive effects
 @reactive.effect
