@@ -4,7 +4,7 @@ import tempfile
 import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from lib import drug_database
+import drug_database
 
 
 class TestDrugDatabase(unittest.TestCase):

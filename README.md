@@ -92,6 +92,24 @@ uv run pdst-calc --drug-data data/my_drugs.csv --single-test-input tests/test.cs
 uv run pdst-calc --test-input tests/all_tests.csv --test-output test_results.log --session-name "batch_run"
 ```
 
+## Using the Shiny App
+
+- Run the app:
+  ```bash
+  uv run shiny run app/shiny/app.py --port 8001
+  ```
+- Workflow (3 steps):
+  - Drug Selection: choose one or more drugs. The table shows original molecular weight, default diluent, and critical concentration. Header units reflect your sidebar unit choices.
+  - Parameters: enter stock volume, purchased molecular weight, and critical concentration. Click "Calculate" to see estimated weights; then click "Next".
+  - Final Results: enter actual weighed values and number of MGIT tubes, then click "Calculate Final Results" to show final volumes. After results are shown, the button becomes "New Calculation" to reset and start again.
+- Unit preferences (sidebar):
+  - Molecular Weight: g/mol, kg/mol, mg/mol
+  - Volume: ml, L, μl
+  - Concentration: mg/ml, g/L, μg/ml, ng/ml
+  - Weight: mg, g, μg
+  Internally, calculations are performed in mg/ml (concentration), ml (volume), and mg (weight), with automatic conversions to/from your selections.
+- Warnings: If calculations are not feasible (e.g., required stock aliquot exceeds available stock, or negative diluent), warnings appear above the results. Warnings clear when you navigate between steps or recalculate.
+
 ## Input File Formats
 
 ### Single Test Input CSV Format

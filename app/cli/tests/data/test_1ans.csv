@@ -1,0 +1,51 @@
+id;expected_error
+1;None
+2;None
+3;None
+4;None
+5;None
+6;None
+7;None
+8;Invalid numeral 0 (must be 1-21)
+9;Invalid numeral 22 (must be 1-21)
+10;Invalid cc value 21.0 (must be 0-20)
+11;Invalid cc value -1.0 (must be 0-20)
+12;Invalid cc value 25.0 (must be 0-20)
+13;cc_values count (2) does not match selected_numerals count (3)
+14;Invalid stock_vol -1.0 (must be 0-1000)
+15;Invalid stock_vol 1001.0 (must be 0-1000)
+16;Invalid weighed_drug -1.0 (must be 0-100)
+17;Invalid weighed_drug 101.0 (must be 0-100)
+18;Invalid mgit_tubes -1 (must be 0-100)
+19;Invalid mgit_tubes 101 (must be 0-100)
+20;Missing selected_numerals
+21;Too many numerals (22, max 21)
+22;Invalid numeral format (non-numeric 'a')
+23;Invalid purch_mol_weight 136.5 (must be 137-823)
+24;Invalid purch_mol_weight 824.0 (must be 137-823)
+25;Invalid reselect_numerals 'x' (must be 'y' or 'n')
+26;Invalid own_cc 'x' (must be 'y' or 'n')
+27;Missing logfile_name
+28;Missing results_filename
+29;Missing final_results_filename
+30;Duplicate numerals detected (1)
+31;None
+32;cc_values count (4) does not match selected_numerals count (5)
+33;cc_values count (5) does not match selected_numerals count (5)
+34;purch_mol_weights count (1) does not match selected_numerals count (3)
+35;Missing cc_values for own_cc='y'
+36;cc_values count (4) does not match selected_numerals count (3)
+37;purch_mol_weights count (2) does not match selected_numerals count (3)
+38;purch_mol_weights count (4) does not match selected_numerals count (3)
+39;None
+40;purch_mol_weights count (1) does not match selected_numerals count (3)
+41;None
+42;purch_mol_weights count (2) does not match selected_numerals count (3)
+43;purch_mol_weights count (4) does not match selected_numerals count (3)
+44;Invalid numeral -1 (must be 1-21)
+45;Too many numerals (23, max 21)
+46;Invalid numeral format (non-numeric 'a')
+47;Invalid purch_mol_weight -1.0 (must be 137-823)
+48;Invalid purch_mol_weight 824.0 (must be 137-823)
+49;Invalid stock_vol 'abc' (must be a float 0-1000)
+50;Invalid mgit_tubes 'abc' (must be an integer 0-100)
