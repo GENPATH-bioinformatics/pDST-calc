@@ -1,6 +1,6 @@
 import unittest
 import math
-from lib import dst_calc
+import dst_calc
 
 
 class TestDstCalc(unittest.TestCase):

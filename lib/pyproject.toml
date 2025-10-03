@@ -18,6 +18,7 @@ dependencies = [
     "pandas",
     "tabulate"
 ]
+
 keywords = ["drug-susceptibility", "testing", "DST", "MGIT", "tuberculosis"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -29,6 +30,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "hypothesis>=6.0",
+    "pytest-cov",
+    "pytest-mock"
 ]
 
 [project.urls]
@@ -43,3 +52,20 @@ py-modules = ["dst_calc", "drug_database", "supp_calc"]
 where = ["."]
 include = ["*"]
 exclude = ["tests*", "app*", "cli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-config",
+    "--strict-markers",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "hypothesis: Property-based tests using Hypothesis",
+]

@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock, mock_open
 import logging
 import tempfile
 import os
-from lib import supp_calc
+import supp_calc
 
 
 class TestSuppCalc(unittest.TestCase):
