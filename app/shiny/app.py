@@ -169,6 +169,70 @@ def calculate_weights_for_restored_session():
             except Exception as e:
                 print(f"Reactive effect: Error calculating estimated weights: {e}")
 
+# Variables for session results view
+show_results_view = reactive.Value(False)
+session_data = reactive.Value({})
+session_inputs = reactive.Value({})
+
+# Flag to prevent multiple calculations
+weights_calculated = reactive.Value(False)
+
+# Reactive effect to calculate weights for restored sessions
+@reactive.effect
+def calculate_weights_for_restored_session():
+    if current_step() == 3:
+        cs = current_session()
+        if cs and not weights_calculated.get():
+            print("Reactive effect: Calculating estimated weights for restored session")
+            try:
+                # Get session data
+                with db_manager.get_connection() as conn:
+                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        import json
+                        preparation = json.loads(row[0])
+                        inputs = preparation.get('inputs', {})
+                        selected = preparation.get('selected_drugs', [])
+                        
+                        # Calculate estimated weights from session data
+                        estimated_weights = []
+                        drug_data = load_drug_data()
+                        
+                        for i, drug_name in enumerate(selected):
+                            drug_inputs = inputs.get(str(i), {})
+                            if drug_inputs:
+                                # Get values from session
+                                custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 1)
+                                stock_vol = drug_inputs.get('St_Vol(ml)', 20)
+                                purch_molw = drug_inputs.get('PurMol_W(g/mol)', 558)
+                                
+                                # Get drug data
+                                drug_row = drug_data[drug_data['Drug'] == drug_name]
+                                if not drug_row.empty:
+                                    org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
+                                    
+                                    # Calculate potency
+                                    pot = potency(purch_molw, org_molw)
+                                    
+                                    # Calculate estimated drug weight
+                                    est_dw = est_drugweight(custom_crit, stock_vol, pot)
+                                    
+                                    # Convert to user's preferred weight unit
+                                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
+                                    estimated_weights.append(est_dw_user_unit)
+                                else:
+                                    estimated_weights.append(0)
+                            else:
+                                estimated_weights.append(0)
+                        
+                        # Store calculated weights
+                        calculation_results.set({'estimated_weights': estimated_weights})
+                        weights_calculated.set(True)
+                        print(f"Reactive effect: Calculated estimated weights: {estimated_weights}")
+            except Exception as e:
+                print(f"Reactive effect: Error calculating estimated weights: {e}")
+
 def get_estimated_weight(drug_index):
     """Get the estimated weight for a drug from previous calculations."""
     results = calculation_results.get()
@@ -184,6 +248,8 @@ def perform_final_calculations():
     2. Stock solution with aliquots: Calculate total stock volume with error margin
     """
     print("perform_final_calculations: Starting")
+    
+    print(f"perform_final_calculations: Processing {len(selected)} drugs")
     
     try:
         # Get selected drugs and preferences
@@ -2346,6 +2412,9 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     )
                 else:
                     return ui.tags.div()
+            
+            # The render functions are automatically called by Shiny Express
+            # when they are defined with @render.ui decorators
 
     with ui.nav_panel("Education & Help"):
         ui.tags.div(
