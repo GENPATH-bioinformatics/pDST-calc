@@ -15,6 +15,14 @@ from app.api.database import db_manager
 # Unit conversion functions
 # UI reactive prefs
 make_stock_pref = reactive.Value(False)
+# Persist toggle changes
+@reactive.effect
+@reactive.event(input.make_stock_toggle)
+def on_make_stock_toggle():
+    try:
+        make_stock_pref.set(bool(input.make_stock_toggle()))
+    except Exception:
+        pass
 
 def convert_volume(value, from_unit, to_unit):
     """Convert volume between different units."""
@@ -101,7 +109,7 @@ def calculate_weights_for_restored_session():
                             drug_inputs = inputs.get(str(i), {})
                             if drug_inputs:
                                 # Get values from session
-                                custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 1)
+                                custom_crit = drug_inputs.get('Crit_Conc(ug/ml)', 1)
                                 stock_vol = drug_inputs.get('St_Vol(ml)', 20)
                                 purch_molw = drug_inputs.get('PurMol_W(g/mol)', 558)
                                 
@@ -162,7 +170,7 @@ def perform_initial_calculations():
                 # Convert to standard units for calculations
                 stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
                 purch_molw_gmol = purch_molw
-                # Critical concentration is already in mg/ml
+                # Critical concentration is already in μg/ml
                 custom_crit_mgml = custom_crit
                 
                 # Calculate potency
@@ -251,7 +259,7 @@ def perform_final_calculations():
                             drug_inputs = session_inputs.get(str(i), {})
                             stock_vol = drug_inputs.get('St_Vol(ml)', None)
                             purch_molw = drug_inputs.get('PurMol_W(g/mol)', None)
-                            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', None)
+                            custom_crit = drug_inputs.get('Crit_Conc(ug/ml)', None)
                             print(f"perform_final_calculations: Got values from session - stock_vol: {stock_vol}, purch_molw: {purch_molw}, custom_crit: {custom_crit}")
                         except Exception as e:
                             print(f"perform_final_calculations: Error getting session values: {e}")
@@ -269,7 +277,7 @@ def perform_final_calculations():
                     
                     stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
                     purch_molw_gmol = purch_molw
-                    # Critical concentration is already in mg/ml
+                    # Critical concentration is already in μg/ml
                     custom_crit_mgml = custom_crit
                     
                     # Calculate potency
@@ -289,7 +297,7 @@ def perform_final_calculations():
                     
                     # Step 3: Calculate MGIT working solution
                     # [5] conc_ws calculation from dst-calc.py
-                    conc_ws_ugml = conc_ws(custom_crit_mgml)  # conc_ws expects mg/ml input, returns μg/ml output
+                    conc_ws_ugml = conc_ws(custom_crit_mgml)  # conc_ws expects μg/ml input, returns μg/ml output
                     # [6] vol_workingsol calculation from dst-calc.py
                     vol_working_sol_ml = vol_workingsol(mgit_tubes)
                     # [7] vol_ss_to_ws calculation from dst-calc.py
@@ -603,7 +611,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     selected="ml"
                 )
                 
-                # Concentration fixed to mg/ml
+                # Concentration fixed to μg/ml
                 ui.input_select(
                     "weight_unit",
                     "Weight:",
@@ -671,7 +679,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         ui.tags.div(
                             ui.tags.h4(f"Drug: {drug_name}", style="color: #2c3e50; margin-bottom: 10px; font-size: 16px;"),
                             ui.tags.div(
-                                ui.tags.p(f"Critical Concentration: {drug_inputs.get('Crit_Conc(mg/ml)', 'N/A')} mg/ml", style="margin-bottom: 5px;"),
+                                ui.tags.p(f"Critical Concentration: {drug_inputs.get('Crit_Conc(ug/ml)', 'N/A')} μg/ml", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Purchased Molecular Weight: {drug_inputs.get('PurMol_W(g/mol)', 'N/A')} g/mol", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Stock Volume: {drug_inputs.get('St_Vol(ml)', 'N/A')} {volume_unit_val}", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Actual Drug Weight: {drug_inputs.get('Act_DrugW(mg)', 'N/A')} {weight_unit_val}", style="margin-bottom: 5px;"),
@@ -700,7 +708,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             # Get input values
                             stock_vol = drug_inputs.get('St_Vol(ml)', 0)
                             purch_molw = drug_inputs.get('PurMol_W(g/mol)', 0)
-                            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 0)
+                            custom_crit = drug_inputs.get('Crit_Conc(ug/ml)', 0)
                             
                             if stock_vol and purch_molw and custom_crit:
                                 # Convert to standard units for calculations
@@ -762,7 +770,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             mgit_tubes = drug_inputs.get('Total Mgit tubes', 0)
                             stock_vol = drug_inputs.get('St_Vol(ml)', 0)
                             purch_molw = drug_inputs.get('PurMol_W(g/mol)', 0)
-                            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 0)
+                            custom_crit = drug_inputs.get('Crit_Conc(ug/ml)', 0)
                             
                             if actual_weight and mgit_tubes and stock_vol and purch_molw and custom_crit:
                                 # Convert actual weight to mg for calculations
@@ -908,139 +916,138 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 else:
                     print("Returning default interface")
                     return ui.tags.div()
-            
-            # Display selected drugs in a table
-            @render.ui
-            def selected_drugs_table():
-                print(f"selected_drugs_table called, show_results_view: {show_results_view()}")
-                # Hide when viewing results
-                if show_results_view():
-                    print("Returning empty div (hiding selected_drugs_table)")
-                    return ui.tags.div()
+                
+                # Display selected drugs in a table
+                @render.ui
+                def selected_drugs_table():
+                    print(f"selected_drugs_table called, show_results_view: {show_results_view()}")
+                    # Hide when viewing results
+                    if show_results_view():
+                        print("Returning empty div (hiding selected_drugs_table)")
+                        return ui.tags.div()
 
-                # Always try to get drugs from session first when in a session
-                selected = []
-                cs = current_session()
-                if cs:
-                    print(f"Getting drugs from session {cs['session_id']}")
-                    try:
-                        with db_manager.get_connection() as conn:
-                            cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
-                            row = cur.fetchone()
-                            if row and row[0]:
-                                import json
-                                preparation = json.loads(row[0])
-                                selected = preparation.get('selected_drugs', [])
-                                print(f"Got drugs from session: {selected}")
-                    except Exception as e:
-                        print(f"Error getting session data: {e}")
-                
-                # Fallback to input if no session data
-                if not selected:
-                    selected = input.drug_selection()
-                    print(f"Selected drugs from input: {selected}")
-                
-                print(f"Current step: {current_step()}")
-                
-                if not selected:
-                    print("No drugs selected, returning message")
-                    return ui.tags.div("No drugs selected yet.")
-                
-                # Get the full drug data
-                drug_data = load_drug_data()
-                
-                if current_step() == 1:
-                    # Create table headers for step 1
-                    table_headers = ui.tags.tr(
-                        ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                        ui.tags.th("Mol. Weight (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                        ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                        style="background-color: #f8f9fa;"
+                    # Always try to get drugs from session first when in a session
+                    selected = []
+                    cs = current_session()
+                    if cs:
+                        print(f"Getting drugs from session {cs['session_id']}")
+                        try:
+                            with db_manager.get_connection() as conn:
+                                cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                                row = cur.fetchone()
+                                if row and row[0]:
+                                    import json
+                                    preparation = json.loads(row[0])
+                                    selected = preparation.get('selected_drugs', [])
+                                    print(f"Got drugs from session: {selected}")
+                        except Exception as e:
+                            print(f"Error getting session data: {e}")
+                    
+                    # Fallback to input if no session data
+                    if not selected:
+                        selected = input.drug_selection()
+                        print(f"Selected drugs from input: {selected}")
+                    
+                    print(f"Current step: {current_step()}")
+                    
+                    if not selected:
+                        print("No drugs selected, returning message")
+                        return ui.tags.div("No drugs selected yet.")
+                    
+                    # Get the full drug data
+                    drug_data = load_drug_data()
+                    
+                    # Simple table for now - just show selected drugs
+                    return ui.tags.div(
+                        ui.tags.h3("Selected Drugs", style="color: #2c3e50; margin-bottom: 15px;"),
+                        ui.tags.ul(
+                            *[ui.tags.li(drug, style="margin-bottom: 5px;") for drug in selected],
+                            style="list-style-type: disc; margin-left: 20px;"
+                        )
                     )
                     
                     # Create table rows for each selected drug
                     table_rows = []
                     for i, drug_name in enumerate(selected):
-                        # Find the drug data in the dataframe
-                        drug_row = drug_data[drug_data['Drug'] == drug_name]
-                        if not drug_row.empty:
-                            row_data = drug_row.iloc[0]
-                            row = ui.tags.tr(
-                                ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                ui.tags.td(row_data['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                ui.tags.td(
-                                    ui.input_numeric(
-                                        f"custom_critical_{i}",
-                                        "",
-                                        value=row_data['Critical_Concentration'],
-                                        min=0,
-                                        step=0.01
+                            # Find the drug data in the dataframe
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                row_data = drug_row.iloc[0]
+                                row = ui.tags.tr(
+                                    ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                    ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(row_data['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                    ui.tags.td(
+                                        ui.input_numeric(
+                                            f"custom_critical_{i}",
+                                            "",
+                                            value=row_data['Critical_Concentration'],
+                                            min=0,
+                                            step=0.01
+                                        ),
+                                        style="padding: 5px; border: 1px solid #ddd; width: 100px;"
                                     ),
-                                    style="padding: 5px; border: 1px solid #ddd; width: 100px;"
-                                ),
-                                style="background-color: white;"
-                            )
-                            table_rows.append(row)
+                                    style="background-color: white;"
+                                )
+                                table_rows.append(row)
                     
                     return ui.tags.div(
-                        ui.tags.div(
-                            ui.tags.table(
-                                table_headers,
-                                *table_rows,
-                                style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                            ),
-                            style="overflow-x: auto; max-width: 100%;"
+                            ui.tags.div(
+                                ui.tags.table(
+                                    table_headers,
+                                    *table_rows,
+                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                ),
+                                style="overflow-x: auto; max-width: 100%;"
+                            )
                         )
-                    )
                 elif current_step() == 2:
                     print("Creating step 2 table (new flow)")
                     # Create table headers for new Step 2 flow
                     table_headers = ui.tags.tr(
-                        ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                        ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                        ui.tags.th("Crit. Conc. (μg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                         ui.tags.th("Org. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 140px;"),
                         ui.tags.th("Purch. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 140px;"),
                         ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        style="background-color: #f8f9fa;"
-                    )
-
+                            style="background-color: #f8f9fa;"
+                        )
+                    
                     # Create table rows for each selected drug
                     table_rows = []
                     stored_inputs = session_inputs.get()
                     print(f"Stored inputs: {stored_inputs}")
                     for i, drug_name in enumerate(selected):
                         print(f"Processing drug {i}: {drug_name}")
-                        # Find the drug data in the dataframe for step 2
-                        drug_row = drug_data[drug_data['Drug'] == drug_name]
-                        if not drug_row.empty:
-                            row_data = drug_row.iloc[0]
-                            current_custom = input[f"custom_critical_{i}"]()
-                            if current_custom is None:
-                                current_custom = row_data['Critical_Concentration']
-
-                        # Get stored values if they exist
-                        stored_values = stored_inputs.get(str(i), {})
-                        purch_molw_value = stored_values.get('PurMol_W(g/mol)', 0)
+                            # Find the drug data in the dataframe for step 2
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                row_data = drug_row.iloc[0]
+                                current_custom = input[f"custom_critical_{i}"]()
+                                if current_custom is None:
+                                    current_custom = row_data['Critical_Concentration']
+                            
+                            # Get stored values if they exist
+                            stored_values = stored_inputs.get(str(i), {})
+                            purch_molw_value = stored_values.get('PurMol_W(g/mol)', 0)
                         mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
-
-                        row = ui.tags.tr(
-                            ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                            ui.tags.td(f"{current_custom:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                            ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"purchased_molw_{i}",
-                                    "",
-                                    value=purch_molw_value,
-                                    min=row_data['OrgMolecular_Weight'],
-                                    step=0.01
-                                ),
+                            
+                            row = ui.tags.tr(
+                                ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                ui.tags.td(f"{current_custom:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                ui.tags.td(
+                                    ui.input_numeric(
+                                        f"purchased_molw_{i}",
+                                        "",
+                                        value=purch_molw_value,
+                                        min=row_data['OrgMolecular_Weight'],
+                                        step=0.01
+                                    ),
                                 style="padding: 5px; border: 1px solid #ddd; width: 140px;"
-                            ),
-                            ui.tags.td(
-                                ui.input_numeric(
+                                ),
+                                ui.tags.td(
+                                    ui.input_numeric(
                                     f"mgit_tubes_{i}",
                                     "",
                                     value=mgit_tubes_value,
@@ -1048,92 +1055,92 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     step=1
                                 ),
                                 style="padding: 5px; border: 1px solid #ddd; width: 120px;"
-                            ),
-                            style="background-color: white;"
-                        )
-                        table_rows.append(row)
-
-                    return ui.tags.div(
-                        ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                                ),
+                                style="background-color: white;"
+                            )
+                            table_rows.append(row)
+                        
+                        return ui.tags.div(
+                            ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
                         ui.tags.p("Enter purchased molecular weight, critical concentration, and MGIT tubes for each selected drug.", style="color: #7f8c8d; margin-bottom: 15px;"),
-                        ui.tags.div(
-                            ui.tags.table(
-                                table_headers,
-                                *table_rows,
-                                style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                            ),
+                            ui.tags.div(
+                                ui.tags.table(
+                                    table_headers,
+                                    *table_rows,
+                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                ),
                             style="overflow-x: auto; max-width: 100%;"
                         )
                     )
-                elif current_step() == 3:
+                    elif current_step() == 3:
                     print("Creating step 3 table")
                     # Get estimated weight for display (calculated by reactive effect)
                     est_weight = get_estimated_weight(0) if selected else 0
                     print(f"Step 3: Estimated weight: {est_weight}")
                     
-                    # Create table headers for step 3
-                    table_headers = ui.tags.tr(
-                        ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                        ui.tags.th(f"Est. Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                        style="background-color: #f8f9fa;"
-                    )
-                    
-                    # Create table rows for each selected drug
-                    table_rows = []
-                    stored_inputs = session_inputs.get()
+                        # Create table headers for step 3
+                        table_headers = ui.tags.tr(
+                            ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                            ui.tags.th(f"Est. Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                            ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                            style="background-color: #f8f9fa;"
+                        )
+                        
+                        # Create table rows for each selected drug
+                        table_rows = []
+                        stored_inputs = session_inputs.get()
                     print(f"Step 3: Creating rows for {len(selected)} drugs")
-                    for i, drug_name in enumerate(selected):
-                        # Get estimated weight from previous calculation
+                        for i, drug_name in enumerate(selected):
+                            # Get estimated weight from previous calculation
                         est_weight = get_estimated_weight(i) if i == 0 else get_estimated_weight(i)
-                        
-                        # Get stored values if they exist
-                        stored_values = stored_inputs.get(str(i), {})
-                        actual_weight_value = stored_values.get('Act_DrugW(mg)', 0)
-                        mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
+                            
+                            # Get stored values if they exist
+                            stored_values = stored_inputs.get(str(i), {})
+                            actual_weight_value = stored_values.get('Act_DrugW(mg)', 0)
+                            mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
                         print(f"Step 3: Drug {i} ({drug_name}) - estimated weight: {est_weight}, stored values: actual_weight={actual_weight_value}, mgit_tubes={mgit_tubes_value}")
-                        
-                        row = ui.tags.tr(
-                            ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                            ui.tags.td(f"{est_weight:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"actual_weight_{i}",
-                                    "",
-                                    value=actual_weight_value,
-                                    min=0,
-                                    step=0.001
+                            
+                            row = ui.tags.tr(
+                                ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                ui.tags.td(f"{est_weight:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                ui.tags.td(
+                                    ui.input_numeric(
+                                        f"actual_weight_{i}",
+                                        "",
+                                        value=actual_weight_value,
+                                        min=0,
+                                        step=0.001
+                                    ),
+                                    style="padding: 5px; border: 1px solid #ddd; width: 120px;"
                                 ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
-                            ),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"mgit_tubes_{i}",
-                                    "",
-                                    value=mgit_tubes_value,
-                                    min=1,
-                                    step=1
+                                ui.tags.td(
+                                    ui.input_numeric(
+                                        f"mgit_tubes_{i}",
+                                        "",
+                                        value=mgit_tubes_value,
+                                        min=1,
+                                        step=1
+                                    ),
+                                    style="padding: 5px; border: 1px solid #ddd; width: 100px;"
                                 ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 100px;"
-                            ),
-                            style="background-color: white;"
-                        )
-                        table_rows.append(row)
+                                style="background-color: white;"
+                            )
+                            table_rows.append(row)
                         print(f"Step 3: Created row for drug {i}")
-                    
+                        
                     print("Step 3: Returning table")
-                    return ui.tags.div(
-                        ui.tags.h3("Enter Actual Weights and MGIT Tubes", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                        ui.tags.div(
-                            ui.tags.table(
-                                table_headers,
-                                *table_rows,
-                                style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                            ),
-                            style="overflow-x: auto; max-width: 100%;"
+                        return ui.tags.div(
+                            ui.tags.h3("Enter Actual Weights and MGIT Tubes", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                            ui.tags.div(
+                                ui.tags.table(
+                                    table_headers,
+                                    *table_rows,
+                                    style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                ),
+                                style="overflow-x: auto; max-width: 100%;"
+                            )
                         )
-                    )
             
             
             # Results section for step 2
@@ -1161,7 +1168,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 # Fallback to input if no session data
                 if not selected:
                     try:
-                        selected = input.drug_selection()
+                selected = input.drug_selection()
                         print(f"results_section: Got selected drugs from input: {selected}")
                     except Exception as e:
                         # Handle SilentException - inputs not ready yet
@@ -1205,22 +1212,22 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             custom_crit = input[f"custom_critical_{i}"]()
                             if custom_crit is None or custom_crit <= 0:
                                 return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: green;")
-                            # Use mg/ml directly
+                            # Use μg/ml directly
                             custom_crit_mgml = custom_crit
                             custom_critical_values.append(custom_crit_mgml)
                         
                         # Calculate results (always when inputs valid)
-                        results_data = []
+                            results_data = []
                         estimated_weights = []  # step 2 main outputs
                         diluent_volumes = []    # step 2 main outputs
-                        
-                        for i, drug_name in enumerate(selected):
-                            drug_row = drug_data[drug_data['Drug'] == drug_name]
-                            if not drug_row.empty:
-                                row_data = drug_row.iloc[0]
                             
+                            for i, drug_name in enumerate(selected):
+                                drug_row = drug_data[drug_data['Drug'] == drug_name]
+                                if not drug_row.empty:
+                                    row_data = drug_row.iloc[0]
+                                
                                 # [1] potency
-                                pot = potency(purchased_mol_weights[i], row_data['OrgMolecular_Weight'])
+                                    pot = potency(purchased_mol_weights[i], row_data['OrgMolecular_Weight'])
                                 # [5] conc_ws
                                 ws_conc_ugml = conc_ws(custom_critical_values[i])
                                 # [6] vol_workingsol
@@ -1228,14 +1235,14 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 # [2] est_drugweight (new formula)
                                 est_dw_mg = (ws_conc_ugml * vol_ws_ml * pot) / 1000.0
                                 est_dw_user_unit = convert_weight(est_dw_mg, "mg", weight_unit())
-                                estimated_weights.append(est_dw_user_unit)
+                                    estimated_weights.append(est_dw_user_unit)
                                 # [3] vol_diluent (as vol_workingsol)
                                 vol_dil_ml = vol_ws_ml
                                 diluent_volumes.append(convert_volume(vol_dil_ml, "ml", volume_unit()))
-
-                                results_data.append({
-                                    'Drug': drug_name,
-                                    'Potency': f"{pot:.5f}",
+                                
+                                    results_data.append({
+                                        'Drug': drug_name,
+                                        'Potency': f"{pot:.5f}",
                                     'Conc_WS(ug/ml)': f"{ws_conc_ugml:.4f}",
                                     'Vol_WS(ml)': f"{vol_ws_ml:.4f}",
                                     'Vol_WS_ml_num': vol_ws_ml,
@@ -1249,15 +1256,15 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         calculate_clicked.set(True)
 
                         # Create results tables (split emphasis)
-                        if results_data:
+                            if results_data:
                                 main_headers = ui.tags.tr(
                                     ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
                                     ui.tags.th("Potency", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                                    ui.tags.th("Critical Concentration (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
+                                    ui.tags.th("Critical Concentration (μg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
                                     ui.tags.th("Total Volume of Working Solution (ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
                                     style="background-color: #f8f9fa;"
                                 )
-
+                            
                                 emph_headers = ui.tags.tr(
                                     ui.tags.th("Drug", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 200px;"),
                                     ui.tags.th(f"Calculated Drug Weight to Weigh Out ({weight_unit()})", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 220px;"),
@@ -1270,12 +1277,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 for result in results_data:
                                     main_rows.append(
                                         ui.tags.tr(
-                                            ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                            ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                        ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                        ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                             ui.tags.td(result['Conc_WS(ug/ml)'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                             ui.tags.td(result['Vol_WS(ml)'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                            style="background-color: white;"
-                                        )
+                                        style="background-color: white;"
+                                    )
                                     )
 
                                     emph_rows.append(
@@ -1295,8 +1302,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 stock_rows = []
                                 make_stock = False
                                 if any_low_mass:
-                                    # Use persisted toggle state
-                                    make_stock = bool(make_stock_pref())
+                                    # Read toggle safely and persist
+                                    try:
+                                        make_stock = bool(input.make_stock_toggle())
+                                        make_stock_pref.set(make_stock)
+                                    except Exception:
+                                        make_stock = bool(make_stock_pref())
                                     for idx, r in enumerate(results_data):
                                         # Default practical weight: 3.0 mg
                                         practical_val = 3.0
@@ -1508,7 +1519,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         purch_molw = input[f"purchased_molw_{i}"]()
                         if purch_molw is None or purch_molw <= 0 or purch_molw < org_molw:
                             return False
-                        # Critical concentration (mg/ml)
+                        # Critical concentration (μg/ml)
                         try:
                             custom_crit = input[f"custom_critical_{i}"]()
                         except Exception:
@@ -1549,27 +1560,27 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     # Fallback to input if no session data
                     if not selected:
                         try:
-                            selected = input.drug_selection()
+                selected = input.drug_selection()
                             print(f"validate_step3_inputs: Got selected drugs from input: {selected}")
                         except Exception as e:
                             # Handle SilentException - inputs not ready yet
                             print(f"validate_step3_inputs: SilentException - inputs not ready yet: {e}")
                             return False
                     
-                    if not selected:
+                if not selected:
                         print("validate_step3_inputs: No selected drugs")
-                        return False
-                    
+                    return False
+                
                     print(f"validate_step3_inputs: Checking {len(selected)} drugs")
                     
                     # Check if input fields exist before trying to access them
-                    for i in range(len(selected)):
+                for i in range(len(selected)):
                         try:
-                            actual_weight = input[f"actual_weight_{i}"]()
-                            mgit_tubes = input[f"mgit_tubes_{i}"]()
+                    actual_weight = input[f"actual_weight_{i}"]()
+                    mgit_tubes = input[f"mgit_tubes_{i}"]()
                             print(f"validate_step3_inputs: Drug {i} - actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}")
                             
-                            if actual_weight is None or actual_weight <= 0 or mgit_tubes is None or mgit_tubes <= 0:
+                    if actual_weight is None or actual_weight <= 0 or mgit_tubes is None or mgit_tubes <= 0:
                                 print(f"validate_step3_inputs: Drug {i} validation failed - values too low")
                                 return False
                         except KeyError as e:
@@ -1577,15 +1588,15 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             return False
                         except Exception as e:
                             print(f"validate_step3_inputs: Drug {i} input error: {e}")
-                            return False
-                    
+                        return False
+                
                     print("validate_step3_inputs: All inputs valid!")
-                    return True
+                return True
                 except Exception as e:
                     # Handle SilentException - this means inputs are not ready yet
                     if "SilentException" in str(type(e)):
                         print("validate_step3_inputs: Inputs not ready yet (SilentException)")
-                        return False
+                    return False
                     else:
                         print(f"validate_step3_inputs: General error: {e}")
                         print(f"validate_step3_inputs: Error type: {type(e)}")
@@ -1683,6 +1694,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
     with ui.nav_panel("C"):
         pass
 
+# Add the main interface components after all function definitions
+main_interface()
+selected_drugs_table()
+action_buttons()
+
 # Reactive functions
 @reactive.effect
 @reactive.event(input.next_btn)
@@ -1723,8 +1739,8 @@ def back_step():
         else:
             # For new sessions, go back to step 1
             print("Back button - going back to step 1")
-            current_step.set(1)
-            calculate_clicked.set(False)
+        current_step.set(1)
+        calculate_clicked.set(False)
     elif current_step() == 3:
         print("Back button - going back to step 2")
         current_step.set(2)
@@ -1774,7 +1790,7 @@ def calculate_results():
                                 
                                 # Store in session format similar to CLI
                                 session_data[drug_id] = {
-                                    'Crit_Conc(mg/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                    'Crit_Conc(ug/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
                                     'PurMol_W(g/mol)': purch_molw if purch_molw is not None else 0.0,
                                     'St_Vol(ml)': stock_vol if stock_vol is not None else 0.0,
                                     'Act_DrugW(mg)': 0.0,  # Not yet entered
@@ -1872,7 +1888,7 @@ def calculate_final_results():
                                     try:
                                         session_inputs = preparation.get('inputs', {})
                                         drug_inputs = session_inputs.get(str(i), {})
-                                        custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', None)
+                                        custom_crit = drug_inputs.get('Crit_Conc(ug/ml)', None)
                                         purch_molw = drug_inputs.get('PurMol_W(g/mol)', None)
                                         stock_vol = drug_inputs.get('St_Vol(ml)', None)
                                         print(f"calculate_final_results: Got session values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, stock_vol: {stock_vol}")
@@ -1891,9 +1907,9 @@ def calculate_final_results():
                                 # Fallback to input fields if session data not available
                                 if custom_crit is None or purch_molw is None or stock_vol is None:
                                     try:
-                                        custom_crit = input[f"custom_critical_{i}"]()
-                                        purch_molw = input[f"purchased_molw_{i}"]()
-                                        stock_vol = input[f"stock_volume_{i}"]()
+                                custom_crit = input[f"custom_critical_{i}"]()
+                                purch_molw = input[f"purchased_molw_{i}"]()
+                                stock_vol = input[f"stock_volume_{i}"]()
                                         print(f"calculate_final_results: Got fallback input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, stock_vol: {stock_vol}")
                                     except Exception as e:
                                         print(f"calculate_final_results: Error getting fallback input values: {e}")
@@ -1901,7 +1917,7 @@ def calculate_final_results():
                                 
                                 # Store complete session data
                                 session_data[drug_id] = {
-                                    'Crit_Conc(mg/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                    'Crit_Conc(ug/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
                                     'PurMol_W(g/mol)': purch_molw if purch_molw is not None else 0.0,
                                     'St_Vol(ml)': stock_vol if stock_vol is not None else 0.0,
                                     'Act_DrugW(mg)': actual_weight if actual_weight is not None else 0.0,
@@ -2179,8 +2195,8 @@ def start_session():
                                         drug_index = selected.index(drug_name)
                                         
                                         # Update inputs based on session data
-                                        if 'Crit_Conc(mg/ml)' in drug_inputs:
-                                            ui.update_numeric(f"custom_critical_{drug_index}", value=drug_inputs['Crit_Conc(mg/ml)'])
+                                        if 'Crit_Conc(ug/ml)' in drug_inputs:
+                                            ui.update_numeric(f"custom_critical_{drug_index}", value=drug_inputs['Crit_Conc(ug/ml)'])
                                         if 'PurMol_W(g/mol)' in drug_inputs:
                                             ui.update_numeric(f"purchased_molw_{drug_index}", value=drug_inputs['PurMol_W(g/mol)'])
                                         if 'St_Vol(ml)' in drug_inputs:
@@ -2229,14 +2245,6 @@ def clear_warnings_on_navigation():
 def clear_warnings_on_recalculation():
     # Clear warnings when recalculating final results
     warnings.set([])
-
-@reactive.effect
-@reactive.event(input.make_stock_toggle)
-def on_make_stock_toggle():
-    try:
-        make_stock_pref.set(bool(input.make_stock_toggle()))
-    except Exception:
-        pass
 
 # Footer
 ui.tags.div(
