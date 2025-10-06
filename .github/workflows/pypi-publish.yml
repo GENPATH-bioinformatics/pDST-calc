@@ -63,7 +63,7 @@ jobs:
     - name: Publish library to PyPI
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.EMILYN_PYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.EMILYN_PYPI_TOKEN }}
       run: |
         echo "🚀 Publishing library to PyPI ..."
         python -m twine upload --repository-url https://upload.pypi.org/legacy/  lib/dist/* --verbose
