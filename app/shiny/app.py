@@ -8,7 +8,7 @@ import os
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from app.api.drug_database import load_drug_data
-from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_mgit, vol_workingsol, vol_ss_to_ws, vol_final_dil
+from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_ws, vol_workingsol, vol_ss_to_ws, vol_final_dil
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
 
@@ -36,10 +36,6 @@ def convert_volume(value, from_unit, to_unit):
         return base_value * 1000
     else:
         return base_value
-
-def convert_concentration(value, from_unit, to_unit):
-    # Deprecated: concentration is fixed to mg/ml now. Keep for compatibility.
-    return value
 
 def convert_weight(value, from_unit, to_unit):
     """Convert weight between different units."""
@@ -113,9 +109,11 @@ def calculate_weights_for_restored_session():
                                     org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
                                     
                                     # Calculate potency
+                                    # [1] potency calculation from dst-calc.py
                                     pot = potency(purch_molw, org_molw)
                                     
                                     # Calculate estimated drug weight
+                                    # [2] est_drugweight calculation from dst-calc.py
                                     est_dw = est_drugweight(custom_crit, stock_vol, pot)
                                     
                                     # Convert to user's preferred weight unit
@@ -166,9 +164,11 @@ def perform_initial_calculations():
                 custom_crit_mgml = custom_crit
                 
                 # Calculate potency
+                # [1] potency calculation from dst-calc.py
                 pot = potency(purch_molw_gmol, drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0])
                 
                 # Calculate estimated drug weight
+                # [2] est_drugweight calculation from dst-calc.py
                 est_dw = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
                 
                 # Convert to user's preferred weight unit
@@ -271,20 +271,28 @@ def perform_final_calculations():
                     custom_crit_mgml = custom_crit
                     
                     # Calculate potency
+                    # [1] potency calculation from dst-calc.py
                     org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
                     pot = potency(purch_molw_gmol, org_molw)
                     
                     # Step 1: Calculate estimated drug weight (from step 2)
+                    # [2] est_drugweight calculation from dst-calc.py
                     est_drug_weight_mg = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
                     
                     # Step 2: Calculate diluent volume and stock concentration
+                    # [3] vol_diluent calculation from dst-calc.py
                     vol_dil = vol_diluent(est_drug_weight_mg, actual_weight_mg, stock_vol_ml)
+                    # [4] conc_stock calculation from dst-calc.py
                     conc_stock_ugml = conc_stock(actual_weight_mg, vol_dil)
                     
                     # Step 3: Calculate MGIT working solution
-                    conc_mgit_ugml = conc_mgit(custom_crit_mgml)  # conc_mgit expects mg/ml input, returns μg/ml output
+                    # [5] conc_ws calculation from dst-calc.py
+                    conc_ws_ugml = conc_ws(custom_crit_mgml)  # conc_ws expects mg/ml input, returns μg/ml output
+                    # [6] vol_workingsol calculation from dst-calc.py
                     vol_working_sol_ml = vol_workingsol(mgit_tubes)
-                    vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_mgit_ugml, conc_stock_ugml)
+                    # [7] vol_ss_to_ws calculation from dst-calc.py
+                    vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_ws_ugml, conc_stock_ugml)
+                    # [8] vol_final_dil calculation from dst-calc.py
                     vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
                     
                     # Convert volumes to user's preferred unit
@@ -627,11 +635,15 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 # Get drug data for calculations
                 drug_data = load_drug_data()
                 
+                # Get session name from current session
+                cs = current_session()
+                session_name = cs.get('session_name', 'Unnamed Session') if cs else 'Unnamed Session'
+                
                 # Build session info header
                 session_info = ui.tags.div(
                     ui.tags.h2("Session Results", style="color: #2c3e50; margin-bottom: 20px;"),
                     ui.tags.div(
-                        ui.tags.p(f"Session: {preparation.get('session_name', 'Unnamed Session')}", style="font-weight: bold; margin-bottom: 5px;"),
+                        ui.tags.p(f"Session: {session_name}", style="font-weight: bold; margin-bottom: 5px;"),
                         ui.tags.p(f"Volume Unit: {volume_unit_val} | Weight Unit: {weight_unit_val}", style="color: #7f8c8d; margin-bottom: 10px;"),
                         style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;"
                     )
@@ -700,9 +712,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
                                     
                                     # Calculate potency
+                                    # [1] potency calculation from dst-calc.py
                                     pot = potency(purch_molw_gmol, org_molw)
                                     
                                     # Calculate estimated drug weight
+                                    # [2] est_drugweight calculation from dst-calc.py
                                     est_dw = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
                                     
                                     # Convert to user's preferred weight unit
@@ -763,19 +777,27 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
                                     
                                     # Calculate potency
+                                    # [1] potency calculation from dst-calc.py
                                     pot = potency(purch_molw_gmol, org_molw)
                                     
                                     # Calculate estimated drug weight (from step 2)
+                                    # [2] est_drugweight calculation from dst-calc.py
                                     est_drug_weight_mg = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
                                     
                                     # Calculate diluent volume and stock concentration
+                                    # [3] vol_diluent calculation from dst-calc.py
                                     vol_dil = vol_diluent(est_drug_weight_mg, actual_weight_mg, stock_vol_ml)
+                                    # [4] conc_stock calculation from dst-calc.py
                                     conc_stock_ugml = conc_stock(actual_weight_mg, vol_dil)
                                     
                                     # Calculate final working solution parameters
-                                    conc_mgit_ugml = conc_mgit(custom_crit_mgml)
+                                    # [5] conc_ws calculation from dst-calc.py
+                                    conc_ws_ugml = conc_ws(custom_crit_mgml)
+                                    # [6] vol_workingsol calculation from dst-calc.py
                                     vol_working_sol_ml = vol_workingsol(mgit_tubes)
-                                    vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_mgit_ugml, conc_stock_ugml)
+                                    # [7] vol_ss_to_ws calculation from dst-calc.py
+                                    vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_ws_ugml, conc_stock_ugml)
+                                    # [8] vol_final_dil calculation from dst-calc.py
                                     vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
                                     
                                     # Convert volumes to user's preferred unit
@@ -971,29 +993,17 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         )
                     )
                 elif current_step() == 2:
-                    print("Creating step 2 table")
-                    # For incomplete sessions, show the saved values as read-only and continue to step 3
-                    return ui.tags.div(
-                        ui.tags.h3("Session Data", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                        ui.tags.p("Your saved session data:", style="color: #7f8c8d; margin-bottom: 15px;"),
-                        ui.tags.div(
-                            ui.tags.p(f"Drug: {selected[0] if selected else 'Unknown'}", style="margin-bottom: 5px;"),
-                            ui.tags.p(f"Critical Concentration: 1 mg/ml", style="margin-bottom: 5px;"),
-                            ui.tags.p(f"Purchased Molecular Weight: 558 g/mol", style="margin-bottom: 5px;"),
-                            ui.tags.p(f"Stock Volume: 20 ml", style="margin-bottom: 5px;"),
-                            style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;"
-                        ),
-                        ui.tags.p("Continue to step 3 to enter actual weights and MGIT tubes.", style="color: #3498db; font-weight: bold;")
-                    )
+                    print("Creating step 2 table (new flow)")
+                    # Create table headers for new Step 2 flow
                     table_headers = ui.tags.tr(
                         ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                        ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
-                        ui.tags.th("Org. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th("Purch. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th(f"Stock Vol. ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 100px;"),
+                        ui.tags.th("Crit. Conc. (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                        ui.tags.th("Org. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 140px;"),
+                        ui.tags.th("Purch. Mol. Wt. (g/mol)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 140px;"),
+                        ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                         style="background-color: #f8f9fa;"
                     )
-                    
+
                     # Create table rows for each selected drug
                     table_rows = []
                     stored_inputs = session_inputs.get()
@@ -1007,12 +1017,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             current_custom = input[f"custom_critical_{i}"]()
                             if current_custom is None:
                                 current_custom = row_data['Critical_Concentration']
-                        
+
                         # Get stored values if they exist
                         stored_values = stored_inputs.get(str(i), {})
                         purch_molw_value = stored_values.get('PurMol_W(g/mol)', 0)
-                        stock_vol_value = stored_values.get('St_Vol(ml)', 0)
-                        
+                        mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
+
                         row = ui.tags.tr(
                             ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
                             ui.tags.td(f"{current_custom:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
@@ -1025,24 +1035,25 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     min=row_data['OrgMolecular_Weight'],
                                     step=0.01
                                 ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
+                                style="padding: 5px; border: 1px solid #ddd; width: 140px;"
                             ),
                             ui.tags.td(
                                 ui.input_numeric(
-                                    f"stock_volume_{i}",
+                                    f"mgit_tubes_{i}",
                                     "",
-                                    value=stock_vol_value,
-                                    min=0,
-                                    step=0.1
+                                    value=mgit_tubes_value,
+                                    min=1,
+                                    step=1
                                 ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 100px;"
+                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
                             ),
                             style="background-color: white;"
                         )
                         table_rows.append(row)
-                    
+
                     return ui.tags.div(
                         ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                        ui.tags.p("Enter purchased molecular weight, critical concentration, and MGIT tubes for each selected drug.", style="color: #7f8c8d; margin-bottom: 15px;"),
                         ui.tags.div(
                             ui.tags.table(
                                 table_headers,
@@ -1160,11 +1171,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     return ui.tags.div()
                     
                 if current_step() == 2:
-                    # Get input values
+                    # Get input values (new Step 2 flow)
                     try:
-                        stock_volumes = []
                         purchased_mol_weights = []
                         custom_critical_values = []
+                        mgit_tubes_values = []
                         drug_data = load_drug_data()
                         
                         for i, drug_name in enumerate(selected):
@@ -1182,14 +1193,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             purch_molw_gmol = purch_molw
                             purchased_mol_weights.append(purch_molw_gmol)
                             
-                            # Get stock volume
-                            stock_vol = input[f"stock_volume_{i}"]()
-                            if stock_vol is None or stock_vol <= 0:
-                                return ui.tags.div("Please enter valid stock volumes for all drugs.", style="color: green;")
-
-                            # Convert to ml for calculations
-                            stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                            stock_volumes.append(stock_vol_ml)
+                            # Get MGIT tubes
+                            mgit_tubes = input[f"mgit_tubes_{i}"]()
+                            if mgit_tubes is None or mgit_tubes <= 0:
+                                return ui.tags.div("Please enter valid MGIT tube counts for all drugs.", style="color: green;")
+                            mgit_tubes_values.append(int(mgit_tubes))
                             
                             # Get custom critical value
                             custom_crit = input[f"custom_critical_{i}"]()
@@ -1199,63 +1207,162 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             custom_crit_mgml = custom_crit
                             custom_critical_values.append(custom_crit_mgml)
                         
-                        if calculate_clicked():
-                            # Calculate results
-                            results_data = []
-                            estimated_weights = []
-                            
-                            for i, drug_name in enumerate(selected):
-                                drug_row = drug_data[drug_data['Drug'] == drug_name]
-                                if not drug_row.empty:
-                                    row_data = drug_row.iloc[0]
-                                
-                                    # Calculate potency
-                                    pot = potency(purchased_mol_weights[i], row_data['OrgMolecular_Weight'])
-                                
-                                    # Calculate estimated drug weight
-                                    est_dw = est_drugweight(custom_critical_values[i], stock_volumes[i], pot)
-                                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
-                                    estimated_weights.append(est_dw_user_unit)
-                                
-                                    results_data.append({
-                                        'Drug': drug_name,
-                                        'Potency': f"{pot:.5f}",
-                                        'Est_DrugWeight': est_dw_user_unit
-                                    })
-                            
-                            # Store estimated weights for step 3
-                            calculation_results.set({'estimated_weights': estimated_weights})
+                        # Calculate results (always when inputs valid)
+                        results_data = []
+                        estimated_weights = []  # step 2 main outputs
+                        diluent_volumes = []    # step 2 main outputs
                         
-                            # Create results table
-                            if results_data:
-                                table_headers = ui.tags.tr(
+                        for i, drug_name in enumerate(selected):
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                row_data = drug_row.iloc[0]
+                            
+                                # [1] potency
+                                pot = potency(purchased_mol_weights[i], row_data['OrgMolecular_Weight'])
+                                # [5] conc_ws
+                                ws_conc_ugml = conc_ws(custom_critical_values[i])
+                                # [6] vol_workingsol
+                                vol_ws_ml = vol_workingsol(mgit_tubes_values[i])
+                                # [2] est_drugweight (new formula)
+                                est_dw_mg = (ws_conc_ugml * vol_ws_ml * pot) / 1000.0
+                                est_dw_user_unit = convert_weight(est_dw_mg, "mg", weight_unit())
+                                estimated_weights.append(est_dw_user_unit)
+                                # [3] vol_diluent (as vol_workingsol)
+                                vol_dil_ml = vol_ws_ml
+                                diluent_volumes.append(convert_volume(vol_dil_ml, "ml", volume_unit()))
+
+                                results_data.append({
+                                    'Drug': drug_name,
+                                    'Potency': f"{pot:.5f}",
+                                    'Conc_WS(ug/ml)': f"{ws_conc_ugml:.4f}",
+                                    'Vol_WS(ml)': f"{vol_ws_ml:.4f}",
+                                    'Vol_WS_ml_num': vol_ws_ml,
+                                    'Est_DrugWeight': est_dw_user_unit,
+                                    'Est_DrugWeight_mg_num': est_dw_mg,
+                                    'Vol_Diluent': diluent_volumes[-1]
+                                })
+                        
+                        # Store step 2 outputs for step 3 and allow Next
+                        calculation_results.set({'estimated_weights': estimated_weights, 'diluent_volumes': diluent_volumes})
+                        calculate_clicked.set(True)
+
+                        # Create results tables (split emphasis)
+                        if results_data:
+                                main_headers = ui.tags.tr(
                                     ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
                                     ui.tags.th("Potency", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                                    ui.tags.th(f"Est. Drug Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
+                                    ui.tags.th("Critical Concentration (mg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
+                                    ui.tags.th("Total Volume of Working Solution (ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
                                     style="background-color: #f8f9fa;"
                                 )
+
+                                emph_headers = ui.tags.tr(
+                                    ui.tags.th("Drug", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    ui.tags.th(f"Calculated Drug Weight to Weigh Out ({weight_unit()})", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 220px;"),
+                                    ui.tags.th(f"Volume of Diluent to Add ({volume_unit()})", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    style="background-color: #eafaf1;"
+                                )
                             
-                                table_rows = []
+                                main_rows = []
+                                emph_rows = []
                                 for result in results_data:
-                                    row = ui.tags.tr(
-                                        ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                        ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                        ui.tags.td(round(float(result['Est_DrugWeight']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                        style="background-color: white;"
+                                    main_rows.append(
+                                        ui.tags.tr(
+                                            ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                                            ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                            ui.tags.td(result['Conc_WS(ug/ml)'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                            ui.tags.td(result['Vol_WS(ml)'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
+                                            style="background-color: white;"
+                                        )
                                     )
-                                    table_rows.append(row)
+
+                                    emph_rows.append(
+                                        ui.tags.tr(
+                                            ui.tags.td(result['Drug'], style="padding: 8px; border: 2px solid #27ae60; font-weight: bold; font-size: 14px;"),
+                                            ui.tags.td(round(float(result['Est_DrugWeight']), 4), style="padding: 8px; border: 2px solid #27ae60; text-align: center; font-size: 14px;"),
+                                            ui.tags.td(result['Vol_Diluent'], style="padding: 8px; border: 2px solid #27ae60; text-align: center; font-size: 14px;"),
+                                            style="background-color: #ffffff;"
+                                        )
+                                    )
+
+                                # Determine if any drug has est weight < 3 mg
+                                any_low_mass = any((r.get('Est_DrugWeight_mg_num') or 0) > 0 and r['Est_DrugWeight_mg_num'] < 3 for r in results_data)
+
+                                # Build practical rows safely (avoid accessing inputs before they exist)
+                                practical_rows = []
+                                if any_low_mass:
+                                    for idx, r in enumerate(results_data):
+                                        # Default practical weight: 3.0 mg
+                                        practical_val = 3.0
+                                        try:
+                                            v = input[f"practical_weight_{idx}"]()
+                                            if v is not None and v > 0:
+                                                practical_val = v
+                                        except Exception:
+                                            # Input not ready yet; keep default
+                                            pass
+                                        # Compute practical diluent volume: (x / est_dw_mg) * vol_ws_ml
+                                        try:
+                                            vol_needed_ml = convert_volume(((practical_val or 0) / max(r['Est_DrugWeight_mg_num'], 1e-12)) * r['Vol_WS_ml_num'], "ml", volume_unit())
+                                        except Exception:
+                                            vol_needed_ml = ""
+                                        practical_rows.append(
+                                            ui.tags.tr(
+                                                ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #f39c12; font-weight: bold; font-size: 14px;"),
+                                                ui.tags.td(
+                                                    ui.input_numeric(
+                                                        f"practical_weight_{idx}",
+                                                        "",
+                                                        value=practical_val,
+                                                        min=0.001,
+                                                        step=0.01
+                                                    ),
+                                                    style="padding: 5px; border: 2px solid #f39c12; width: 220px;"
+                                                ),
+                                                ui.tags.td(
+                                                    f"{vol_needed_ml:.4f}" if isinstance(vol_needed_ml, (int, float)) else vol_needed_ml,
+                                                    style="padding: 8px; border: 2px solid #f39c12; text-align: center; font-size: 14px;"
+                                                ),
+                                                style="background-color: #ffffff;"
+                                            )
+                                        )
 
                                 return ui.tags.div(
-                                    ui.tags.h3("Calculation Results", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                                    ui.tags.h3("Step 2 Calculations", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
                                     ui.tags.div(
                                         ui.tags.table(
-                                            table_headers,
-                                            *table_rows,
+                                            main_headers,
+                                            *main_rows,
                                             style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
                                         ),
                                         style="overflow-x: auto; max-width: 100%;"
                                     ),
-                                            ui.tags.div("INSTRUCTION: Please go weigh out the following estimated drug weights for each drug, then return to input the actual weighed values:", style="color: #1e90ff; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 20px;")
+                                    ui.tags.h3("Prepare These", style="color: #27ae60; margin-top: 10px; margin-bottom: 10px;"),
+                                    ui.tags.div(
+                                        ui.tags.table(
+                                            emph_headers,
+                                            *emph_rows,
+                                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                                        ),
+                                        style="overflow-x: auto; max-width: 100%;"
+                                    ),
+                                    # Practical scenario if any weight < 3 mg
+                                    (
+                                        ui.tags.div(
+                                            ui.tags.p("Note: The values above are ideal. For practical weighing, 3 mg would be recommended, but this would in turn increase the diluent volume. Toggle the inputs below to help you decide on a realistic outcome.",
+                                                      style="color: #e67e22; margin: 10px 0; font-weight: 600;"),
+                                            ui.tags.table(
+                                                ui.tags.tr(
+                                                    ui.tags.th("Drug", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                    ui.tags.th("Weight to Weigh Out (mg)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 220px;"),
+                                                    ui.tags.th(f"Volume of Diluent Needed ({volume_unit()})", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 220px;"),
+                                                ),
+                                                *practical_rows,
+                                                style="width: auto; border-collapse: collapse; margin: 10px 0 20px; table-layout: fixed;"
+                                            )
+                                        ) if any_low_mass else ui.tags.div()
+                                    ),
+                                    ui.tags.div("INSTRUCTION: Weigh out drug according to above values. Then proceed to Step 3 to enter the actual weights.", style="color: #1e90ff; margin-top: 10px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
                                 )
                         
                     except Exception as e:
@@ -1329,25 +1436,16 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 selected = input.drug_selection()
                 if not selected:
                     return False
-                
                 try:
                     drug_data = load_drug_data()
-                    
                     for i, drug_name in enumerate(selected):
-                        # Get stock volume
-                        stock_vol = input[f"stock_volume_{i}"]()
-                        if stock_vol is None or stock_vol <= 0:
-                            return False
-                        
-                        # Get original molecular weight
+                        # Original molecular weight
                         org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
-                        
-                        # Get purchased molecular weight
+                        # Purchased molecular weight (g/mol)
                         purch_molw = input[f"purchased_molw_{i}"]()
                         if purch_molw is None or purch_molw <= 0 or purch_molw < org_molw:
                             return False
-                        
-                        # Get custom critical value (mg/ml); fallback to DB default when not present in step 2
+                        # Critical concentration (mg/ml)
                         try:
                             custom_crit = input[f"custom_critical_{i}"]()
                         except Exception:
@@ -1357,9 +1455,12 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             custom_crit = default_crit
                         if custom_crit <= 0:
                             return False
-                    
+                        # MGIT tubes
+                        mgit_tubes = input[f"mgit_tubes_{i}"]()
+                        if mgit_tubes is None or mgit_tubes <= 0:
+                            return False
                     return True
-                except:
+                except Exception:
                     return False
 
             def validate_step3_inputs():
@@ -1515,9 +1616,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         )
                 else:
                     return ui.tags.div()
-            
-            # The render functions are automatically called by Shiny Express
-            # when they are defined with @render.ui decorators
 
     with ui.nav_panel("C"):
         pass

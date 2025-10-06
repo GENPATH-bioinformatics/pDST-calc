@@ -448,7 +448,7 @@ def mgit_tubes(selected_df):
                     try:
                         # Get required values for calculation
                         cc_val = float(row.get('Crit_Conc(mg/ml)'))
-                        concentration_mgit = conc_mgit(cc_val)
+                        concentration_mgit = conc_ws(cc_val)
                         conc_st = float(row.get('Conc_st_dil(ug/ml)'))
 
                         # Calculate working solution volume
@@ -503,7 +503,7 @@ def cal_mgit_ws(selected_df):
     for idx, row in selected_df.iterrows():
         try:
             cc_val = float(row.get('Crit_Conc(mg/ml)'))
-            concentration_mgit = conc_mgit(cc_val)
+            concentration_mgit = conc_ws(cc_val)
             num_mgit = float(row.get('Total Mgit tubes'))
             volume_ws = vol_workingsol(num_mgit)
             conc_st = float(row.get('Conc_st_dil(ug/ml)'))

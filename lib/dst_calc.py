@@ -48,17 +48,17 @@ def conc_stock(act_drugweight, vol_diluent):
     """
     return ((act_drugweight * 1000) / vol_diluent)
 
-def conc_mgit(crit_concentration):
+def conc_ws(crit_concentration):
     """
-    Calculate the final MGIT concentration after dilution.
+    Calculate the final working solution concentration after dilution.
     Formula: (critical_concentration * 8.4) / 0.1
     This accounts for the dilution factor used in MGIT testing.
     Args:
         crit_concentration (float): Critical concentration (mg/mL).
     Returns:
-        float: Final MGIT concentration (μg/mL).
+        float: Final working solution concentration (μg/mL).
     """
-    return (crit_concentration * 8.4) / 0.1
+    return (crit_concentration * 8.4) / 0.1 
 
 def vol_workingsol(num_mgits):
     """
@@ -70,20 +70,20 @@ def vol_workingsol(num_mgits):
     Returns:
         float: Volume of working solution needed (mL).
     """
-    return (num_mgits * 0.12) + 0.36
+    return (num_mgits * 0.1) + 0.2
 
-def vol_ss_to_ws(vol_workingsol, conc_mgit, conc_stock):
+def vol_ss_to_ws(vol_workingsol, conc_ws, conc_stock):
     """
     Calculate the volume of stock solution needed to prepare the working solution.
-    Formula: (working_solution_volume * mgit_concentration) / stock_concentration
+    Formula: (working_solution_volume * working_solution_concentration) / stock_concentration
     Args:
         vol_workingsol (float): Volume of working solution needed (mL).
-        conc_mgit (float): Target MGIT concentration (μg/mL).
+        conc_ws (float): Target working solution concentration (μg/mL).
         conc_stock (float): Concentration of stock solution (μg/mL).
     Returns:
         float: Volume of stock solution to add to working solution (mL).
     """
-    return (vol_workingsol * conc_mgit) / conc_stock
+    return (vol_workingsol * conc_ws) / conc_stock
 
 def vol_final_dil(vol_ss_to_ws, vol_workingsol):
     """

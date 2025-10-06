@@ -15,7 +15,7 @@ from pathlib import Path
 import dst_calc
 from dst_calc import (
     potency, est_drugweight, vol_diluent, conc_stock,
-    conc_mgit, vol_workingsol, vol_ss_to_ws, vol_final_dil, vol_ssleft
+    conc_ws, vol_workingsol, vol_ss_to_ws, vol_final_dil, vol_ssleft
 )
 
 
@@ -173,33 +173,33 @@ class TestConcStock:
 
 
 @pytest.mark.hypothesis
-class TestConcMgit:
-    """Test MGIT concentration calculation properties."""
+class TestConcWS:
+    """Test working solution concentration calculation properties."""
     
     @given(crit_conc=positive_floats)
-    def test_mgit_concentration_formula(self, crit_conc):
+    def test_ws_concentration_formula(self, crit_conc):
         """Verify the exact formula: (crit_conc * 8.4) / 0.1."""
-        result = conc_mgit(crit_conc)
+        result = conc_ws(crit_conc)
         expected = (crit_conc * 8.4) / 0.1
         assert abs(result - expected) < 1e-10
     
     @given(crit_conc=positive_floats)
-    def test_mgit_concentration_factor(self, crit_conc):
-        """MGIT concentration should be exactly 84 times the critical concentration."""
-        result = conc_mgit(crit_conc)
+    def test_ws_concentration_factor(self, crit_conc):
+        """Working solution concentration should be exactly 84 times the critical concentration."""
+        result = conc_ws(crit_conc)
         expected = crit_conc * 84
         assert abs(result - expected) < max(1e-10, abs(expected) * 1e-12)
     
     @given(crit_conc=positive_floats)
-    def test_mgit_concentration_proportional(self, crit_conc):
-        """MGIT concentration should be proportional to critical concentration."""
-        conc1 = conc_mgit(crit_conc)
-        conc2 = conc_mgit(2 * crit_conc)
+    def test_ws_concentration_proportional(self, crit_conc):
+        """Working solution concentration should be proportional to critical concentration."""
+        conc1 = conc_ws(crit_conc)
+        conc2 = conc_ws(2 * crit_conc)
         assert abs(conc2 - 2 * conc1) < 1e-10
     
-    def test_mgit_concentration_zero(self):
-        """Zero critical concentration should give zero MGIT concentration."""
-        result = conc_mgit(0)
+    def test_ws_concentration_zero(self):
+        """Zero critical concentration should give zero working solution concentration."""
+        result = conc_ws(0)
         assert result == 0
 
 
@@ -238,11 +238,11 @@ class TestVolWorkingsol:
 class TestVolSsToWs:
     """Test stock solution to working solution volume calculation properties."""
     
-    @given(vol_ws=positive_floats, conc_mgit=positive_floats, conc_stock=positive_floats)
-    def test_ss_to_ws_formula(self, vol_ws, conc_mgit, conc_stock):
-        """Verify the exact formula: (vol_ws * conc_mgit) / conc_stock."""
-        result = vol_ss_to_ws(vol_ws, conc_mgit, conc_stock)
-        expected = (vol_ws * conc_mgit) / conc_stock
+    @given(vol_ws=positive_floats, conc_ws_val=positive_floats, conc_stock=positive_floats)
+    def test_ss_to_ws_formula(self, vol_ws, conc_ws_val, conc_stock):
+        """Verify the exact formula: (vol_ws * conc_ws) / conc_stock."""
+        result = vol_ss_to_ws(vol_ws, conc_ws_val, conc_stock)
+        expected = (vol_ws * conc_ws_val) / conc_stock
         assert abs(result - expected) < 1e-10
     
     @given(vol_ws=positive_floats, conc=positive_floats)
@@ -251,11 +251,11 @@ class TestVolSsToWs:
         result = vol_ss_to_ws(vol_ws, conc, conc)
         assert abs(result - vol_ws) < max(1e-10, abs(vol_ws) * 1e-12)
     
-    @given(vol_ws=positive_floats, conc_mgit=positive_floats, conc_stock=positive_floats)
-    def test_ss_to_ws_dilution_principle(self, vol_ws, conc_mgit, conc_stock):
+    @given(vol_ws=positive_floats, conc_ws_val=positive_floats, conc_stock=positive_floats)
+    def test_ss_to_ws_dilution_principle(self, vol_ws, conc_ws_val, conc_stock):
         """Higher stock concentration should require less stock solution volume."""
-        vol1 = vol_ss_to_ws(vol_ws, conc_mgit, conc_stock)
-        vol2 = vol_ss_to_ws(vol_ws, conc_mgit, 2 * conc_stock)
+        vol1 = vol_ss_to_ws(vol_ws, conc_ws_val, conc_stock)
+        vol2 = vol_ss_to_ws(vol_ws, conc_ws_val, 2 * conc_stock)
         assert vol2 < vol1
         assert abs(vol2 - vol1 / 2) < 1e-10
 
@@ -338,7 +338,7 @@ class TestIntegrationProperties:
         conc_st = conc_stock(act_drugweight, vol_dil)
         
         # Step 5: Calculate MGIT concentration
-        conc_mg = conc_mgit(conc_crit)
+        conc_mg = conc_ws(conc_crit)
         
         # Step 6: Calculate working solution volume
         vol_ws = vol_workingsol(num_mgits)
@@ -392,7 +392,7 @@ class TestEdgeCases:
         assert potency(small_val, small_val) == 1.0
         assert est_drugweight(small_val, small_val, small_val) > 0
         assert conc_stock(small_val, small_val) > 0
-        assert conc_mgit(small_val) > 0
+        assert conc_ws(small_val) > 0
     
     def test_very_large_values(self):
         """Test with very large values."""
@@ -416,7 +416,7 @@ class TestEdgeCases:
         
         # Zero input handling
         assert est_drugweight(0, positive_val, positive_val) == 0
-        assert conc_mgit(0) == 0
+        assert conc_ws(0) == 0
         
         # Volume conservation
         stock_vol = 10.0
