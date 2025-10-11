@@ -63,7 +63,7 @@ def conc_ws(crit_concentration):
 def vol_workingsol(num_mgits):
     """
     Calculate the volume of working solution needed for a given number of MGIT tubes.
-    Formula: (number_of_mgits * 0.12) + 0.36
+    Formula: (number_of_mgits * 0.1) + 0.2
     This includes extra volume for pipetting and ensures sufficient working solution.
     Args:
         num_mgits (int): Number of MGIT tubes to prepare.

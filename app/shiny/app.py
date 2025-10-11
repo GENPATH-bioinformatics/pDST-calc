@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+from math import floor
 from shiny import reactive
 from shiny.express import input, render, ui
 from shiny import ui as shiny_ui
@@ -12,62 +14,26 @@ from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
 
-# Unit conversion functions
 # UI reactive prefs
 make_stock_pref = reactive.Value(False)
-make_aliquot_pref = reactive.Value(False)
 potency_method_pref = reactive.Value("mol_weight")
 
-def convert_volume(value, from_unit, to_unit):
-    """Convert volume between different units."""
-    if from_unit == to_unit:
-        return value
-    
-    # Convert to ml as base unit
-    if from_unit == "ml":
-        base_value = value
-    
-    elif from_unit == "μl":
-        base_value = value / 1000
-    else:
-        base_value = value
-    
-    # Convert from base unit to target unit
-    if to_unit == "ml":
-        return base_value
-    
-    elif to_unit == "μl":
-        return base_value * 1000
-    else:
-        return base_value
-
-def convert_weight(value, from_unit, to_unit):
-    """Convert weight between different units."""
-    if from_unit == to_unit:
-        return value
-    
-    # Convert to mg as base unit
-    if from_unit == "mg":
-        base_value = value
-    elif from_unit == "g":
-        base_value = value * 1000
-    elif from_unit == "μg":
-        base_value = value / 1000
-    else:
-        base_value = value
-    
-    # Convert from base unit to target unit
-    if to_unit == "mg":
-        return base_value
-    elif to_unit == "g":
-        return base_value / 1000
-    elif to_unit == "μg":
-        return base_value * 1000
-    else:
-        return base_value
+# Unit constants (base units)
+def weight_unit():
+    return "mg"
+def volume_unit():
+    return "ml"
 
 # Global variables to store calculation results
 calculation_results = reactive.Value({})
+Step2_EstWeights = reactive.Value([])
+Step2_TotalStockVolumes = reactive.Value([])
+Step2_ConcWS = reactive.Value([])
+Step2_VolWS = reactive.Value([])
+Step2_Potencies = reactive.Value([])
+Step2_MgitTubes = reactive.Value([])
+Step2_mlperAliquot = reactive.Value([])
+Step3_ActDrugWeights = reactive.Value([])
 
 # Variables for session results view
 show_results_view = reactive.Value(False)
@@ -144,200 +110,81 @@ def get_estimated_weight(drug_index):
             return estimated_weights[drug_index]
     return 0
 
-def perform_initial_calculations():
-    """Perform initial calculations for estimated weights."""
-    selected = input.drug_selection()
-    if not selected:
-        return {}
-    
-    try:
-        drug_data = load_drug_data()
-        estimated_weights = []
-        
-        for i, drug_name in enumerate(selected):
-            # Get input values
-            stock_vol = input[f"stock_volume_{i}"]()
-            purch_molw = input[f"purchased_molw_{i}"]()
-            custom_crit = input[f"custom_critical_{i}"]()
-            
-            if stock_vol and purch_molw and custom_crit:
-                # Convert to standard units for calculations
-                stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                purch_molw_gmol = purch_molw
-                # Critical concentration is already in mg/ml
-                custom_crit_mgml = custom_crit
-                
-                # Calculate potency
-                # [1] potency calculation from dst-calc.py
-                pot = potency(purch_molw_gmol, drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0])
-                
-                # Calculate estimated drug weight
-                # [2] est_drugweight calculation from dst-calc.py
-                est_dw = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
-                
-                # Convert to user's preferred weight unit
-                est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
-                estimated_weights.append(est_dw_user_unit)
-            else:
-                estimated_weights.append(0)
-        
-        return {'estimated_weights': estimated_weights}
-    except Exception as e:
-        print(f"Error in calculations: {e}")
-        return {}
-
 def perform_final_calculations():
-    """Perform final calculations for MGIT tubes and working solutions."""
+    """Perform final calculations for MGIT tubes and working solutions based on two categories:
+    1. No stock solution: Recalculate diluent volume using actual weight
+    2. Stock solution with aliquots: Calculate total stock volume with error margin
+    """
     print("perform_final_calculations: Starting")
     
-    # Try to get drugs from session first (for restored sessions)
-    selected = []
-    preparation = None
-    cs = current_session()
-    if cs:
-        print(f"perform_final_calculations: Getting drugs from session {cs['session_id']}")
-        try:
-            with db_manager.get_connection() as conn:
-                cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
-                row = cur.fetchone()
-                if row and row[0]:
-                    import json
-                    preparation = json.loads(row[0])
-                    selected = preparation.get('selected_drugs', [])
-                    print(f"perform_final_calculations: Got drugs from session: {selected}")
-        except Exception as e:
-            print(f"perform_final_calculations: Error getting session data: {e}")
-    
-    # Fallback to input if no session data
-    if not selected:
-        try:
-            selected = input.drug_selection()
-            print(f"perform_final_calculations: Got selected drugs from input: {selected}")
-        except Exception as e:
-            print(f"perform_final_calculations: SilentException - inputs not ready yet: {e}")
-            return []
-    
-    if not selected:
-        print("perform_final_calculations: No selected drugs")
-        return []
-    
-    print(f"perform_final_calculations: Processing {len(selected)} drugs")
-    
     try:
+        # Get selected drugs and preferences
+        selected = input.drug_selection()
+        if not selected:
+            print("perform_final_calculations: No drugs selected")
+            return []
+            
+        make_stock = bool(make_stock_pref())
+        print(f"perform_final_calculations: Processing {len(selected)} drugs with make_stock={make_stock}")
+        
         drug_data = load_drug_data()
         final_results = []
         
-        for i, drug_name in enumerate(selected):
-            try:
-                print(f"perform_final_calculations: Processing drug {i}: {drug_name}")
+        # Process each drug
+        for drug_idx, drug_name in enumerate(selected):
+            mgit_tubes = Step2_MgitTubes[drug_idx]
+            if make_stock:
+                # Stock solution calculations
+                total_stock_vol = Step2_TotalStockVolumes[drug_idx]
+                ws_conc_ugml = Step2_ConcWS[drug_idx]
+                pot = Step2_Potencies[drug_idx]
+                ws_vol_ml = Step2_VolWS[drug_idx]
+                est_weight = Step2_EstWeights[drug_idx]
+                actual_weight = Step3_ActDrugWeights[drug_idx]
+                ml_ali = Step2_mlperAliquot[drug_idx]
+
+                total_volWS = (actual_weight / est_weight) * ws_vol_ml
+
+                new_a_val = (actual_weight * 1000) / (total_stock_vol * ws_conc_ugml * pot)
+
+                stock_vol_to_add_to_ws_ml = total_volWS / new_a_val
+                diluent_vol_to_add_to_ws_ml = total_volWS - stock_vol_to_add_to_ws_ml
+                total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
+                num_aliquots = floor(total_stock_left / ml_ali)
                 
-                # Get actual weight and MGIT tubes
-                actual_weight = input[f"actual_weight_{i}"]()
-                mgit_tubes = input[f"mgit_tubes_{i}"]()
+                final_results.append({
+                    'Drug': drug_name,
+                    'Act_Weight': actual_weight,
+                    'Stock_Conc': new_a_val,
+                    'Stock_to_WS': stock_vol_to_add_to_ws_ml,
+                    'Dil_to_WS': diluent_vol_to_add_to_ws_ml,
+                    'Total_Stock_Vol': total_stock_vol,
+                    'Total_Stock_Left': total_stock_left,
+                    'MGIT_Tubes': mgit_tubes,
+                    'Number_of_Ali': num_aliquots,
+                })
+            else:
+                # No stock solution calculations
+                est_weight = Step2_EstWeights[drug_idx]
+                ws_vol_ml = Step2_VolWS[drug_idx]
+                actual_weight = Step3_ActDrugWeights[drug_idx]
+
+                final_vol_diluent = (actual_weight/ est_weight)*ws_vol_ml
                 
-                print(f"perform_final_calculations: Drug {i} - actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}")
-                
-                if actual_weight and mgit_tubes:
-                    # Convert actual weight to mg for calculations
-                    actual_weight_mg = convert_weight(actual_weight, weight_unit(), "mg")
-                    
-                    # Get original values for calculations from session data
-                    stock_vol = None
-                    purch_molw = None
-                    custom_crit = None
-                    
-                    # Try to get values from session data first
-                    if cs:
-                        try:
-                            session_inputs = preparation.get('inputs', {})
-                            drug_inputs = session_inputs.get(str(i), {})
-                            stock_vol = drug_inputs.get('St_Vol(ml)', None)
-                            purch_molw = drug_inputs.get('PurMol_W(g/mol)', None)
-                            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', None)
-                            print(f"perform_final_calculations: Got values from session - stock_vol: {stock_vol}, purch_molw: {purch_molw}, custom_crit: {custom_crit}")
-                        except Exception as e:
-                            print(f"perform_final_calculations: Error getting session values: {e}")
-                    
-                    # Fallback to input fields if session data not available
-                    if stock_vol is None or purch_molw is None or custom_crit is None:
-                        try:
-                            stock_vol = input[f"stock_volume_{i}"]()
-                            purch_molw = input[f"purchased_molw_{i}"]()
-                            custom_crit = input[f"custom_critical_{i}"]()
-                            print(f"perform_final_calculations: Got values from input - stock_vol: {stock_vol}, purch_molw: {purch_molw}, custom_crit: {custom_crit}")
-                        except Exception as e:
-                            print(f"perform_final_calculations: Error getting input values: {e}")
-                            continue
-                    
-                    stock_vol_ml = convert_volume(stock_vol, volume_unit(), "ml")
-                    purch_molw_gmol = purch_molw
-                    # Critical concentration is already in mg/ml
-                    custom_crit_mgml = custom_crit
-                    
-                    # Calculate potency
-                    # [1] potency calculation from dst-calc.py
-                    org_molw = drug_data[drug_data['Drug'] == drug_name]['OrgMolecular_Weight'].iloc[0]
-                    pot = potency(purch_molw_gmol, org_molw)
-                    
-                    # Step 1: Calculate estimated drug weight (from step 2)
-                    # [2] est_drugweight calculation from dst-calc.py
-                    est_drug_weight_mg = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
-                    
-                    # Step 2: Calculate diluent volume and stock concentration
-                    # [3] vol_diluent calculation from dst-calc.py
-                    vol_dil = vol_diluent(est_drug_weight_mg, actual_weight_mg, stock_vol_ml)
-                    # [4] conc_stock calculation from dst-calc.py
-                    conc_stock_ugml = conc_stock(actual_weight_mg, vol_dil)
-                    
-                    # Step 3: Calculate MGIT working solution
-                    # [5] conc_ws calculation from dst-calc.py
-                    conc_ws_ugml = conc_ws(custom_crit_mgml)  # conc_ws expects mg/ml input, returns μg/ml output
-                    # [6] vol_workingsol calculation from dst-calc.py
-                    vol_working_sol_ml = vol_workingsol(mgit_tubes)
-                    # [7] vol_ss_to_ws calculation from dst-calc.py
-                    vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_ws_ugml, conc_stock_ugml)
-                    # [8] vol_final_dil calculation from dst-calc.py
-                    vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
-                    
-                    # Convert volumes to user's preferred unit
-                    stock_vol_user = convert_volume(vol_stock_to_ws_ml, "ml", volume_unit())
-                    diluent_vol_user = convert_volume(vol_diluent_to_add_ml, "ml", volume_unit())
-                    
-                    # Check for warnings
-                    warning_message = ""
-                    if vol_diluent_to_add_ml < 0:
-                        warning_message = f"Warning for {drug_name}: Stock concentration too low. Using full working volume as stock solution."
-                        stock_vol_user = convert_volume(vol_working_sol_ml, "ml", volume_unit())
-                        diluent_vol_user = convert_volume(0, "ml", volume_unit())
-                    
-                    drug_row = drug_data[drug_data['Drug'] == drug_name]
-                    diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else "Unknown"
-                    
-                    final_results.append({
-                        'Drug': drug_name,
-                        'Diluent': diluent,
-                        'Stock_Vol_Aliquot': stock_vol_user,
-                        'Diluent_Vol': diluent_vol_user
-                    })
-                    
-                    # Store warning if present
-                    if warning_message:
-                        current_warnings = warnings()
-                        current_warnings.append(warning_message)
-                        warnings.set(current_warnings)
-                        print(f"WARNING STORED: {warning_message}")
-                        print(f"Total warnings now: {len(warnings())}")
-            except Exception as e:
-                print(f"Error processing drug {drug_name}: {e}")
-                import traceback
-                traceback.print_exc()
+                final_results.append({
+                    'Drug': drug_name,
+                    'Act_Weight': actual_weight,
+                    'Final_Vol_Dil': final_vol_diluent,
+                    'MGIT_Tubes': mgit_tubes,
+                })
+    
         
         return final_results
+        
     except Exception as e:
-        print(f"Error in final calculations: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"perform_final_calculations: Error: {e}")
         return []
+    
 
 # Read the first column from the CSV file
 drug_options = load_drug_data()
@@ -574,7 +421,8 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     steps = [
                         "Drug Selection",
                         "Parameters",
-                        "Final Results"
+                        "Weight Entry",
+                        "Solution Guide"
                     ]
                 
                     step_elements = []
@@ -591,27 +439,10 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 
                 ui.tags.div(style="margin-top: 30px;")
                 
-                # Unit Selection Section
-                ui.tags.div(style="margin-top: 30px;")
-                ui.tags.h4("Unit Preferences", style="color: #2c3e50; margin-bottom: 15px;")
-                
-                ui.tags.p("Select your preferred units:", style="color: #7f8c8d; font-size: 12px; margin-bottom: 10px;")
-                
-                # Molecular weight fixed to g/mol
-                ui.input_select(
-                    "vol_unit",
-                    "Volume:",
-                    choices=["ml", "μl"],
-                    selected="ml"
-                )
-                
-                # Concentration fixed to mg/ml
-                ui.input_select(
-                    "weight_unit",
-                    "Weight:",
-                    choices=["mg", "g", "μg"],
-                    selected="mg"
-                )
+                # Unit Selection Section - only shown in Step 2
+                @render.ui
+                def unit_preferences():
+                    return ui.tags.div()
             
             # Main content area with additional top padding
             ui.tags.div(style="padding-top: 30px;")
@@ -759,26 +590,17 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         drug_inputs = inputs.get(str(i), {})
                         
                         if drug_inputs:
-                            # Get input values
-                            actual_weight = drug_inputs.get('Act_DrugW(mg)', 0)
-                            mgit_tubes = drug_inputs.get('Total Mgit tubes', 0)
-                            stock_vol = drug_inputs.get('St_Vol(ml)', 0)
-                            purch_molw = drug_inputs.get('PurMol_W(g/mol)', 0)
-                            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 0)
-                            
-                            if actual_weight and mgit_tubes and stock_vol and purch_molw and custom_crit:
-                                # Convert actual weight to mg for calculations
-                                actual_weight_mg = convert_weight(actual_weight, weight_unit_val, "mg")
-                                
-                                # Convert to standard units
-                                stock_vol_ml = convert_volume(stock_vol, volume_unit_val, "ml")
-                                purch_molw_gmol = purch_molw
-                                custom_crit_mgml = custom_crit
-                                
-                                # Get drug data
-                                drug_row = drug_data[drug_data['Drug'] == drug_name]
-                                if not drug_row.empty:
-                                    org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
+                                    # Get input values in base units
+                                    actual_weight_mg = drug_inputs.get('Act_DrugW(mg)', 0)
+                                    mgit_tubes = drug_inputs.get('Total Mgit tubes', 0)
+                                    stock_vol_ml = drug_inputs.get('St_Vol(ml)', 0)
+                                    purch_molw_gmol = drug_inputs.get('PurMol_W(g/mol)', 0)
+                                    custom_crit_mgml = drug_inputs.get('Crit_Conc(mg/ml)', 0)
+                                    
+                                    if actual_weight_mg and mgit_tubes and stock_vol_ml and purch_molw_gmol and custom_crit_mgml:                                # Get drug data
+                                        drug_row = drug_data[drug_data['Drug'] == drug_name]
+                                    if not drug_row.empty:
+                                        org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
                                     
                                     # Calculate potency
                                     # [1] potency calculation from dst-calc.py
@@ -804,14 +626,14 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     # [8] vol_final_dil calculation from dst-calc.py
                                     vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
                                     
-                                    # Convert volumes to user's preferred unit
-                                    stock_vol_user = convert_volume(vol_stock_to_ws_ml, "ml", volume_unit_val)
-                                    diluent_vol_user = convert_volume(vol_diluent_to_add_ml, "ml", volume_unit_val)
+                                    # Keep values in base units (ml)
+                                    stock_vol_user = vol_stock_to_ws_ml
+                                    diluent_vol_user = vol_diluent_to_add_ml
                                     
                                     # Check for warnings
                                     if vol_diluent_to_add_ml < 0:
-                                        stock_vol_user = convert_volume(vol_working_sol_ml, "ml", volume_unit_val)
-                                        diluent_vol_user = convert_volume(0, "ml", volume_unit_val)
+                                        stock_vol_user = vol_working_sol_ml
+                                        diluent_vol_user = 0
                                     
                                     # Get diluent from drug data
                                     diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else "Unknown"
@@ -819,7 +641,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     final_results.append({
                                         'Drug': drug_name,
                                         'Diluent': diluent,
-                                        'Stock_Vol_Aliquot': stock_vol_user,
+                                        'Stock_Vol': stock_vol_user,
                                         'Diluent_Vol': diluent_vol_user
                                     })
                     
@@ -832,13 +654,13 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     ui.tags.tr(
                                         ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;"),
                                         ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;"),
-                                        ui.tags.th(f"Aliquot for Stock Solution ({volume_unit_val})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;"),
-                                        ui.tags.th(f"Diluent to Add ({volume_unit_val})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;")
+                                        ui.tags.th("Aliquot for Stock Solution (ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;"),
+                                        ui.tags.th("Diluent to Add (ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;")
                                     ),
                                     *[ui.tags.tr(
                                         ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd;"),
                                         ui.tags.td(result['Diluent'], style="padding: 8px; border: 1px solid #ddd;"),
-                                        ui.tags.td(f"{result['Stock_Vol_Aliquot']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center;"),
+                                        ui.tags.td(f"{result['Stock_Vol']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center;"),
                                         ui.tags.td(f"{result['Diluent_Vol']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center;")
                                     ) for result in final_results],
                                     style="border-collapse: collapse; margin-bottom: 20px;"
@@ -885,13 +707,13 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     print("Returning step 1 interface (drug selection)")
                     return ui.tags.div(
                         ui.tags.h2("Select Drugs", style="color: #2c3e50; margin-bottom: 20px;"),
-                ui.input_selectize(
-                    "drug_selection",
-                    "Select the drugs you want to calculate parameters for:",
-                    drug_selection,
-                    multiple=True,
-                        ),
-                        style="margin-bottom: 30px;"
+                    ui.input_selectize(
+                        "drug_selection",
+                        "Select the drugs you want to calculate parameters for:",
+                        drug_selection,
+                        multiple=True,
+                            ),
+                            style="margin-bottom: 30px;"
                     )
                 elif current_step() == 2:
                     print("Returning step 2 interface (input parameters)")
@@ -903,8 +725,8 @@ with ui.navset_card_pill(id="tab", selected="A"):
                 elif current_step() == 3:
                     print("Returning step 3 interface (final inputs)")
                     return ui.tags.div(
-                        ui.tags.h2("Final Inputs", style="color: #2c3e50; margin-bottom: 20px;"),
-                        ui.tags.p("Enter the actual drug weight and MGIT tube count:", style="color: #7f8c8d; margin-bottom: 20px;"),
+                        ui.tags.h2("Final Input", style="color: #2c3e50; margin-bottom: 20px;"),
+                        ui.tags.p("Enter the actual drug weight and calculate final results:", style="color: #7f8c8d; margin-bottom: 20px;"),
                         style="margin-bottom: 30px;"
                     )
                 else:
@@ -973,14 +795,17 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 ui.tags.td(f"{row_data['OrgMolecular_Weight']:.2f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                 ui.tags.td(row_data['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
                                 ui.tags.td(
-                                    ui.input_numeric(
-                                        f"custom_critical_{i}",
-                                        "",
-                                        value=row_data['Critical_Concentration'],
-                                        min=0,
-                                        step=0.01
+                                    ui.tags.div(
+                                        ui.input_numeric(
+                                            f"custom_critical_{i}",
+                                            "",
+                                            value=row_data['Critical_Concentration'],
+                                            min=0,
+                                            step=0.1
+                                        ),
+                                        style="width: 90px;"
                                     ),
-                                    style="padding: 5px; border: 1px solid #ddd; width: 100px;"
+                                    style="padding: 5px; border: 1px solid #ddd; width: 80px;"
                                 ),
                                 style="background-color: white;"
                             )
@@ -1043,7 +868,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         stored_values = stored_inputs.get(str(i), {})
                         purch_molw_value = stored_values.get('PurMol_W(g/mol)', 0)
                         mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
-                        purity_value = stored_values.get('Purity_%', 100)
+                        purity_value = stored_values.get('Purity_%', 0)
                         
                         # Get current purity value
                         try:
@@ -1062,46 +887,83 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         
                         # Add purchased molecular weight column if needed
                         if current_potency_method in ["mol_weight", "both"]:
+
+                            try:
+                                existing_purch = input[f"purchased_molw_{i}"]()
+                            except Exception:
+                                existing_purch = None
+                            if existing_purch is None:
+                                purch_default = purch_molw_value
+                            else:
+                                purch_default = existing_purch
+
                             row_cells.append(
                                 ui.tags.td(
-                                    ui.input_numeric(
-                                        f"purchased_molw_{i}",
-                                        "",
-                                        value=0,
-                                        min=row_data['OrgMolecular_Weight'],
-                                        step=0.01
+                                    ui.tags.div(
+                                        ui.input_numeric(
+                                            f"purchased_molw_{i}",
+                                            "",
+                                            value=purch_default,
+                                            min=row_data['OrgMolecular_Weight'],
+                                            step=1
+                                        ),
+                                        style="width: 80px;"
                                     ),
-                                    style="padding: 5px; border: 1px solid #ddd; width: 140px;"
+                                    style="padding: 5px; border: 1px solid #ddd; width: 60px;"
                                 )
                             )
                         
-                        # Add purity column if needed
                         if current_potency_method in ["purity", "both"]:
+                            # Use the current input value if present to avoid overwriting user typing
+                            try:
+                                existing_purity_input = input[f"purity_{i}"]()
+                            except Exception:
+                                existing_purity_input = None
+                            if existing_purity_input is None:
+                                purity_default = purity_value
+                            else:
+                                purity_default = existing_purity_input
+
                             row_cells.append(
                                 ui.tags.td(
-                                    ui.input_numeric(
-                                        f"purity_{i}",
-                                        "",
-                                        value=0,
-                                        min=0.01,
-                                        max=100,
-                                        step=0.1
+                                    ui.tags.div(
+                                        ui.input_numeric(
+                                            f"purity_{i}",
+                                            "",
+                                            value=purity_default,
+                                            min=1,
+                                            max=100,
+                                            step=1
+                                        ),
+                                        style="width: 80px;"
                                     ),
-                                    style="padding: 5px; border: 1px solid #ddd; width: 100px;"
+                                    style="padding: 5px; border: 1px solid #ddd; width: 60px;"
                                 )
                             )
                         
+                        try:
+                            existing_mgit_input = input[f"mgit_tubes_{i}"]()
+                        except Exception:
+                            existing_mgit_input = None
+                        if existing_mgit_input is None:
+                            mgit_tubes_default = mgit_tubes_value
+                        else:
+                            mgit_tubes_default = existing_mgit_input
+
                         # Always add MGIT tubes column
                         row_cells.append(
                             ui.tags.td(
-                                ui.input_numeric(
-                                    f"mgit_tubes_{i}",
-                                    "",
-                                    value=mgit_tubes_value,
-                                    min=1,
-                                    step=1
+                                ui.tags.div(
+                                    ui.input_numeric(
+                                        f"mgit_tubes_{i}",
+                                        "",
+                                        value=mgit_tubes_default,
+                                        min=1,
+                                        step=1
+                                    ),
+                                    style="width: 80px;"
                                 ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
+                                style="padding: 5px; border: 1px solid #ddd; width: 60px;"
                             )
                         )
                         
@@ -1137,15 +999,360 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     )
                 elif current_step() == 3:
                     print("Creating step 3 table")
-                    # Get estimated weight for display (calculated by reactive effect)
-                    est_weight = get_estimated_weight(0) if selected else 0
-                    print(f"Step 3: Estimated weight: {est_weight}")
+                    # Create table headers for step 3
+                    table_headers = ui.tags.tr(
+                        ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
+                        ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                    )
+                    
+                    # Create table rows for each selected drug
+                    table_rows = []
+                    stored_inputs = session_inputs.get()
+                    print(f"Step 3: Creating rows for {len(selected)} drugs")
+                    for i, drug_name in enumerate(selected):
+                        # Get estimated weight from previous calculation
+                        est_weight = get_estimated_weight(i)
+                        
+                        # Get stored values if they exist
+                        stored_values = stored_inputs.get(str(i), {})
+                        actual_weight_value = stored_values.get('Act_DrugW(mg)', 0)
+                        mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
+                        print(f"Step 3: Drug {i} ({drug_name}) - estimated weight: {est_weight}, stored values: actual_weight={actual_weight_value}, mgit_tubes={mgit_tubes_value}")
+                        
+                        row = ui.tags.tr(
+                            ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
+                            ui.tags.td(
+                                ui.input_numeric(
+                                    f"actual_weight_{i}",
+                                    "",
+                                    value=actual_weight_value,
+                                    min=0,
+                                    step=0.001
+                                ),
+                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
+                            ),
+                            style="background-color: white;"
+                        )
+                        table_rows.append(row)
+                        print(f"Step 3: Created row for drug {i}")
+                    
+                    print("Step 3: Returning table")
+                    return ui.tags.div(
+                        ui.tags.h3("Enter Actual Weights", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                        ui.tags.p("Enter the actual weighed amount for each drug", style="color: #7f8c8d; margin-bottom: 15px;"),
+                        ui.tags.div(
+                            ui.tags.table(
+                                table_headers,
+                                *table_rows,
+                                style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
+                            ),
+                            style="overflow-x: auto; max-width: 100%;"
+                        )
+                    )
+
+                elif current_step() == 4:
+                    try:
+                        # Collect data needed for instructions
+                        make_stock = bool(make_stock_pref())
+                        drug_data = load_drug_data()
+                        final_results = perform_final_calculations()
+
+                        if not final_results:
+                            return ui.tags.div("Please complete Step 3 first.", style="color: red;")
+
+                        # Create instruction sections
+                        instruction_sections = []
+
+                        # 1. Safety Precautions Section
+                        instruction_sections.append(
+                            ui.tags.div(
+                                ui.tags.h3("A. Safety Precautions", 
+                                         style="color: #c0392b; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #c0392b; padding-bottom: 5px;"),
+                                ui.tags.div(
+                                    ui.tags.ol(
+                                        ui.tags.li("Put on appropriate personal protective equipment (PPE):",
+                                            ui.tags.ul(
+                                                ui.tags.li("Laboratory coat"),
+                                                ui.tags.li("Nitrile gloves"),
+                                                ui.tags.li("Safety goggles"),
+                                                ui.tags.li("Face mask (N95 or equivalent)")
+                                            )
+                                        ),
+                                        ui.tags.li("Clean and disinfect your work area"),
+                                        ui.tags.li("Ensure proper ventilation"),
+                                        ui.tags.li("Have spill kit ready"),
+                                        style="color: #2c3e50;"
+                                    ),
+                                    style="background-color: #fadbd8; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                )
+                            )
+                        )
+
+                        # 2. Preparation Instructions
+                        if make_stock:
+                            # Stock Solution Instructions
+                            instruction_sections.append(
+                                ui.tags.div(
+                                    ui.tags.h3("B. Stock Solution Preparation", 
+                                             style="color: #8e44ad; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #8e44ad; padding-bottom: 5px;"),
+                                    ui.tags.div(
+                                        *[ui.tags.div(
+                                            ui.tags.h4(f"{result['Drug']} Stock Solution",
+                                                    style="color: #8e44ad; margin-top: 15px; margin-bottom: 10px;"),
+                                            ui.tags.ol(
+                                                *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline" else [] ),
+                                                ui.tags.li(f"Label a clean container: '{result['Drug']} Stock Solution'"),
+                                                *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
+                                                ui.tags.li(f"Record the drug details:",
+                                                    ui.tags.ul(
+                                                        ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
+                                                        ui.tags.li(f"Drug: {result['Drug']}"),
+                                                        ui.tags.li(f"Weight used: {input[f'actual_weight_{i}']():.4f} {weight_unit()}"),
+                                                        ui.tags.li(f"Diluent: {result['Diluent']}"),
+                                                        ui.tags.li(f"Initials")
+                                                    )
+                                                ),
+                                                ui.tags.li("Add the weighed drug powder to a clean container"),
+                                                ui.tags.li(
+                                                    f"Add {result['Stock_Vol']:.4f} {volume_unit()} of {result['Diluent']} to the same container"
+                                                ),
+                                                ui.tags.li("Mix thoroughly:",
+                                                    ui.tags.ul(
+                                                        ui.tags.li("For bedaquiline:",
+                                                            ui.tags.ul(
+                                                                ui.tags.li("Cap the tube securely"),
+                                                                ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
+                                                            )
+                                                        ) if result['Drug'] == "Bedaquiline" else [
+                                                            ui.tags.li("Cap the tube securely"),
+                                                            ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
+                                                            ui.tags.li("Do not shake vigorously to avoid foam formation"),
+                                                            ui.tags.li("Check that drug powder is completely dissolved"),
+                                                            ui.tags.li("Ensure no visible particles remain"),
+                                                        ],
+                                                    )
+                                                ),
+                                                style="color: #2c3e50;"
+                                            ),
+                                            style="background-color: #f5eef8; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                        ) for i, result in enumerate(final_results)]
+                                    )
+                                )
+                            )
+
+                        # Working Solution Instructions
+                        section_title = "C. Working Solution Preparation" if not make_stock else "D. Working Solution Preparation"
+                        instruction_sections.append(
+                            ui.tags.div(
+                                ui.tags.h3(section_title, 
+                                         style="color: #2980b9; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #2980b9; padding-bottom: 5px;"),
+                                ui.tags.div(
+                                    *[ui.tags.div(
+                                        ui.tags.h4(f"{result['Drug']} Working Solution",
+                                                style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;"),
+                                        ui.tags.ol(
+                                            *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline" else [] ),
+                                            ui.tags.li(f"Label a clean container: '{result['Drug']} Working Solution'"),
+                                            ui.tags.li("Record solution details:",
+                                                ui.tags.ul(
+                                                    ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
+                                                    ui.tags.li(f"Drug: {result['Drug']}"),
+                                                    ui.tags.li(f"Diluent: {result['Diluent']}"),
+                                                    ui.tags.li(f"Initials")
+                                                )
+                                            ),
+                                            *( [ui.tags.li("Wrap tube in foil or use amber/dark tube as DMSO is light sensitive")] if result['Diluent'] == "DMSO" else [] ),
+                                            *(
+                                                [
+                                                    ui.tags.li(f"Add {result['Stock_Vol']:.4f} {volume_unit()} of stock solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result['Diluent_Vol']:.4f} {volume_unit()} of {result['Diluent']} to the same tube")
+                                                ] if make_stock else [
+                                                    ui.tags.li("Add the weighed drug powder to a clean container"),
+                                                    ui.tags.li(f"Add {result['Diluent_Vol']:.4f} {volume_unit()} of {result['Diluent']} to the same container")
+                                                ]
+                                            ),
+                                            ui.tags.li("Mix solution:",
+                                                ui.tags.ul(
+                                                        ui.tags.li("For bedaquiline:",
+                                                            ui.tags.ul(
+                                                                ui.tags.li("Cap the tube securely"),
+                                                                ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
+                                                            )
+                                                        ) if result['Drug'] == "Bedaquiline" else [
+                                                            ui.tags.li("Cap the tube securely"),
+                                                            ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
+                                                            ui.tags.li("Do not shake vigorously to avoid foam formation"),
+                                                            ui.tags.li("Check that drug powder is completely dissolved"),
+                                                            ui.tags.li("Ensure no visible particles remain"),
+                                                        ],
+                                                )
+                                            ),
+                                            style="color: #2c3e50;"
+                                        ),
+                                        style="background-color: #ebf5fb; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                    ) for i, result in enumerate(final_results)]
+                                )
+                            )
+                        )
+
+                        if make_stock:
+                            # Aliquoting Instructions
+                            instruction_sections.append(
+                                ui.tags.div(
+                                    ui.tags.h3("D. Aliquoting Remaining Stock", 
+                                             style="color: #27ae60; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #27ae60; padding-bottom: 5px;"),
+                                    ui.tags.div(
+                                        *[ui.tags.div(
+                                            ui.tags.h4(f"{result['Drug']} Aliquots",
+                                                    style="color: #27ae60; margin-top: 15px; margin-bottom: 10px;"),
+                                            ui.tags.ol(
+                                                ui.tags.li("Calculate remaining stock solution:",
+                                                    ui.tags.ul(
+                                                        ui.tags.li(f"Total stock solution: {result['Stock_Vol']:.4f} {volume_unit()}"),
+                                                        ui.tags.li(f"Used for working solution: {result['Working_Stock_Vol']:.4f} {volume_unit()}"),
+                                                        ui.tags.li(f"Remaining stock: {(result['Stock_Vol'] - result['Working_Stock_Vol']):.4f} {volume_unit()}")
+                                                    )
+                                                ),
+                                                ui.tags.li(f"Prepare {max(1, int((result['Stock_Vol'] - result['Working_Stock_Vol'])/float(input[f'ml_per_aliquot_{i}']() or 1.0)))} sterile tubes"),
+                                                ui.tags.li("Label each tube with:",
+                                                    ui.tags.ul(
+                                                        ui.tags.li(f"Drug name: {result['Drug']}"),
+                                                        ui.tags.li("Stock solution"),
+                                                        ui.tags.li(f"Volume: {input[f'ml_per_aliquot_{i}']() or 1.0} {volume_unit()}"),
+                                                        ui.tags.li(f"Date prepared: {datetime.now().strftime('%Y-%m-%d')}"),
+                                                        ui.tags.li(f"Storage temperature: -20°C or -80°C"),
+                                                        ui.tags.li(f"Expiry: {(datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d')}"),
+                                                        ui.tags.li(f"Initials")
+                                                    )
+                                                ),
+                                                ui.tags.li(f"Dispense {input[f'ml_per_aliquot_{i}']() or 1.0} {volume_unit()} of remaining stock solution into each tube"),
+                                                ui.tags.li("Cap tubes tightly and check for proper sealing"),
+                                                ui.tags.li("Storage instructions:",
+                                                    ui.tags.ul(
+                                                        ui.tags.li("Store aliquots at -20°C or -80°C"),
+                                                        ui.tags.li("Valid for up to 6 months from preparation date"),
+                                                        ui.tags.li("Avoid repeated freeze-thaw cycles")
+                                                    )
+                                                ),
+                                                style="color: #2c3e50;"
+                                            ),
+                                            style="background-color: #e8f6f3; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                        ) for i, result in enumerate(final_results)]
+                                    )
+                                )
+                            )
+
+                        # MGIT Preparation Section
+                        mgit_section_title = "D. MGIT Tube Preparation" if not make_stock else "E. MGIT Tube Preparation"
+                        instruction_sections.append(
+                            ui.tags.div(
+                                ui.tags.h3(mgit_section_title, 
+                                         style="color: #16a085; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #16a085; padding-bottom: 5px;"),
+                                ui.tags.div(
+                                    *[ui.tags.div(
+                                        ui.tags.h4(f"{result['Drug']} MGIT Preparation",
+                                                style="color: #16a085; margin-top: 15px; margin-bottom: 10px;"),
+                                        ui.tags.ol(
+                                            ui.tags.li(f"Label {input[f'mgit_tubes_{i}']() or 1} MGIT tubes with:",
+                                                ui.tags.ul(
+                                                    ui.tags.li(f"Drug name: {result['Drug']}"),
+                                                    ui.tags.li(f"Critical concentration: {input[f'custom_critical_{i}']():.4f} μg/ml"),
+                                                    ui.tags.li(f"Sample ID"),
+                                                    ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
+                                                    ui.tags.li(f"Initials")
+                                                )
+                                            ),
+                                            ui.tags.li("For each MGIT tube:",
+                                                ui.tags.ul(
+                                                    ui.tags.li("Pipette 0.1 ml of working solution"),
+                                                    ui.tags.li("Add 0.8 ml of OADC (growth supplement)"),
+                                                    ui.tags.li("Add 0.5 ml of culture")
+                                                )
+                                            ),
+                                            ui.tags.li("After adding all components to each tube:",
+                                                ui.tags.ul(
+                                                        ui.tags.li("For bedaquiline:",
+                                                            ui.tags.ul(
+                                                                ui.tags.li("Cap the tube securely"),
+                                                                ui.tags.li("Check for proper sealing"),
+                                                                ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes"),
+                                                                ui.tags.li("Place in MGIT machine as soon as possible after adding culture")
+                                                            )
+                                                        ) if result['Drug'] == "Bedaquiline" else [
+                                                            ui.tags.li("Cap the tube securely"),
+                                                            ui.tags.li("Check for proper sealing"),
+                                                            ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
+                                                            ui.tags.li("Do not shake vigorously to avoid foam formation"),
+                                                            ui.tags.li("Check that drug powder is completely dissolved"),
+                                                            ui.tags.li("Ensure no visible particles remain"),
+                                                            ui.tags.li("Place in MGIT machine as soon as possible after adding culture")
+                                                        ],
+                                                )
+                                            ),
+                                            style="color: #2c3e50;"
+                                        ),
+                                        style="background-color: #e8f8f5; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                    ) for i, result in enumerate(final_results)]
+                                )
+                            )
+                        )
+
+                        # Quality Control Section
+                        final_section_title = "E. Quality Control" if not make_stock else "F. Quality Control"
+                        instruction_sections.append(
+                            ui.tags.div(
+                                ui.tags.h3(final_section_title, 
+                                         style="color: #d35400; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #d35400; padding-bottom: 5px;"),
+                                ui.tags.div(
+                                    ui.tags.h4("Final Checks:",
+                                            style="color: #d35400; margin-top: 15px; margin-bottom: 10px;"),
+                                    ui.tags.ol(
+                                        ui.tags.li("Verify all solutions are properly labeled"),
+                                        ui.tags.li("Check all solutions for:",
+                                            ui.tags.ul(
+                                                ui.tags.li("Complete dissolution"),
+                                                ui.tags.li("Absence of visible particles"),
+                                                ui.tags.li("Proper volume measurement"),
+                                                ui.tags.li("Correct labeling")
+                                            )
+                                        ),
+                                        ui.tags.li("Document preparation in laboratory records"),
+                                        ui.tags.li("Store solutions according to requirements:",
+                                            ui.tags.ul(
+                                                ui.tags.li("Stock solutions: Follow drug-specific storage instructions"),
+                                                ui.tags.li("Working solutions: Use immediately for best results"),
+                                                ui.tags.li("Aliquots: Store according to stability requirements")
+                                            )
+                                        ),
+                                        style="color: #2c3e50;"
+                                    ),
+                                    style="background-color: #fef5e7; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                )
+                            )
+                        )
+
+                        return ui.tags.div(
+                            ui.tags.h2("Step 4: Solution Preparation Guide",
+                                     style="color: #2c3e50; margin-bottom: 20px;"),
+                            *instruction_sections,
+                            ui.tags.div(
+                                ui.tags.p("⚠️ Important: Follow all laboratory safety protocols and maintain aseptic technique throughout the procedure.",
+                                       style="color: #e74c3c; margin-top: 20px; font-weight: bold;")
+                            )
+                        )
+
+                    except Exception as e:
+                        return ui.tags.div(f"Error generating instructions: {str(e)}", style="color: red;")
                     
                     # Create table headers for step 3
                     table_headers = ui.tags.tr(
                         ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
                         ui.tags.th(f"Est. Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                         ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                        ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                         style="background-color: #f8f9fa;"
                     )
                     
@@ -1232,7 +1439,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     return ui.tags.div()
                     
                 if current_step() == 2:
-                    # Get input values (new Step 2 flow)
                     try:
                         purchased_mol_weights = []
                         custom_critical_values = []
@@ -1264,6 +1470,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             if mgit_tubes is None or mgit_tubes <= 0:
                                 return ui.tags.div("Please enter valid MGIT tube counts for all drugs.", style="color: green;")
                             mgit_tubes_values.append(int(mgit_tubes))
+                            Step2_MgitTubes[i] = int(mgit_tubes)
                             
                             # Get custom critical value
                             custom_crit = input[f"custom_critical_{i}"]()
@@ -1283,44 +1490,53 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             if not drug_row.empty:
                                 row_data = drug_row.iloc[0]
                                 org_molw = row_data['OrgMolecular_Weight']
-                            
+
                                 # [1] potency calculation - depends on selected method
                                 potency_method = potency_method_pref()
-                                
+
                                 if potency_method == "purity":
                                     # Potency from purity only: 1.0 / (purity / 100)
                                     try:
                                         purity_pct = input[f"purity_{i}"]()
-                                        if purity_pct and purity_pct > 0:
-                                            pot = 1.0 / (purity_pct / 100.0)
-                                        else:
-                                            pot = 1.0
+                                        if purity_pct is None or purity_pct <= 0:
+                                            return ui.tags.div("Please enter valid purity percentages for all drugs.", style="color: green;")
+                                    except Exception:
+                                        purity_pct = None
+                                        
+                                    try:
+                                        pot = 1.0 / (purity_pct / 100.0)
                                     except Exception:
                                         pot = 1.0
+                                    print(f"potency (purity) for idx={i}, purity_pct={purity_pct} -> pot={pot}")
                                 elif potency_method == "both":
-                                    # Potency from both: (1.0 / (purity / 100)) * (purch_molw / org_molw)
                                     try:
                                         purity_pct = input[f"purity_{i}"]()
                                         if purity_pct and purity_pct > 0:
                                             pot = (1.0 / (purity_pct / 100.0)) * (purchased_mol_weights[i] / org_molw)
                                         else:
-                                            pot = potency(purchased_mol_weights[i], org_molw)
+                                            return ui.tags.div("Please enter valid purity percentages for all drugs.", style="color: green;")
                                     except Exception:
                                         pot = potency(purchased_mol_weights[i], org_molw)
-                                else:  # "mol_weight" (default)
+                                else:
                                     # Traditional potency calculation from molecular weights
                                     pot = potency(purchased_mol_weights[i], org_molw)
+                                
+                                Step2_Potencies[i] = pot
+
                                 # [5] conc_ws
                                 ws_conc_ugml = conc_ws(custom_critical_values[i])
+                                Step2_ConcWS[i] = ws_conc_ugml
                                 # [6] vol_workingsol
                                 vol_ws_ml = vol_workingsol(mgit_tubes_values[i])
+                                Step2_VolWS[i] = vol_ws_ml
                                 # [2] est_drugweight (new formula)
                                 est_dw_mg = (ws_conc_ugml * vol_ws_ml * pot) / 1000.0
-                                est_dw_user_unit = convert_weight(est_dw_mg, "mg", weight_unit())
+                                est_dw_user_unit = est_dw_mg
                                 estimated_weights.append(est_dw_user_unit)
+                                Step2_EstWeights[i] = est_dw_user_unit
                                 # [3] vol_diluent (as vol_workingsol)
                                 vol_dil_ml = vol_ws_ml
-                                diluent_volumes.append(convert_volume(vol_dil_ml, "ml", volume_unit()))
+                                diluent_volumes.append(vol_dil_ml)
 
                                 results_data.append({
                                     'Drug': drug_name,
@@ -1342,11 +1558,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         # Create results tables (split emphasis)
                         if results_data:
                                 main_headers = ui.tags.tr(
-                                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                                    ui.tags.th("Potency", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                                    ui.tags.th("Conc. of Working Solution (μg/ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
-                                    ui.tags.th("Total Volume of Working Solution (ml)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                                    style="background-color: #f8f9fa;"
+                                    ui.tags.th("Drug", style="padding: 8px; border: 2px solid #3498db; background-color: #ebf5fb; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    ui.tags.th("Potency", style="padding: 8px; border: 2px solid #3498db; background-color: #ebf5fb; font-weight: bold; font-size: 14px; width: 120px;"),
+                                    ui.tags.th("Conc. of Working Solution (μg/ml)", style="padding: 8px; border: 2px solid #3498db; background-color: #ebf5fb; font-weight: bold; font-size: 14px; width: 180px;"),
+                                    ui.tags.th("Total Volume of Working Solution (ml)", style="padding: 8px; border: 2px solid #3498db; background-color: #ebf5fb; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    style="background-color: #ebf5fb;"
                                 )
 
                                 emph_headers = ui.tags.tr(
@@ -1361,11 +1577,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 for result in results_data:
                                     main_rows.append(
                                         ui.tags.tr(
-                                            ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                            ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                            ui.tags.td(round(float(result['Conc_WS(ug/ml)']), 2), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                            ui.tags.td(round(float(result['Vol_WS(ml)']), 2), style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                            style="background-color: white;"
+                                            ui.tags.td(result['Drug'], style="padding: 8px; border: 2px solid #3498db; font-weight: bold; font-size: 14px;"),
+                                            ui.tags.td(round(float(result['Potency']), 4), style="padding: 8px; border: 2px solid #3498db; text-align: center; font-size: 14px;"),
+                                            ui.tags.td(round(float(result['Conc_WS(ug/ml)']), 2), style="padding: 8px; border: 2px solid #3498db; text-align: center; font-size: 14px;"),
+                                            ui.tags.td(round(float(result['Vol_WS(ml)']), 2), style="padding: 8px; border: 2px solid #3498db; text-align: center; font-size: 14px;"),
+                                            style="background-color: #f8fbfe;"
                                         )
                                     )
 
@@ -1395,7 +1611,9 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 try:
                                     num_aliq_val = input.num_aliquots() if input.num_aliquots() else 1
                                     ml_per_aliq_val = input.ml_per_aliquot() if input.ml_per_aliquot() else 1.0
+                                    Step2_mlperAliquot[idx] = ml_per_aliq_val
                                     aliquot_total_num = num_aliq_val * ml_per_aliq_val
+                                    Step2_TotalStockVolumes[idx] = aliquot_total_num
                                     aliquot_total = f"{aliquot_total_num:.2f}"
                                 except Exception:
                                     aliquot_total = "1.00"
@@ -1409,8 +1627,8 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     # Use persisted toggle state
                                     make_stock = bool(make_stock_pref())
                                     for idx, r in enumerate(results_data):
-                                        # Default practical weight: 3.0 mg
-                                        practical_val = 3.0
+                                        # Default practical weight: 2.0 mg
+                                        practical_val = 2.0
                                         try:
                                             v = input[f"practical_weight_{idx}"]()
                                             if v is not None and v > 0:
@@ -1420,7 +1638,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                             pass
                                         # Compute practical diluent volume: (x / est_dw_mg) * vol_ws_ml
                                         try:
-                                            vol_needed_ml = convert_volume(((practical_val or 0) / max(r['Est_DrugWeight_mg_num'], 1e-12)) * r['Vol_WS_ml_num'], "ml", volume_unit())
+                                            vol_needed_ml = ((practical_val or 0) / max(r['Est_DrugWeight_mg_num'], 1e-12)) * r['Vol_WS_ml_num']
                                         except Exception:
                                             vol_needed_ml = ""
                                         practical_rows.append(
@@ -1466,7 +1684,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         
                                         stock_rows.append(
                                             ui.tags.tr(
-                                                ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #2c3e50; font-weight: bold; font-size: 14px;"),
+                                                ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #8e44ad; font-weight: bold; font-size: 14px;"),
                                                 ui.tags.td(
                                                     ui.input_numeric(
                                                         f"dilution_factor_{idx}",
@@ -1475,85 +1693,75 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                         min=1.1,
                                                         step=1
                                                     ),
-                                                    style="padding: 5px; border: 2px solid #2c3e50; width: 200px;"
+                                                    style="padding: 5px; border: 2px solid #8e44ad; width: 200px;"
                                                 ),
                                                 ui.tags.td(
                                                     f"{stock_vol_ml:.4f}",
-                                                    style="padding: 8px; border: 2px solid #2c3e50; text-align: center; font-size: 14px;"
+                                                    style="padding: 8px; border: 2px solid #8e44ad; text-align: center; font-size: 14px;"
                                                 ),
                                                 ui.tags.td(
                                                     f"{diluent_vol_ml:.4f}",
-                                                    style="padding: 8px; border: 2px solid #2c3e50; text-align: center; font-size: 14px;"
+                                                    style="padding: 8px; border: 2px solid #8e44ad; text-align: center; font-size: 14px;"
                                                 ),
                                                 style="background-color: #ffffff;"
                                             )
                                         )
                                         
                                         # Build aliquot summary row for this drug
-                                        # Total Stock Volume (+ 10% error) = (Total Aliquot Volume + Stock Volume) * 1.1
-                                        total_stock_vol_with_error = (aliquot_total_num + stock_vol_ml) * 1.1
+                                        # Total Stock Volume = (Volume of Stock)
+                                        # Prefer per-drug inputs if present (num_aliquots_{idx}, ml_per_aliquot_{idx}),
+                                        # otherwise fall back to the global aliquot_total_num computed earlier.
+                                        try:
+                                            num_aliq_idx = input[f"num_aliquots_{idx}"]()
+                                            ml_per_aliq_idx = input[f"ml_per_aliquot_{idx}"]()
+                                            if num_aliq_idx is None or num_aliq_idx <= 0:
+                                                num_aliq_idx = 0
+                                            if ml_per_aliq_idx is None or ml_per_aliq_idx <= 0:
+                                                ml_per_aliq_idx = 0.0
+                                            aliquot_total_num_idx = float(num_aliq_idx) * float(ml_per_aliq_idx)
+                                        except Exception:
+                                            # Inputs not ready or missing; use the previously computed global total
+                                            aliquot_total_num_idx = aliquot_total_num
+                                        Step2_mlperAliquot[idx] = ml_per_aliq_idx
+                                        total_stock_vol = (aliquot_total_num_idx )
+                                        Step2_TotalStockVolumes[idx] = aliquot_total_num_idx
                                         
                                         # Drug to weigh out = Total Stock Volume * conc_ws * dilution_factor * potency / 1000
                                         pot = r.get('Potency_num', 1.0)
-                                        drug_to_weigh = (total_stock_vol_with_error * ws_conc_ugml * a_val * pot) / 1000
+                                        drug_to_weigh = (total_stock_vol * ws_conc_ugml * a_val * pot) / 1000
+                                        Step2_EstWeights[idx] = drug_to_weigh
                                         
-                                        # Build stock without aliquot summary row (drug weight for stock solution only)
-                                        # Drug to weigh out for stock (without aliquots) = Stock Volume × conc_ws × dilution_factor × potency / 1000
-                                        drug_to_weigh_stock_only = (stock_vol_ml * ws_conc_ugml * a_val * pot) / 1000
 
                                         # Validation logic depends on whether aliquots are being made
-                                        if bool(make_aliquot_pref()):
+                                        if make_stock:
                                             # Validation 1: Check if drug to weigh out is less than 2 mg (WITH aliquots)
                                             if drug_to_weigh < 2.0:
                                                 validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg. Consider increasing the number of aliquots or ml per aliquot to achieve a more realistic weighing value."
+                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the ml per aliquot, or (3) increasing the stock concentration factor to achieve a more realistic weighing value."
                                                 )
                                                 # Validation 2: Check if stock volume is less than 250 microliters (0.25 ml) when aliquots are NOT being made
                                             if stock_vol_ml < 0.25:
                                                 validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette. Consider decreasing the stock concentration factor, otherwise an intermediate dilution will be needed."
+                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the amount of working solutions by increasing MGIT tube count, otherwise an intermediate dilution will be needed."
                                                 )
-                                        else:
-                                            # Validation for stock without aliquots
-                                            # Check if drug weight is less than 2 mg
-                                            if drug_to_weigh_stock_only < 2.0:
-                                                validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh_stock_only:.4f} mg) is less than 2 mg. Consider making aliquots to increase the total drug weight needed."
-                                                )
-                                            # Check if stock volume is less than 250 microliters (0.25 ml)
-                                            if stock_vol_ml < 0.25:
-                                                validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette. Consider decreasing the stock concentration factor or making aliquots, otherwise an intermediate dilution will be needed."
-                                                )
-
-                                        stock_no_aliquot_rows.append(
-                                            ui.tags.tr(
-                                                ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #2c3e50; font-weight: bold; font-size: 14px;"),
-                                                ui.tags.td(
-                                                    f"{drug_to_weigh_stock_only:.4f}",
-                                                    style="padding: 8px; border: 2px solid #2c3e50; text-align: center; font-size: 14px;"
-                                                ),
-                                                style="background-color: #ffffff;"
-                                            )
-                                        )
                                         
                                         aliquot_summary_rows.append(
                                             ui.tags.tr(
-                                                ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #16a085; font-weight: bold; font-size: 14px;"),
+                                                ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #d35400; font-weight: bold; font-size: 14px;"),
                                                 ui.tags.td(
-                                                    f"{total_stock_vol_with_error:.4f}",
-                                                    style="padding: 8px; border: 2px solid #16a085; text-align: center; font-size: 14px;"
+                                                    f"{total_stock_vol:.4f}",
+                                                    style="padding: 8px; border: 2px solid #d35400; text-align: center; font-size: 14px;"
                                                 ),
                                                 ui.tags.td(
                                                     f"{drug_to_weigh:.4f}",
-                                                    style="padding: 8px; border: 2px solid #16a085; text-align: center; font-size: 14px;"
+                                                    style="padding: 8px; border: 2px solid #d35400; text-align: center; font-size: 14px;"
                                                 ),
                                                 style="background-color: #ffffff;"
                                             )
                                         )
 
                                 return ui.tags.div(
-                                    ui.tags.h3("Step 2 Calculations", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                                    ui.tags.h3("Calculations", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
                                     ui.tags.div(
                                         ui.tags.table(
                                             main_headers,
@@ -1562,7 +1770,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         ),
                                         style="overflow-x: auto; max-width: 100%;"
                                     ),
-                                    ui.tags.h3("Prepare These", style="color: #27ae60; margin-top: 10px; margin-bottom: 10px;"),
+                                    ui.tags.h3("Working Solution Preparation", style="color: #27ae60; margin-top: 10px; margin-bottom: 10px;"),
                                     ui.tags.div(
                                         ui.tags.table(
                                             emph_headers,
@@ -1574,84 +1782,104 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     # Practical scenario if any weight < 3 mg
                                     (
                                         ui.tags.div(
-                                            ui.tags.p("Note: The values above are ideal. For practical weighing, 3 mg would be recommended, but this would in turn increase the diluent volume. Toggle the inputs below to help you decide on a realistic outcome.",
-                                                      style="color: #e67e22; margin: 10px 0; font-weight: 600;"),
                                             # Toggle: Create Stock Solution vs No stock solution
                                             ui.tags.div(
                                                 ui.input_switch("make_stock_toggle", "Create Stock Solution", value=make_stock_pref()),
                                                 style="margin: 8px 0 12px;"
                                             ),
-                                            # Second toggle: Create Aliquots (only shown when make_stock is True)
-                                            ui.tags.div(
-                                                ui.input_switch("make_aliquot_toggle", "Create Aliquots", value=make_aliquot_pref()),
-                                                style="margin: 8px 0 12px;"
-                                            ) if make_stock else ui.tags.div(),
+                                            (
+                                                ui.tags.p(
+                                                    "Note: The values above are the minimum required weight per drug based on the inputs. For practical weighing, 2 mg would be recommended, but this would in turn increase the diluent volume. Adjust the inputs below to help you decide on a realistic outcome.",
+                                                    style="color: #e67e22; margin: 10px 0; font-weight: 600;"
+                                                )
+                                            ) if not make_stock else ui.tags.div(),
+                                            style="margin-bottom: 15px;"
+                                        ),                                            
+                                            # First show Aliquot Planning if making stock solution
+                                            (ui.tags.div(
+                                                ui.tags.h4("Aliquot Planning", style="color: #008080; margin-top: 20px; margin-bottom: 10px;"),
+                                                ui.tags.table(
+                                                    ui.tags.thead(
+                                                        ui.tags.tr(
+                                                            ui.tags.th("Drug", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
+                                                            ui.tags.th("Number of Aliquots", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
+                                                            ui.tags.th(f"Volume per Aliquot ({volume_unit()})", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
+                                                            ui.tags.th(f"Total Aliquot Volume ({volume_unit()})", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                        )
+                                                    ),
+                                                    *[
+                                                        (lambda idx, r: ui.tags.tr(
+                                                            ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #008080; font-weight: bold; font-size: 14px;"),
+                                                            ui.tags.td(
+                                                                ui.input_numeric(
+                                                                    f"num_aliquots_{idx}",
+                                                                    None,
+                                                                    value=(input[f"num_aliquots_{idx}"]() if (f"num_aliquots_{idx}" in input and callable(input[f"num_aliquots_{idx}"])) else num_aliq_val),
+                                                                    min=1,
+                                                                    step=1
+                                                                ),
+                                                                style="padding: 8px; border: 2px solid #008080;"
+                                                            ),
+                                                            ui.tags.td(
+                                                                ui.input_numeric(
+                                                                    f"ml_per_aliquot_{idx}",
+                                                                    None,
+                                                                    value=(input[f"ml_per_aliquots_{idx}"]() if False else (input[f"ml_per_aliquot_{idx}"]() if (f"ml_per_aliquot_{idx}" in input and callable(input[f"ml_per_aliquot_{idx}"])) else ml_per_aliq_val)),
+                                                                    min=0.5,
+                                                                    step=0.5
+                                                                ),
+                                                                style="padding: 8px; border: 2px solid #008080;"
+                                                            ),
+                                                            ui.tags.td(
+                                                                (lambda ii=idx: (
+                                                                    (lambda: (  # compute total safely
+                                                                        (input[f"num_aliquots_{ii}"]() if (f"num_aliquots_{ii}" in input and callable(input[f"num_aliquots_{ii}"])) and input[f"num_aliquots_{ii}"]() is not None else num_aliq_val) *
+                                                                        (input[f"ml_per_aliquot_{ii}"]() if (f"ml_per_aliquot_{ii}" in input and callable(input[f"ml_per_aliquot_{ii}"])) and input[f"ml_per_aliquot_{ii}"]() is not None else ml_per_aliq_val)
+                                                                    ))()
+                                                                ))(),
+                                                                style="padding: 8px; border: 2px solid #008080; text-align: center; font-weight: bold; font-size: 14px;"
+                                                            ),
+                                                        ))(idx, r) for idx, r in enumerate(results_data)
+                                                    ],
+                                                    style="width: auto; border-collapse: collapse; margin: 10px 0 20px; table-layout: fixed;"
+                                                )
+                                            )) if make_stock else ui.tags.div(),
+
+                                            # Then show Stock Solution Planning table
                                             ui.tags.table(
                                                 (
                                                     ui.tags.tr(
                                                         ui.tags.th("Drug", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 180px;"),
                                                         ui.tags.th("Weight to Weigh Out (mg)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 180px;"),
                                                         ui.tags.th(f"Volume of Diluent Needed ({volume_unit()})", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                    ) if not make_stock else
-                                                    ui.tags.tr(
-                                                        ui.tags.th("Drug", style="padding: 8px; border: 2px solid #2c3e50; background-color: #ecf5ff; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                        ui.tags.th("Stock Concentration Increase Factor", style="padding: 8px; border: 2px solid #2c3e50; background-color: #ecf5ff; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                        ui.tags.th(f"Stock Volume ({volume_unit()})", style="padding: 8px; border: 2px solid #2c3e50; background-color: #ecf5ff; font-weight: bold; font-size: 14px; width: 150px;"),
-                                                        ui.tags.th(f"Volume Diluent to dilute stock ({volume_unit()})", style="padding: 8px; border: 2px solid #2c3e50; background-color: #ecf5ff; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                    ) if not make_stock else (
+                                                        ui.tags.h3("Stock Solution Planning", style="color: #8e44ad; margin-top: 10px; margin-bottom: 10px;"),
+                                                        ui.tags.thead(
+                                                            ui.tags.tr(
+                                                                ui.tags.th("Drug", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 180px; border-bottom: none;", rowspan="2"),
+                                                                ui.tags.th("Stock Concentration Increase Factor", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 200px; border-bottom: none;", rowspan="2"),
+                                                                ui.tags.th("Working Solution Make Up", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; text-align: center;", colspan="2"),
+                                                            ),
+                                                            ui.tags.tr(
+                                                                ui.tags.th(f"Volume of Stock ({volume_unit()})", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                                ui.tags.th(f"Volume Diluent ({volume_unit()})", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                            )
+                                                        )
                                                     )
                                                 ),
                                                 *(practical_rows if not make_stock else stock_rows),
                                                 style="width: auto; border-collapse: collapse; margin: 10px 0 20px; table-layout: fixed;"
                                             ),
-                                            # Stock without aliquots summary table (shown when make_stock is True but make_aliquot is False)
                                             (
                                                 ui.tags.div(
-                                                    ui.tags.h4("Stock Solution Preparation", style="color: #2c3e50; margin-top: 20px; margin-bottom: 10px;"),
-                                                    ui.tags.table(
-                                                        ui.tags.tr(
-                                                            ui.tags.th("Drug", style="padding: 8px; border: 2px solid #2c3e50; background-color: #ecf5ff; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                            ui.tags.th("Drug to Weigh Out (mg)", style="padding: 8px; border: 2px solid #2c3e50; background-color: #ecf5ff; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                        ),
-                                                        *stock_no_aliquot_rows,
-                                                        style="width: auto; border-collapse: collapse; margin: 10px 0 20px; table-layout: fixed;"
-                                                    )
-                                                )
-                                            ) if (make_stock and not bool(make_aliquot_pref())) else ui.tags.div(),
-                                            # Aliquot table (only shown when make_stock AND make_aliquot are both True)
-                                            (
-                                                ui.tags.div(
-                                                    ui.tags.h4("Aliquot Planning", style="color: #16a085; margin-top: 20px; margin-bottom: 10px;"),
-                                                    ui.tags.table(
-                                                        ui.tags.tr(
-                                                            ui.tags.th("Number of Aliquots", style="padding: 8px; border: 2px solid #16a085; background-color: #e8f8f5; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                            ui.tags.th(f"ml per Aliquot ({volume_unit()})", style="padding: 8px; border: 2px solid #16a085; background-color: #e8f8f5; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                            ui.tags.th(f"Total Aliquot Volume ({volume_unit()})", style="padding: 8px; border: 2px solid #16a085; background-color: #e8f8f5; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                        ),
-                                                        ui.tags.tr(
-                                                            ui.tags.td(
-                                                                ui.input_numeric("num_aliquots", None, value=num_aliq_val, min=1, step=1),
-                                                                style="padding: 8px; border: 2px solid #16a085;"
-                                                            ),
-                                                            ui.tags.td(
-                                                                ui.input_numeric("ml_per_aliquot", None, value=ml_per_aliq_val, min=0.5, step=1),
-                                                                style="padding: 8px; border: 2px solid #16a085;"
-                                                            ),
-                                                            ui.tags.td(
-                                                                aliquot_total,
-                                                                style="padding: 8px; border: 2px solid #16a085; text-align: center; font-weight: bold; font-size: 14px;"
-                                                            ),
-                                                        ),
-                                                        style="width: auto; border-collapse: collapse; margin: 10px 0 20px; table-layout: fixed;"
-                                                    ),
-                                                    # Aliquot Summary table (only shown when make_aliquot is True)
                                                     (
                                                         ui.tags.div(
-                                                            ui.tags.h4("Stock Solution Preparation Summary", style="color: #16a085; margin-top: 20px; margin-bottom: 10px;"),
+                                                            ui.tags.h4("Stock Solution Preparation", style="color: #d35400; margin-top: 20px; margin-bottom: 10px;"),
                                                             ui.tags.table(
                                                                 ui.tags.tr(
-                                                                    ui.tags.th("Drug", style="padding: 8px; border: 2px solid #16a085; background-color: #e8f8f5; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                                    ui.tags.th(f"Total Stock Volume (+ 10% error) ({volume_unit()})", style="padding: 8px; border: 2px solid #16a085; background-color: #e8f8f5; font-weight: bold; font-size: 14px; width: 250px;"),
-                                                                    ui.tags.th("Drug to Weigh Out (mg)", style="padding: 8px; border: 2px solid #16a085; background-color: #e8f8f5; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                                    ui.tags.th("Drug", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                                    ui.tags.th(f"Total Stock Volume ({volume_unit()})", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 250px;"),
+                                                                    ui.tags.th("Drug to Weigh Out (mg)", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 200px;"),
                                                                 ),
                                                                 *aliquot_summary_rows,
                                                                 style="width: auto; border-collapse: collapse; margin: 10px 0 20px; table-layout: fixed;"
@@ -1659,24 +1887,17 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                             # Display validation messages if any
                                                             (
                                                                 ui.tags.div(
-                                                                    *[ui.tags.p(msg, style="color: #e67e22; margin: 5px 0; padding: 10px; background-color: #fff3cd; border-left: 4px solid #e67e22; border-radius: 4px; font-size: 14px;") for msg in validation_messages],
+                                                                    *[ui.tags.p(msg, style="color: #000000; margin: 5px 0; padding: 10px; background-color: #fff3cd; border-left: 4px solid #e67e22; border-radius: 4px; font-size: 14px;") for msg in validation_messages],
                                                                     style="margin-top: 15px;"
                                                                 )
                                                             ) if validation_messages else ui.tags.div()
                                                         )
-                                                    ) if bool(make_aliquot_pref()) else ui.tags.div()
+                                                    ) if make_stock else ui.tags.div()
                                                 )
-                                            ) if (make_stock and bool(make_aliquot_pref())) else ui.tags.div(),
-                                            # Validation message for stock volume without aliquots
-                                            (
-                                                ui.tags.div(
-                                                    *[ui.tags.p(msg, style="color: #e67e22; margin: 5px 0; padding: 10px; background-color: #fff3cd; border-left: 4px solid #e67e22; border-radius: 4px; font-size: 14px;") for msg in validation_messages],
-                                                    style="margin-top: 15px;"
-                                                )
-                                            ) if (make_stock and not bool(make_aliquot_pref()) and validation_messages) else ui.tags.div()
-                                        ) if any_low_mass else ui.tags.div()
-                                    ),
-                                    ui.tags.div("INSTRUCTION: Weigh out drug according to above values. Then proceed to Step 3 to enter the actual weights.", style="color: #1e90ff; margin-top: 10px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
+                                            ) if (make_stock) else ui.tags.div(),
+                                        ) if any_low_mass else ui.tags.div(),
+                                    ui.tags.div("INSTRUCTION: Weigh out drug according to above values. Then proceed to Step 3 to enter the actual weights.", 
+                                              style="color: #1e90ff; margin-top: 10px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
                                 )
                         
                     except Exception as e:
@@ -1689,58 +1910,20 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     if warning_list:
                         warning_ui = ui.tags.div(
                             ui.tags.h4("⚠️ Warnings Detected", style="color: #e74c3c; margin-bottom: 15px;"),
-                            *[ui.tags.p(warning, style="color: #2c3e50; margin-bottom: 10px; padding: 10px; background-color: #fdf2f2; border-left: 4px solid #e74c3c; border-radius: 4px;") for warning in warning_list],
+                            *[ui.tags.p(warning, style="color: #000000; margin-bottom: 10px; padding: 10px; background-color: #fdf2f2; border-left: 4px solid #e74c3c; border-radius: 4px; white-space: pre-wrap;") for warning in warning_list],
                             style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;"
                         )
                     else:
                         warning_ui = ui.tags.div()
                     print(f"results_section: final_calculation_done: {final_calculation_done()}")
-                    if final_calculation_done():
-                        try:
-                            final_results = perform_final_calculations()
+                    final_results = perform_final_calculations()
+                    if final_results:
+                        for r in final_results:
                             
-                            if final_results:
-                                
-                                table_headers = ui.tags.tr(
-                                    ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                                    ui.tags.th("Diluent", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                                    ui.tags.th(f"Aliquot for Stock Solution ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 180px;"),
-                                    ui.tags.th(f"Diluent to Add ({volume_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 150px;"),
-                                    style="background-color: #f8f9fa;"
-                                )
-                                
-                                table_rows = []
-                                for result in final_results:
-                                    row = ui.tags.tr(
-                                        ui.tags.td(result['Drug'], style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                                        ui.tags.td(result['Diluent'], style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                        ui.tags.td(f"{result['Stock_Vol_Aliquot']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                        ui.tags.td(f"{result['Diluent_Vol']:.8f}" if result['Diluent_Vol'] < 0.001 else f"{result['Diluent_Vol']:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                                        style="background-color: white;"
-                                    )
-                                    table_rows.append(row)
-                                
-                                return ui.tags.div(
-                                    warning_ui,  # Show warnings at the top
-                                    ui.tags.h3("Final Results", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                                    ui.tags.div(
-                                        ui.tags.table(
-                                            table_headers,
-                                            *table_rows,
-                                            style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                                        ),
-                                        style="overflow-x: auto; max-width: 100%;"
-                                    ),
-                                    ui.tags.div("Final values calculated successfully! Use these volumes to prepare your working solutions.", style="color: #27ae60; margin-top: 30px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
-                                )
-                        except Exception as e:
-                            return ui.tags.div(f"Error in final calculations: {str(e)}", style="color: red;")
                     else:
                         print("results_section: Showing step 3 instruction text")
                         return ui.tags.div(
                             warning_ui,  # Show warnings if any
-                            ui.tags.h3("Enter Final Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                            ui.tags.p("Please enter the actual weights for each selected drug, then click 'Calculate Final Results'.", style="color: #7f8c8d; margin-bottom: 20px;")
                         )
                 
                 return ui.tags.div()
@@ -1829,12 +2012,13 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     for i in range(len(selected)):
                         try:
                             actual_weight = input[f"actual_weight_{i}"]()
-                            mgit_tubes = input[f"mgit_tubes_{i}"]()
-                            print(f"validate_step3_inputs: Drug {i} - actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}")
+                            Step3_ActDrugWeights[i] = actual_weight
+                            print(f"validate_step3_inputs: Drug {i} - actual_weight: {actual_weight}")
                             
-                            if actual_weight is None or actual_weight <= 0 or mgit_tubes is None or mgit_tubes <= 0:
-                                print(f"validate_step3_inputs: Drug {i} validation failed - values too low")
+                            if actual_weight is None or actual_weight <= 0:
+                                print(f"validate_step3_inputs: Drug {i} validation failed - actual weight too low or missing")
                                 return False
+                            
                         except KeyError as e:
                             print(f"validate_step3_inputs: Drug {i} input field does not exist yet: {e}")
                             return False
@@ -1916,15 +2100,13 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         )
                 elif current_step() == 3:
                     print("Step 3 action buttons logic")
-                    print(f"final_calculation_done: {final_calculation_done()}")
                     
                     # Validate step 3 inputs
-                    if final_calculation_done():
-                        print("Final calculation done - showing New Calculation button")
-                        # After results are shown, replace with New Calculation
+                    if validate_step3_inputs():
+                        print("Step 3 inputs valid - showing Calculate Final Results button")
                         return ui.tags.div(
                             ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                            ui.input_action_button("new_calc_btn", "New Calculation", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
+                            ui.input_action_button("calculate_final_btn", "Calculate Final Results", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
                             style="text-align: center; margin-top: 30px;"
                         )
                     elif validate_step3_inputs():
@@ -1962,6 +2144,14 @@ def next_step():
         current_step.set(3)
         calculate_clicked.set(False)
         final_calculation_done.set(False)
+    elif current_step() == 3:
+        print("Moving from step 3 to step 4")
+        current_step.set(4)
+        calculate_clicked.set(False)
+        final_calculation_done.set(False)
+    elif current_step() == 4:
+        # At step 4, there's no next step
+        pass
     else:
         print(f"next_step: unexpected step - {current_step()}")
     
@@ -1992,6 +2182,10 @@ def back_step():
         print("Back button - going back to step 2")
         current_step.set(2)
         final_calculation_done.set(False)  # Reset final calculation flag
+    elif current_step() == 4:
+        print("Back button - going back to step 3")
+        current_step.set(3)
+        final_calculation_done.set(True)  # Keep final calculation result when going back
 
 @reactive.effect
 @reactive.event(input.reset_btn)
@@ -2073,6 +2267,8 @@ def calculate_final_results():
     if current_step() == 3:
         # Mark that final calculation has been performed
         final_calculation_done.set(True)
+        # Move to step 4 after final calculation
+        current_step.set(4)
         try:
             cs = current_session()
             user = current_user()
@@ -2501,13 +2697,6 @@ def on_make_stock_toggle():
     except Exception:
         pass
 
-@reactive.effect
-@reactive.event(input.make_aliquot_toggle)
-def on_make_aliquot_toggle():
-    try:
-        make_aliquot_pref.set(bool(input.make_aliquot_toggle()))
-    except Exception:
-        pass
 
 @reactive.effect
 @reactive.event(input.potency_method_radio)
