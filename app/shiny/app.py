@@ -26,14 +26,15 @@ def volume_unit():
 
 # Global variables to store calculation results
 calculation_results = reactive.Value({})
-Step2_EstWeights = reactive.Value([])
-Step2_TotalStockVolumes = reactive.Value([])
-Step2_ConcWS = reactive.Value([])
-Step2_VolWS = reactive.Value([])
-Step2_Potencies = reactive.Value([])
-Step2_MgitTubes = reactive.Value([])
-Step2_mlperAliquot = reactive.Value([])
-Step3_ActDrugWeights = reactive.Value([])
+Step2_EstWeights = [None] * 21
+Step2_TotalStockVolumes = [None] * 21
+Step2_ConcWS = [None] * 21
+Step2_VolWS = [None] * 21
+Step2_Potencies = [None] * 21
+Step2_MgitTubes = [None] * 21
+Step2_mlperAliquot = [None] * 21
+Step3_ActDrugWeights = [None] * 21
+Step2_CriticalConc = [None] * 21
 
 # Variables for session results view
 show_results_view = reactive.Value(False)
@@ -86,8 +87,7 @@ def calculate_weights_for_restored_session():
                                     # [2] est_drugweight calculation from dst-calc.py
                                     est_dw = est_drugweight(custom_crit, stock_vol, pot)
                                     
-                                    # Convert to user's preferred weight unit
-                                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
+                                    est_dw_user_unit = est_dw
                                     estimated_weights.append(est_dw_user_unit)
                                 else:
                                     estimated_weights.append(0)
@@ -127,20 +127,26 @@ def perform_final_calculations():
         make_stock = bool(make_stock_pref())
         print(f"perform_final_calculations: Processing {len(selected)} drugs with make_stock={make_stock}")
         
+        # Debug: Check if Step3 data exists
+        print(f"perform_final_calculations: Step3_ActDrugWeights = {Step3_ActDrugWeights[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_MgitTubes = {Step2_MgitTubes[:len(selected)]}")
+        
         drug_data = load_drug_data()
         final_results = []
         
         # Process each drug
         for drug_idx, drug_name in enumerate(selected):
             mgit_tubes = Step2_MgitTubes[drug_idx]
+            crit_conc = Step2_CriticalConc[drug_idx]
+            actual_weight = Step3_ActDrugWeights[drug_idx]
+            est_weight = Step2_EstWeights[drug_idx]
+            ws_vol_ml = Step2_VolWS[drug_idx]
+
             if make_stock:
                 # Stock solution calculations
                 total_stock_vol = Step2_TotalStockVolumes[drug_idx]
                 ws_conc_ugml = Step2_ConcWS[drug_idx]
                 pot = Step2_Potencies[drug_idx]
-                ws_vol_ml = Step2_VolWS[drug_idx]
-                est_weight = Step2_EstWeights[drug_idx]
-                actual_weight = Step3_ActDrugWeights[drug_idx]
                 ml_ali = Step2_mlperAliquot[drug_idx]
 
                 total_volWS = (actual_weight / est_weight) * ws_vol_ml
@@ -151,31 +157,98 @@ def perform_final_calculations():
                 diluent_vol_to_add_to_ws_ml = total_volWS - stock_vol_to_add_to_ws_ml
                 total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
                 num_aliquots = floor(total_stock_left / ml_ali)
+                Final_stock_conc = new_a_val*ws_conc_ugml
                 
-                final_results.append({
-                    'Drug': drug_name,
-                    'Act_Weight': actual_weight,
-                    'Stock_Conc': new_a_val,
-                    'Stock_to_WS': stock_vol_to_add_to_ws_ml,
-                    'Dil_to_WS': diluent_vol_to_add_to_ws_ml,
-                    'Total_Stock_Vol': total_stock_vol,
-                    'Total_Stock_Left': total_stock_left,
-                    'MGIT_Tubes': mgit_tubes,
-                    'Number_of_Ali': num_aliquots,
-                })
+                if stock_vol_to_add_to_ws_ml >= 0.2:
+                    final_results.append({
+                        'Intermediate': False,
+                        'Drug': drug_name,
+                        'Diluent': drug_data[drug_data['Drug'] == drug_name].iloc[0]['Diluent'],
+                        'Crit_Conc': round(crit_conc, 2),
+                        'Act_Weight': round(actual_weight, 2),
+                        'Stock_Conc': round(Final_stock_conc, 2),
+                        'Stock_Factor' : round(new_a_val, 1),
+                        'Stock_to_WS_µl': round(stock_vol_to_add_to_ws_ml * 1000, 2),
+                        'Stock_to_WS': round(stock_vol_to_add_to_ws_ml, 2),
+                        'Dil_to_WS_µl': round(diluent_vol_to_add_to_ws_ml * 1000, 2),
+                        'Dil_to_WS': round(diluent_vol_to_add_to_ws_ml, 2),
+                        'Total_Stock_Vol_µl': round(total_stock_vol * 1000, 2),
+                        'Total_Stock_Vol': round(total_stock_vol, 2),
+                        'Total_Stock_Left_µl': round(total_stock_left * 1000, 2),
+                        'Total_Stock_Left': round(total_stock_left, 2),
+                        'MGIT_Tubes': round(mgit_tubes),
+                        'Number_of_Ali': round(num_aliquots),
+                        'µl_aliquot': round(ml_ali * 1000, 2),
+                        'ml_aliquot': round(ml_ali, 2),
+                    })
+                else:
+                    intermediate = True
+                    InterFactor = new_a_val
+
+                    while InterFactor > 1.1: 
+                        InterFactor -= 0.5
+
+                        stock_to_inter = total_volWS / InterFactor
+
+                        if stock_to_inter > 0.2:
+                            break
+                    
+                    # If we couldn't find a valid InterFactor, fall back to simple calculation
+                    if InterFactor <= 1.1:
+                        InterFactor = 2
+                        stock_to_inter = total_volWS / InterFactor
+
+                    total_stock_left = total_stock_vol - stock_to_inter
+                    num_aliquots = floor(total_stock_left / ml_ali)
+                    inter_conc = ws_conc_ugml * InterFactor
+                    Vol_of_inter = (stock_to_inter * Final_stock_conc) / (InterFactor * ws_conc_ugml)
+                    dil_to_inter = Vol_of_inter - stock_to_inter
+
+                    vol_inter_to_ws = (total_volWS * ws_conc_ugml) / (ws_conc_ugml * InterFactor)
+                    vol_dil_to_ws = total_volWS - vol_inter_to_ws
+
+                    final_results.append({
+                        'Intermediate': True,
+                        'Drug': drug_name,
+                        'Diluent': drug_data[drug_data['Drug'] == drug_name].iloc[0]['Diluent'],
+                        'Crit_Conc': round(crit_conc, 2),
+                        'Act_Weight': round(actual_weight, 2),
+                        'Stock_Conc': round(Final_stock_conc, 2),
+                        'Stock_Factor' : round(new_a_val, 2),
+                        'Total_Stock_Vol_µl': round(total_stock_vol * 1000, 2),
+                        'Total_Stock_Vol': round(total_stock_vol, 2),
+                        'Total_Stock_Left_µl': round(total_stock_left * 1000, 2),
+                        'Total_Stock_Left': round(total_stock_left, 2),
+                        'Stock_to_Inter_µl': round(stock_to_inter * 1000, 2),
+                        'Stock_to_Inter': round(stock_to_inter, 2),
+                        'Inter_Factor': round(InterFactor, 1),
+                        'Inter_Conc': round(inter_conc, 2),
+                        'Dil_to_Inter_µl': round(dil_to_inter * 1000, 2),
+                        'Dil_to_Inter': round(dil_to_inter, 2),
+                        'Vol_Inter_to_WS_µl': round(vol_inter_to_ws * 1000, 2),
+                        'Vol_Inter_to_WS': round(vol_inter_to_ws, 2),
+                        'Dil_to_WS_µl': round(vol_dil_to_ws * 1000, 2),
+                        'Dil_to_WS': round(vol_dil_to_ws, 2),
+                        'MGIT_Tubes': round(mgit_tubes),
+                        'Number_of_Ali': round(num_aliquots),
+                        'µl_aliquot': round(ml_ali * 1000, 2),
+                        'ml_aliquot': round(ml_ali, 2),
+                    })
+
             else:
                 # No stock solution calculations
-                est_weight = Step2_EstWeights[drug_idx]
-                ws_vol_ml = Step2_VolWS[drug_idx]
-                actual_weight = Step3_ActDrugWeights[drug_idx]
-
                 final_vol_diluent = (actual_weight/ est_weight)*ws_vol_ml
+                print(f"perform_final_calculations: Drug {drug_name}, actual_weight={actual_weight}, est_weight={est_weight}, ws_vol_ml={ws_vol_ml}, final_vol_diluent={final_vol_diluent}")   
                 
                 final_results.append({
+                    'Intermediate': False,
                     'Drug': drug_name,
-                    'Act_Weight': actual_weight,
-                    'Final_Vol_Dil': final_vol_diluent,
-                    'MGIT_Tubes': mgit_tubes,
+                    'Diluent': drug_data[drug_data['Drug'] == drug_name].iloc[0]['Diluent'],
+                    'Crit_Conc': round(crit_conc, 2),
+                    'Act_Weight': round(actual_weight, 2),
+                    'Final_Vol_Dil_µl': round(final_vol_diluent * 1000, 2),
+                    'Final_Vol_Dil': round(final_vol_diluent, 2),
+                    'MGIT_Tubes': round(mgit_tubes),
                 })
     
         
@@ -536,8 +609,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 0)
                             
                             if stock_vol and purch_molw and custom_crit:
-                                # Convert to standard units for calculations
-                                stock_vol_ml = convert_volume(stock_vol, volume_unit_val, "ml")
+                                stock_vol_ml = stock_vol
                                 purch_molw_gmol = purch_molw
                                 custom_crit_mgml = custom_crit
                                 
@@ -554,8 +626,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     # [2] est_drugweight calculation from dst-calc.py
                                     est_dw = est_drugweight(custom_crit_mgml, stock_vol_ml, pot)
                                     
-                                    # Convert to user's preferred weight unit
-                                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit_val)
+                                    est_dw_user_unit = est_dw
                                     estimated_weights.append(est_dw_user_unit)
                                 else:
                                     estimated_weights.append(0)
@@ -940,15 +1011,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     style="padding: 5px; border: 1px solid #ddd; width: 60px;"
                                 )
                             )
-                        
-                        try:
-                            existing_mgit_input = input[f"mgit_tubes_{i}"]()
-                        except Exception:
-                            existing_mgit_input = None
-                        if existing_mgit_input is None:
-                            mgit_tubes_default = mgit_tubes_value
-                        else:
-                            mgit_tubes_default = existing_mgit_input
 
                         # Always add MGIT tubes column
                         row_cells.append(
@@ -957,7 +1019,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     ui.input_numeric(
                                         f"mgit_tubes_{i}",
                                         "",
-                                        value=mgit_tubes_default,
+                                        value=mgit_tubes_value,
                                         min=1,
                                         step=1
                                     ),
@@ -1100,21 +1162,21 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                             ui.tags.h4(f"{result['Drug']} Stock Solution",
                                                     style="color: #8e44ad; margin-top: 15px; margin-bottom: 10px;"),
                                             ui.tags.ol(
-                                                *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline" else [] ),
+                                                *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline (BDQ)" else [] ),
                                                 ui.tags.li(f"Label a clean container: '{result['Drug']} Stock Solution'"),
                                                 *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
                                                 ui.tags.li(f"Record the drug details:",
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Drug: {result['Drug']}"),
-                                                        ui.tags.li(f"Weight used: {input[f'actual_weight_{i}']():.4f} {weight_unit()}"),
+                                                        ui.tags.li(f"Weight used: {result['Act_Weight']}mg"),
                                                         ui.tags.li(f"Diluent: {result['Diluent']}"),
                                                         ui.tags.li(f"Initials")
                                                     )
                                                 ),
-                                                ui.tags.li("Add the weighed drug powder to a clean container"),
+                                                ui.tags.li(f"Add the {result['Act_Weight']:.4f} mg weighed drug powder to a clean container"),
                                                 ui.tags.li(
-                                                    f"Add {result['Stock_Vol']:.4f} {volume_unit()} of {result['Diluent']} to the same container"
+                                                    f"Add {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) of {result['Diluent']} to the same container"
                                                 ),
                                                 ui.tags.li("Mix thoroughly:",
                                                     ui.tags.ul(
@@ -1124,7 +1186,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                                 ui.tags.li("Do not invert tubes as drug will attach to sides"),
                                                                 ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
                                                             )
-                                                        ) if result['Drug'] == "Bedaquiline" else [
+                                                        ) if result['Drug'] == "Bedaquiline (BDQ)" else [
                                                             ui.tags.li("Cap the tube securely"),
                                                             ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
                                                             ui.tags.li("Do not shake vigorously to avoid foam formation"),
@@ -1140,9 +1202,66 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                     )
                                 )
                             )
+                        
+                        # Intermediate Solution Instructions
+                        intermediate_results = [result for result in final_results if result.get('Intermediate') == True]
+                        if intermediate_results:
+                            section_title = "Intermediate Solution Preparation"
+                            instruction_sections.append(
+                                ui.tags.div(
+                                    ui.tags.h3(section_title, 
+                                            style="color: #2980b9; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #2980b9; padding-bottom: 5px;"),
+                                    ui.tags.div(
+                                        *[ui.tags.div(
+                                            ui.tags.h4(f"{result['Drug']} Intermediate Solution",
+                                                    style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;"),
+                                            ui.tags.ol(
+                                                *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline (BDQ)" else [] ),
+                                                ui.tags.li(f"Label a clean container: '{result['Drug']} Intermediate Solution'"),
+                                                *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
+                                                ui.tags.li("Record solution details:",
+                                                    ui.tags.ul(
+                                                        ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
+                                                        ui.tags.li(f"Drug: {result['Drug']}"),
+                                                        ui.tags.li(f"Diluent: {result['Diluent']}"),
+                                                        ui.tags.li(f"Concentration: {result['Inter_Conc']:.4f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result['Inter_Factor']:.4f}"),
+                                                        ui.tags.li(f"Initials")
+                                                    )
+                                                ),
+                                                *(
+                                                    [
+                                                        ui.tags.li(f"Add {result['Stock_to_Inter']:.4f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) of stock solution to a new clean tube"),
+                                                        ui.tags.li(f"Add {result['Dil_to_Inter']:.4f} ml (= {result['Dil_to_Inter_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                    ]
+                                                ),
+                                                ui.tags.li("Mix solution:",
+                                                    ui.tags.ul(
+                                                            ui.tags.li("For bedaquiline:",
+                                                                ui.tags.ul(
+                                                                    ui.tags.li("Cap the tube securely"),
+                                                                    ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                    ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
+                                                                )
+                                                            ) if result['Drug'] == "Bedaquiline (BDQ)" else [
+                                                                ui.tags.li("Cap the tube securely"),
+                                                                ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
+                                                                ui.tags.li("Do not shake vigorously to avoid foam formation"),
+                                                                ui.tags.li("Check that drug powder is completely dissolved"),
+                                                                ui.tags.li("Ensure no visible particles remain"),
+                                                            ],
+                                                    )
+                                                ),
+                                                style="color: #2c3e50;"
+                                            ),
+                                            style="background-color: #ebf5fb; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                        ) for result in intermediate_results]
+                                    )
+                                )
+                            )
 
                         # Working Solution Instructions
-                        section_title = "C. Working Solution Preparation" if not make_stock else "D. Working Solution Preparation"
+                        section_title = "B. Working Solution Preparation" if not make_stock else "C. Working Solution Preparation"
                         instruction_sections.append(
                             ui.tags.div(
                                 ui.tags.h3(section_title, 
@@ -1152,8 +1271,9 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         ui.tags.h4(f"{result['Drug']} Working Solution",
                                                 style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;"),
                                         ui.tags.ol(
-                                            *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline" else [] ),
+                                            *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline (BDQ)" else [] ),
                                             ui.tags.li(f"Label a clean container: '{result['Drug']} Working Solution'"),
+                                            *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
                                             ui.tags.li("Record solution details:",
                                                 ui.tags.ul(
                                                     ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
@@ -1162,15 +1282,19 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                     ui.tags.li(f"Initials")
                                                 )
                                             ),
-                                            *( [ui.tags.li("Wrap tube in foil or use amber/dark tube as DMSO is light sensitive")] if result['Diluent'] == "DMSO" else [] ),
                                             *(
                                                 [
-                                                    ui.tags.li(f"Add {result['Stock_Vol']:.4f} {volume_unit()} of stock solution to a new clean tube"),
-                                                    ui.tags.li(f"Add {result['Diluent_Vol']:.4f} {volume_unit()} of {result['Diluent']} to the same tube")
-                                                ] if make_stock else [
-                                                    ui.tags.li("Add the weighed drug powder to a clean container"),
-                                                    ui.tags.li(f"Add {result['Diluent_Vol']:.4f} {volume_unit()} of {result['Diluent']} to the same container")
-                                                ]
+                                                    ui.tags.li(f"Add {result['Stock_to_WS']:.4f} ml (= {result['Stock_to_WS_µl']:.2f} µl) of stock solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.4f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                ] if make_stock and result['Intermediate'] == False else
+                                                [
+                                                    ui.tags.li(f"Add {result['Vol_Inter_to_WS']:.4f} ml (= {result['Vol_Inter_to_WS_µl']:.2f} µl) of intermediate solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.4f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                ] if result['Intermediate'] == True and make_stock else
+                                                [
+                                                    ui.tags.li(f"Add the {result['Act_Weight']:.4f} mg weighed drug powder to a clean container"),
+                                                    ui.tags.li(f"Add {result['Final_Vol_Dil']:.4f} ml (= {result['Final_Vol_Dil_µl']:.2f} µl) of {result['Diluent']} to the same container")
+                                                ] if not make_stock and result['Intermediate'] == False else []
                                             ),
                                             ui.tags.li("Mix solution:",
                                                 ui.tags.ul(
@@ -1180,7 +1304,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                                 ui.tags.li("Do not invert tubes as drug will attach to sides"),
                                                                 ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
                                                             )
-                                                        ) if result['Drug'] == "Bedaquiline" else [
+                                                        ) if result['Drug'] == "Bedaquiline (BDQ)" else [
                                                             ui.tags.li("Cap the tube securely"),
                                                             ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
                                                             ui.tags.li("Do not shake vigorously to avoid foam formation"),
@@ -1205,29 +1329,38 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                              style="color: #27ae60; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #27ae60; padding-bottom: 5px;"),
                                     ui.tags.div(
                                         *[ui.tags.div(
+
+
                                             ui.tags.h4(f"{result['Drug']} Aliquots",
                                                     style="color: #27ae60; margin-top: 15px; margin-bottom: 10px;"),
                                             ui.tags.ol(
-                                                ui.tags.li("Calculate remaining stock solution:",
+                                                ui.tags.li("Remaining stock solution:",
                                                     ui.tags.ul(
-                                                        ui.tags.li(f"Total stock solution: {result['Stock_Vol']:.4f} {volume_unit()}"),
-                                                        ui.tags.li(f"Used for working solution: {result['Working_Stock_Vol']:.4f} {volume_unit()}"),
-                                                        ui.tags.li(f"Remaining stock: {(result['Stock_Vol'] - result['Working_Stock_Vol']):.4f} {volume_unit()}")
+                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Used for working solution: {result['Stock_to_WS']:.4f} ml (= {result['Stock_to_WS_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.4f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
+                                                    ) if result['Intermediate'] == False else
+                                                    ui.tags.ul(
+                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Used for intermediate solution: {result['Stock_to_Inter']:.4f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.4f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
                                                     )
                                                 ),
-                                                ui.tags.li(f"Prepare {max(1, int((result['Stock_Vol'] - result['Working_Stock_Vol'])/float(input[f'ml_per_aliquot_{i}']() or 1.0)))} sterile tubes"),
+                                                ui.tags.li(f"Prepare {result['Number_of_Ali']} sterile tubes"),
                                                 ui.tags.li("Label each tube with:",
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Drug name: {result['Drug']}"),
                                                         ui.tags.li("Stock solution"),
-                                                        ui.tags.li(f"Volume: {input[f'ml_per_aliquot_{i}']() or 1.0} {volume_unit()}"),
+                                                        ui.tags.li(f"Volume: {result['ml_aliquot']:.4f} ml (= {result['ml_aliquot_µl']:.2f} µl)"),
+                                                        ui.tags.li(f"Concentration: {result['Stock_Conc']:.4f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result['Stock_Factor']:.4f}"),
                                                         ui.tags.li(f"Date prepared: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Storage temperature: -20°C or -80°C"),
                                                         ui.tags.li(f"Expiry: {(datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Initials")
                                                     )
                                                 ),
-                                                ui.tags.li(f"Dispense {input[f'ml_per_aliquot_{i}']() or 1.0} {volume_unit()} of remaining stock solution into each tube"),
+                                                ui.tags.li(f"Dispense {result['ml_aliquot']:.4f} ml (= {result['ml_aliquot_µl']:.2f} µl) of remaining stock solution into each of the {result['Number_of_Ali']} tubes"),
                                                 ui.tags.li("Cap tubes tightly and check for proper sealing"),
                                                 ui.tags.li("Storage instructions:",
                                                     ui.tags.ul(
@@ -1245,7 +1378,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             )
 
                         # MGIT Preparation Section
-                        mgit_section_title = "D. MGIT Tube Preparation" if not make_stock else "E. MGIT Tube Preparation"
+                        mgit_section_title = "C. MGIT Tube Preparation" if not make_stock else "E. MGIT Tube Preparation"
                         instruction_sections.append(
                             ui.tags.div(
                                 ui.tags.h3(mgit_section_title, 
@@ -1255,10 +1388,10 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         ui.tags.h4(f"{result['Drug']} MGIT Preparation",
                                                 style="color: #16a085; margin-top: 15px; margin-bottom: 10px;"),
                                         ui.tags.ol(
-                                            ui.tags.li(f"Label {input[f'mgit_tubes_{i}']() or 1} MGIT tubes with:",
+                                            ui.tags.li(f"Label {result['MGIT_Tubes']} MGIT tubes with:",
                                                 ui.tags.ul(
                                                     ui.tags.li(f"Drug name: {result['Drug']}"),
-                                                    ui.tags.li(f"Critical concentration: {input[f'custom_critical_{i}']():.4f} μg/ml"),
+                                                    ui.tags.li(f"Critical concentration: {result['Crit_Conc']:.4f} μg/ml"),
                                                     ui.tags.li(f"Sample ID"),
                                                     ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                     ui.tags.li(f"Initials")
@@ -1266,9 +1399,9 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                             ),
                                             ui.tags.li("For each MGIT tube:",
                                                 ui.tags.ul(
-                                                    ui.tags.li("Pipette 0.1 ml of working solution"),
-                                                    ui.tags.li("Add 0.8 ml of OADC (growth supplement)"),
-                                                    ui.tags.li("Add 0.5 ml of culture")
+                                                    ui.tags.li("Pipette 0.1 ml (= 100 µl) of working solution"),
+                                                    ui.tags.li("Add 0.8 ml (= 800 µl) of OADC (growth supplement)"),
+                                                    ui.tags.li("Add 0.5 ml (= 500 µl) of culture")
                                                 )
                                             ),
                                             ui.tags.li("After adding all components to each tube:",
@@ -1281,7 +1414,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                                 ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes"),
                                                                 ui.tags.li("Place in MGIT machine as soon as possible after adding culture")
                                                             )
-                                                        ) if result['Drug'] == "Bedaquiline" else [
+                                                        ) if result['Drug'] == "Bedaquiline (BDQ)" else [
                                                             ui.tags.li("Cap the tube securely"),
                                                             ui.tags.li("Check for proper sealing"),
                                                             ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
@@ -1347,60 +1480,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                     except Exception as e:
                         return ui.tags.div(f"Error generating instructions: {str(e)}", style="color: red;")
                     
-                    # Create table headers for step 3
-                    table_headers = ui.tags.tr(
-                        ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                        ui.tags.th(f"Est. Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        ui.tags.th("MGIT Tubes", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
-                        style="background-color: #f8f9fa;"
-                    )
-                    
-                    # Create table rows for each selected drug
-                    table_rows = []
-                    stored_inputs = session_inputs.get()
-                    print(f"Step 3: Creating rows for {len(selected)} drugs")
-                    for i, drug_name in enumerate(selected):
-                        # Get estimated weight from previous calculation
-                        est_weight = get_estimated_weight(i) if i == 0 else get_estimated_weight(i)
-                        
-                        # Get stored values if they exist
-                        stored_values = stored_inputs.get(str(i), {})
-                        actual_weight_value = stored_values.get('Act_DrugW(mg)', 0)
-                        mgit_tubes_value = stored_values.get('Total Mgit tubes', 0)
-                        print(f"Step 3: Drug {i} ({drug_name}) - estimated weight: {est_weight}, stored values: actual_weight={actual_weight_value}, mgit_tubes={mgit_tubes_value}")
-                        
-                        row = ui.tags.tr(
-                            ui.tags.td(drug_name, style="padding: 8px; border: 1px solid #ddd; font-weight: bold; font-size: 14px;"),
-                            ui.tags.td(f"{est_weight:.4f}", style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 14px;"),
-                            ui.tags.td(
-                                ui.input_numeric(
-                                    f"actual_weight_{i}",
-                                    "",
-                                    value=actual_weight_value,
-                                    min=0,
-                                    step=0.001
-                                ),
-                                style="padding: 5px; border: 1px solid #ddd; width: 120px;"
-                            ),
-                            style="background-color: white;"
-                        )
-                        table_rows.append(row)
-                        print(f"Step 3: Created row for drug {i}")
-                    
-                    print("Step 3: Returning table")
-                    return ui.tags.div(
-                        ui.tags.h3("Enter Actual Weights", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
-                        ui.tags.div(
-                            ui.tags.table(
-                                table_headers,
-                                *table_rows,
-                                style="width: auto; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;"
-                            ),
-                            style="overflow-x: auto; max-width: 100%;"
-                        )
-                    )
-            
             
             # Results section for step 2
             @render.ui
@@ -1476,10 +1555,11 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             custom_crit = input[f"custom_critical_{i}"]()
                             if custom_crit is None or custom_crit <= 0:
                                 return ui.tags.div("Please enter valid critical concentrations for all drugs.", style="color: green;")
-                            # Use mg/ml directly
-                            custom_crit_mgml = custom_crit
-                            custom_critical_values.append(custom_crit_mgml)
-                        
+                            # Use μg/ml directly
+                            custom_crit_μgml = custom_crit
+                            custom_critical_values.append(custom_crit_μgml)
+                            Step2_CriticalConc[i] = custom_crit_μgml
+
                         # Calculate results (always when inputs valid)
                         results_data = []
                         estimated_weights = []  # step 2 main outputs
@@ -1641,6 +1721,14 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                             vol_needed_ml = ((practical_val or 0) / max(r['Est_DrugWeight_mg_num'], 1e-12)) * r['Vol_WS_ml_num']
                                         except Exception:
                                             vol_needed_ml = ""
+                                        
+                                        # Bedaquiline validation for no-stock solution case
+                                        if not make_stock and r['Drug'] == "Bedaquiline (BDQ)":
+                                            vol_ws_ml = r.get('Vol_WS_ml_num', 0)
+                                            if vol_ws_ml > 5.0:
+                                                validation_messages.append(
+                                                    f"❌ {r['Drug']}: Working solution volume ({vol_ws_ml:.4f} ml) exceeds 5ml polystyrene tube limit.\nReduce the number of MGIT tubes to keep volume ≤ 5ml."
+                                                )
                                         practical_rows.append(
                                             ui.tags.tr(
                                                 ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #f39c12; font-weight: bold; font-size: 14px;"),
@@ -1722,6 +1810,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         except Exception:
                                             # Inputs not ready or missing; use the previously computed global total
                                             aliquot_total_num_idx = aliquot_total_num
+                                            ml_per_aliq_idx = 0.0  # Ensure this is always defined
                                         Step2_mlperAliquot[idx] = ml_per_aliq_idx
                                         total_stock_vol = (aliquot_total_num_idx )
                                         Step2_TotalStockVolumes[idx] = aliquot_total_num_idx
@@ -1729,8 +1818,8 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         # Drug to weigh out = Total Stock Volume * conc_ws * dilution_factor * potency / 1000
                                         pot = r.get('Potency_num', 1.0)
                                         drug_to_weigh = (total_stock_vol * ws_conc_ugml * a_val * pot) / 1000
-                                        Step2_EstWeights[idx] = drug_to_weigh
-                                        
+                                        if make_stock:
+                                            Step2_EstWeights[idx] = drug_to_weigh
 
                                         # Validation logic depends on whether aliquots are being made
                                         if make_stock:
@@ -1744,6 +1833,18 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                 validation_messages.append(
                                                     f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the amount of working solutions by increasing MGIT tube count, otherwise an intermediate dilution will be needed."
                                                 )
+                                            
+                                            # Validation 3: Check Bedaquiline volume constraints (polystyrene tube limits)
+                                            if r['Drug'] == "Bedaquiline (BDQ)":
+                                                if total_stock_vol > 5.0:
+                                                    validation_messages.append(
+                                                        f"❌ {r['Drug']}: Total stock volume ({total_stock_vol:.4f} ml) exceeds 5ml polystyrene tube limit.\nReduce the stock concentration factor or number of aliquots tubes to keep volume ≤ 5ml."
+                                                    )
+                                                vol_ws_ml = r.get('Vol_WS_ml_num', 0)
+                                                if vol_ws_ml > 5.0:
+                                                    validation_messages.append(
+                                                        f"❌ {r['Drug']}: Working solution volume ({vol_ws_ml:.4f} ml) exceeds 5ml polystyrene tube limit.\nReduce the number of MGIT tubes to keep volume ≤ 5ml."
+                                                    )
                                         
                                         aliquot_summary_rows.append(
                                             ui.tags.tr(
@@ -1915,16 +2016,6 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         )
                     else:
                         warning_ui = ui.tags.div()
-                    print(f"results_section: final_calculation_done: {final_calculation_done()}")
-                    final_results = perform_final_calculations()
-                    if final_results:
-                        for r in final_results:
-                            
-                    else:
-                        print("results_section: Showing step 3 instruction text")
-                        return ui.tags.div(
-                            warning_ui,  # Show warnings if any
-                        )
                 
                 return ui.tags.div()
             
@@ -2265,6 +2356,11 @@ def calculate_results():
 @reactive.event(input.calculate_final_btn)
 def calculate_final_results():
     if current_step() == 3:
+        # First validate and save Step 3 inputs
+        if not validate_step3_inputs():
+            print("calculate_final_results: Step 3 validation failed")
+            return
+        
         # Mark that final calculation has been performed
         final_calculation_done.set(True)
         # Move to step 4 after final calculation
