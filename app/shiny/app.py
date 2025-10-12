@@ -6,6 +6,12 @@ from shiny import ui as shiny_ui
 import pandas as pd
 import sys
 import os
+import io
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -26,6 +32,7 @@ def volume_unit():
 
 # Global variables to store calculation results
 calculation_results = reactive.Value({})
+Step2_CalEstWeights = [None] * 21
 Step2_EstWeights = [None] * 21
 Step2_TotalStockVolumes = [None] * 21
 Step2_ConcWS = [None] * 21
@@ -33,8 +40,15 @@ Step2_VolWS = [None] * 21
 Step2_Potencies = [None] * 21
 Step2_MgitTubes = [None] * 21
 Step2_mlperAliquot = [None] * 21
+Step2_num_aliquots = [None] * 21
 Step3_ActDrugWeights = [None] * 21
 Step2_CriticalConc = [None] * 21
+Step2_StocktoWS = [None] * 21
+Step2_DiltoWS = [None] * 21
+Step2_Factors = [None] * 21
+Step2_PracWeights = [None] * 21
+Step2_PracVol = [None] * 21
+Step2_Purch = [None] * 21
 
 # Variables for session results view
 show_results_view = reactive.Value(False)
@@ -123,7 +137,7 @@ def perform_final_calculations():
         if not selected:
             print("perform_final_calculations: No drugs selected")
             return []
-            
+        
         make_stock = bool(make_stock_pref())
         print(f"perform_final_calculations: Processing {len(selected)} drugs with make_stock={make_stock}")
         
@@ -139,11 +153,11 @@ def perform_final_calculations():
             mgit_tubes = Step2_MgitTubes[drug_idx]
             crit_conc = Step2_CriticalConc[drug_idx]
             actual_weight = Step3_ActDrugWeights[drug_idx]
-            est_weight = Step2_EstWeights[drug_idx]
             ws_vol_ml = Step2_VolWS[drug_idx]
 
             if make_stock:
                 # Stock solution calculations
+                est_weight = Step2_EstWeights[drug_idx]
                 total_stock_vol = Step2_TotalStockVolumes[drug_idx]
                 ws_conc_ugml = Step2_ConcWS[drug_idx]
                 pot = Step2_Potencies[drug_idx]
@@ -231,13 +245,14 @@ def perform_final_calculations():
                         'Dil_to_WS': round(vol_dil_to_ws, 2),
                         'MGIT_Tubes': round(mgit_tubes),
                         'Number_of_Ali': round(num_aliquots),
-                        'µl_aliquot': round(ml_ali * 1000, 2),
+                        'ml_aliquot_µl': round(ml_ali * 1000, 2),
                         'ml_aliquot': round(ml_ali, 2),
                     })
 
             else:
                 # No stock solution calculations
                 final_vol_diluent = (actual_weight/ est_weight)*ws_vol_ml
+                est_weight = Step2_CalEstWeights[drug_idx]
                 print(f"perform_final_calculations: Drug {drug_name}, actual_weight={actual_weight}, est_weight={est_weight}, ws_vol_ml={ws_vol_ml}, final_vol_diluent={final_vol_diluent}")   
                 
                 final_results.append({
@@ -257,7 +272,589 @@ def perform_final_calculations():
     except Exception as e:
         print(f"perform_final_calculations: Error: {e}")
         return []
-    
+
+
+def generate_step2_pdf():
+    """Generate PDF for Step 2 results"""
+    try:
+        # Create a bytes buffer for the PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=20,
+            textColor=colors.darkblue,
+            alignment=1  # Center alignment
+        )
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=12,
+            textColor=colors.darkblue,
+            alignment=1  # Center alignment
+        )
+            
+        selected = input.drug_selection()
+        make_stock = bool(make_stock_pref())
+        print(f"generate_step2_pdf: Generating PDF for {len(selected)} drugs with make_stock={make_stock}")
+        drug_data = load_drug_data()
+            
+        # Build content
+        content = []
+        
+        # Title
+        content.append(Paragraph("DST Calculator - Step 2 Results", title_style))
+        content.append(Spacer(1, 20))
+        content.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+        content.append(Spacer(1, 20))
+        
+        if make_stock:
+
+            # Parameters
+            table1_data = [
+                ['Drug', 'Crit. Conc.\n(μg/ml)', 'Org. Mol. Wt.\n(g/mol)', 'Purch. Mol. Wt.\n(g/mol)', 'MGIT Tubes']
+            ]
+            # Calculations
+            table2_data = [
+                ['Drug','Potency', 'Working Solution\nConcentration\n(μg/ml)', 'Working Solution\nVolume (ml)']
+            ]
+            # Working Solution Planning
+            table3_data = [
+                ['Drug', 'Calculated Drug\nWeight (mg)', 'Diluent Volume\n(ml)']
+            ]
+            # Aliquot Planning
+            table4_data = [ 
+                ['Drug', 'Number of\nAliquots', 'Volume per\nAliquot (ml)', 'Total Aliquot\nVolume (ml)']
+            ]
+            # Work Solution Preparation
+            table5_data = [ 
+                ['Drug', 'Volume of\nStock (ml)', 'Volume Diluent\n(ml)']
+            ]
+            # Stock Solution Preparation
+            table6_data = [ 
+                ['Drug', 'Stock Conc.\nIncrease Factor', 'Total Stock\nVolume (ml)', 'Drug to\nWeigh Out\n(mg)']
+            ]
+            # Actual Weighed Value
+            table7_data = [ 
+                ['Drug', 'Weighed Value (mg)']
+            ]
+            
+            for drug_idx, drug_name in enumerate(selected):
+                row = [
+                    drug_name,
+                    f"{Step2_CriticalConc[drug_idx] or 0:.2f}",
+                    drug_data[drug_data['Drug'] == drug_name].iloc[0]['OrgMolecular_Weight'],
+                    f"{Step2_Purch[drug_idx] or 0:.2f}",
+                    f"{Step2_MgitTubes[drug_idx] or 0:.1f}"
+                ] 
+                table1_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table1: {row}")
+                row = [
+                    drug_name,
+                    f"{Step2_Potencies[drug_idx] or 0:.4f}",
+                    f"{Step2_ConcWS[drug_idx] or 0:.2f}",
+                    f"{Step2_VolWS[drug_idx] or 0:.2f}"
+                ]
+                table2_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table2: {row}")
+                row = [
+                    drug_name,
+                    f"{Step2_CalEstWeights[drug_idx] or 0:.2f}",
+                    f"{Step2_VolWS[drug_idx] or 0:.2f}"
+                ]
+                table3_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table3: {row}")
+                row = [
+                    drug_name,
+                    f"{Step2_num_aliquots[drug_idx] or 0:.1f}",
+                    f"{Step2_mlperAliquot[drug_idx] or 0:.2f}",
+                    f"{Step2_TotalStockVolumes[drug_idx] or 0:.2f}"
+                ]
+                table4_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table4: {row}")
+                row = [
+                    drug_name,
+                    f"{Step2_StocktoWS[drug_idx] or 0:.4f}",
+                    f"{Step2_DiltoWS[drug_idx] or 0:.4f}"
+                ]
+                table5_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table5: {row}")
+                row = [ 
+                    drug_name,
+                    f"{Step2_Factors[drug_idx] or 0:.2f}",
+                    f"{Step2_TotalStockVolumes[drug_idx] or 0:.2f}",
+                    f"{Step2_EstWeights[drug_idx] or 0:.2f}"
+                ]
+                table6_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table6: {row}")
+                row = [ 
+                    drug_name,
+                    ""
+                ]
+                table7_data.append(row)
+                print(f"generate_step2_pdf: Adding row to table7: {row}")
+        
+            # Create and style the table
+            table1 = Table(table1_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+            table1.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+
+            table2 = Table(table2_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+            table2.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+
+            table3 = Table(table3_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
+            table3.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+
+            table4 = Table(table4_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+            table4.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightcoral),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            table5 = Table(table5_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
+            table5.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.blueviolet),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            table6 = Table(table6_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+            table6.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.pink),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            table7 = Table(table7_data, colWidths=[1.8*inch, 1.8*inch])
+            table7.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            content.append(Paragraph("Parameters", subtitle_style))
+            content.append(table1)
+            content.append(Paragraph("Calculations", subtitle_style))
+            content.append(table2)
+            content.append(Paragraph("Working Solution Planning", subtitle_style))
+            content.append(table3)
+            content.append(Paragraph("Aliquot Planning", subtitle_style))
+            content.append(table4)
+            content.append(Paragraph("Work Solution Preparation", subtitle_style))
+            content.append(table5)
+            content.append(Paragraph("Stock Solution Preparation", subtitle_style))
+            content.append(table6)
+            content.append(Paragraph("Enter Weighed Value", subtitle_style))
+            content.append(table7)
+            
+            print(f"generate_step2_pdf: Finish content appending for make_stock=True")
+        else : 
+            # Parameters
+            table1_data = [
+                ['Drug', 'Crit. Conc.\n(μg/ml)', 'Org. Mol. Wt.\n(g/mol)', 'Purch. Mol. Wt.\n(g/mol)', 'MGIT Tubes']
+            ]
+            # Calculations
+            table2_data = [
+                ['Drug','Potency', 'Working Solution\nConcentration\n(μg/ml)', 'Working Solution\nVolume (ml)']
+            ]
+            # Working Solution Preparation
+            table3_data = [
+                ['Drug', 'Est. Drug\nWeight (mg)', 'Diluent Volume\n(ml)']
+            ]
+            # Practical Weight
+            table4_data = [
+                ['Drug', 'Practical Weight\nto Weigh Out\n(mg)', 'Diluent Volume\n(ml)']
+            ]
+            # Actual Weighed Value
+            table5_data = [ 
+                ['Drug', 'Weighed Value (mg)']
+            ]
+            
+            for drug_idx, drug_name in enumerate(selected):
+                row = [
+                    drug_name,
+                    f"{Step2_CriticalConc[drug_idx]:.2f}",
+                    drug_data[drug_data['Drug'] == drug_name].iloc[0]['OrgMolecular_Weight'],
+                    f"{Step2_Purch[drug_idx]:.2f}",
+                    f"{Step2_MgitTubes[drug_idx]:.1f}"
+                ]
+                table1_data.append(row)
+                row = [
+                    drug_name,
+                    f"{Step2_Potencies[drug_idx]:.4f}",
+                    f"{Step2_ConcWS[drug_idx]:.2f}",
+                    f"{Step2_VolWS[drug_idx]:.2f}"
+                ]
+                table2_data.append(row)
+                row = [
+                    drug_name,
+                    f"{Step2_CalEstWeights[drug_idx]:.2f}",
+                    f"{Step2_VolWS[drug_idx]:.2f}"
+                ]
+                table3_data.append(row)
+                row = [
+                    drug_name,
+                    f"{Step2_PracWeights[drug_idx]:.2f}",
+                    f"{Step2_PracVol[drug_idx]:.4f}"
+                ]
+                table4_data.append(row)
+                row = [ 
+                    drug_name,
+                    ""
+                ]
+                table5_data.append(row)
+        
+            # Create and style the table
+            table1 = Table(table1_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+            table1.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+
+            table2 = Table(table2_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+            table2.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+
+            table3 = Table(table3_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
+            table3.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+
+            table4 = Table(table4_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
+            table4.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightcoral),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            table5 = Table(table5_data, colWidths=[1.8*inch, 1.8*inch])
+            table5.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+        
+            content.append(Paragraph("Parameters", subtitle_style))
+            content.append(table1)
+            content.append(Paragraph("Calculations", subtitle_style))
+            content.append(table2)
+            content.append(Paragraph("Working Solution Planning", subtitle_style))
+            content.append(table3)
+            content.append(Paragraph("Practical Weight", subtitle_style))
+            content.append(table4)
+            content.append(Paragraph("Enter Weighed Value", subtitle_style))
+            content.append(table5)
+            
+        # Add instructions
+        content.append(Paragraph("Instructions:", styles['Heading2']))
+        content.append(Paragraph("1. Review the calculated values above", styles['Normal']))
+        content.append(Paragraph("2. Ensure all equipment and materials are prepared according to your laboratory protocols", styles['Normal']))
+        content.append(Paragraph("3. Weigh out the required amounts of each drug according to above calculations", styles['Normal']))
+        content.append(Paragraph("4. Return to this session and enter actual weights in Step 3", styles['Normal']))
+            
+        # Build PDF
+        doc.build(content)
+        buffer.seek(0)
+        return buffer.getvalue()
+        
+    except Exception as e:
+        print(f"Error generating Step 2 PDF: {e}")
+        return None
+
+
+def generate_step4_pdf():
+    """Generate PDF for Step 4 final results"""
+    try:
+        # Create a bytes buffer for the PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=20,
+            textColor=colors.darkblue,
+            alignment=1  # Center alignment
+        )
+        
+        # Get the final results by calling perform_final_calculations directly
+        final_results = perform_final_calculations()
+        
+        if not final_results:
+            return None
+            
+        # Build content
+        content = []
+        
+        # Title
+        content.append(Paragraph("DST Calculator - Final Results (Step 4)", title_style))
+        content.append(Spacer(1, 20))
+        content.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+        content.append(Spacer(1, 20))
+        
+        # Determine if stock solutions were made
+        make_stock = any(result.get('Intermediate') is not None for result in final_results)
+        
+        if make_stock:
+            # Stock solution table
+            content.append(Paragraph("Stock Solution Preparation", styles['Heading2']))
+            
+            stock_table_data = [
+                ['Drug', 'Actual Weight\n(mg)', 'Stock Concentration\n(μg/ml)', 'Total Stock Volume\n(ml)', 'Stock Left\n(ml)']
+            ]
+            
+            for result in final_results:
+                if result.get('Intermediate') is not None:
+                    row = [
+                        result.get('Drug', ''),
+                        f"{result.get('Act_Weight', 0):.2f}",
+                        f"{result.get('Stock_Conc', 0):.1f}",
+                        f"{result.get('Total_Stock_Vol', 0):.4f}",
+                        f"{result.get('Total_Stock_Left', 0):.4f}"
+                    ]
+                    stock_table_data.append(row)
+            
+            stock_table = Table(stock_table_data, colWidths=[1.5*inch, 1.2*inch, 1.3*inch, 1.3*inch, 1.2*inch])
+            stock_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            
+            content.append(stock_table)
+            content.append(Spacer(1, 20))
+            
+            # Working solution table
+            content.append(Paragraph("Working Solution Preparation", styles['Heading2']))
+            
+            ws_table_data = [
+                ['Drug', 'Stock to WS\n(ml)', 'Diluent to WS\n(ml)', 'MGIT Tubes']
+            ]
+            
+            for result in final_results:
+                if result.get('Intermediate') == False:
+                    row = [
+                        result.get('Drug', ''),
+                        f"{result.get('Stock_to_WS', 0):.4f}",
+                        f"{result.get('Dil_to_WS', 0):.4f}",
+                        f"{result.get('MGIT_Tubes', 0):.0f}"
+                    ]
+                    ws_table_data.append(row)
+                elif result.get('Intermediate') == True:
+                    row = [
+                        result.get('Drug', ''),
+                        f"{result.get('Vol_Inter_to_WS', 0):.4f} (intermediate)",
+                        f"{result.get('Dil_to_WS', 0):.4f}",
+                        f"{result.get('MGIT_Tubes', 0):.0f}"
+                    ]
+                    ws_table_data.append(row)
+            
+            ws_table = Table(ws_table_data, colWidths=[1.5*inch, 1.8*inch, 1.8*inch, 1.2*inch])
+            ws_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            
+            content.append(ws_table)
+            
+        else:
+            # Direct dilution table
+            content.append(Paragraph("Working Solution Preparation (Direct Dilution)", styles['Heading2']))
+            
+            direct_table_data = [
+                ['Drug', 'Actual Weight\n(mg)', 'Final Diluent Volume\n(ml)', 'MGIT Tubes']
+            ]
+            
+            for result in final_results:
+                row = [
+                    result.get('Drug', ''),
+                    f"{result.get('Act_Weight', 0):.2f}",
+                    f"{result.get('Final_Vol_Dil', 0):.4f}",
+                    f"{result.get('MGIT_Tubes', 0):.0f}"
+                ]
+                direct_table_data.append(row)
+            
+            direct_table = Table(direct_table_data, colWidths=[2*inch, 1.5*inch, 1.8*inch, 1.2*inch])
+            direct_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            
+            content.append(direct_table)
+        
+        content.append(Spacer(1, 30))
+        
+        # Add final instructions
+        content.append(Paragraph("Final Instructions:", styles['Heading2']))
+        content.append(Paragraph("1. Follow your laboratory's standard operating procedures", styles['Normal']))
+        content.append(Paragraph("2. Ensure proper sterile technique throughout the process", styles['Normal']))
+        content.append(Paragraph("3. Label all solutions clearly with drug name, concentration, and date", styles['Normal']))
+        content.append(Paragraph("4. Store solutions according to manufacturer recommendations", styles['Normal']))
+        
+        # Build PDF
+        doc.build(content)
+        buffer.seek(0)
+        return buffer.getvalue()
+        
+    except Exception as e:
+        print(f"Error generating Step 4 PDF: {e}")
+        return None
+
 
 # Read the first column from the CSV file
 drug_options = load_drug_data()
@@ -287,9 +884,9 @@ current_session = reactive.Value(None)  # {'session_id': int, 'session_name': st
 # Add top whitespace
 ui.tags.div(style="margin-top: 50px;")
             
-with ui.navset_card_pill(id="tab", selected="A"):
+with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
 
-    with ui.nav_panel("A"):
+    with ui.nav_panel("Account & Sessions"):
         
         ui.tags.h2("Account", style="color: #2c3e50; margin-bottom: 20px;")
 
@@ -474,7 +1071,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
             return ui.tags.div()  # none
 
 
-    with ui.nav_panel("B"):
+    with ui.nav_panel("Calculator"):
         # Main layout with sidebar
         with ui.layout_sidebar():
             
@@ -1543,6 +2140,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 # Use org_molw as default when not using mol_weight method
                                 purch_molw_gmol = org_molw
                             purchased_mol_weights.append(purch_molw_gmol)
+                            Step2_Purch[i] = purch_molw_gmol
                             
                             # Get MGIT tubes
                             mgit_tubes = input[f"mgit_tubes_{i}"]()
@@ -1613,7 +2211,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 est_dw_mg = (ws_conc_ugml * vol_ws_ml * pot) / 1000.0
                                 est_dw_user_unit = est_dw_mg
                                 estimated_weights.append(est_dw_user_unit)
-                                Step2_EstWeights[i] = est_dw_user_unit
+                                Step2_CalEstWeights[i] = est_dw_user_unit
                                 # [3] vol_diluent (as vol_workingsol)
                                 vol_dil_ml = vol_ws_ml
                                 diluent_volumes.append(vol_dil_ml)
@@ -1688,19 +2286,18 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                 num_aliq_val = 1
                                 ml_per_aliq_val = 1.0
                                 aliquot_total_num = 1.0
+
                                 try:
                                     num_aliq_val = input.num_aliquots() if input.num_aliquots() else 1
                                     ml_per_aliq_val = input.ml_per_aliquot() if input.ml_per_aliquot() else 1.0
-                                    Step2_mlperAliquot[idx] = ml_per_aliq_val
                                     aliquot_total_num = num_aliq_val * ml_per_aliq_val
-                                    Step2_TotalStockVolumes[idx] = aliquot_total_num
                                     aliquot_total = f"{aliquot_total_num:.2f}"
                                 except Exception:
                                     aliquot_total = "1.00"
                                     num_aliq_val = 1
                                     ml_per_aliq_val = 1.0
                                     aliquot_total_num = 1.0
-                                
+
                                 # Validation messages
                                 validation_messages = []
                                 if any_low_mass:
@@ -1769,7 +2366,14 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                         except Exception:
                                             stock_vol_ml = 0
                                             diluent_vol_ml = 0
-                                        
+
+                                        Step2_PracWeights[idx] = practical_val
+                                        Step2_PracVol[idx] = vol_needed_ml
+
+                                        Step2_StocktoWS[idx] = stock_vol_ml
+                                        Step2_DiltoWS[idx] = diluent_vol_ml
+                                        Step2_Factors[idx] = a_val
+
                                         stock_rows.append(
                                             ui.tags.tr(
                                                 ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #8e44ad; font-weight: bold; font-size: 14px;"),
@@ -1811,10 +2415,13 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                             # Inputs not ready or missing; use the previously computed global total
                                             aliquot_total_num_idx = aliquot_total_num
                                             ml_per_aliq_idx = 0.0  # Ensure this is always defined
-                                        Step2_mlperAliquot[idx] = ml_per_aliq_idx
-                                        total_stock_vol = (aliquot_total_num_idx )
-                                        Step2_TotalStockVolumes[idx] = aliquot_total_num_idx
-                                        
+                                            num_aliq_idx = 0  # Ensure this is always defined
+                                        total_stock_vol = (aliquot_total_num_idx)
+
+                                        Step2_mlperAliquot[idx] = float(ml_per_aliq_idx)
+                                        Step2_num_aliquots[idx] = float(num_aliq_idx)
+                                        Step2_TotalStockVolumes[idx] = total_stock_vol
+
                                         # Drug to weigh out = Total Stock Volume * conc_ws * dilution_factor * potency / 1000
                                         pot = r.get('Potency_num', 1.0)
                                         drug_to_weigh = (total_stock_vol * ws_conc_ugml * a_val * pot) / 1000
@@ -1829,7 +2436,7 @@ with ui.navset_card_pill(id="tab", selected="A"):
                                                     f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the ml per aliquot, or (3) increasing the stock concentration factor to achieve a more realistic weighing value."
                                                 )
                                                 # Validation 2: Check if stock volume is less than 250 microliters (0.25 ml) when aliquots are NOT being made
-                                            if stock_vol_ml < 0.25:
+                                            if stock_vol_ml < 0.2:
                                                 validation_messages.append(
                                                     f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the amount of working solutions by increasing MGIT tube count, otherwise an intermediate dilution will be needed."
                                                 )
@@ -2168,9 +2775,10 @@ with ui.navset_card_pill(id="tab", selected="A"):
                         print("Inputs are valid")
                         if calculate_clicked():
                             print("Showing Next button (calculation done)")
-                            # Show Next button after calculation
+                            # Show Next button and download button after calculation
                             return ui.tags.div(
                                 ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                                ui.input_action_button("download_step2_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
                                 ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
                                 style="text-align: center; margin-top: 30px;"
                             )
@@ -2213,10 +2821,19 @@ with ui.navset_card_pill(id="tab", selected="A"):
                             ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
                             style="text-align: center; margin-top: 30px;"
                         )
+                elif current_step() == 4:
+                    print("Step 4 action buttons logic")
+                    # Show Back and Download buttons
+                    return ui.tags.div(
+                        ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                        ui.input_action_button("download_step4_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
+                        ui.input_action_button("reset_btn", "Start New Calculation", class_="btn-warning", style="background-color: #f39c12; border-color: #f39c12;"),
+                        style="text-align: center; margin-top: 30px;"
+                    )
                 else:
                     return ui.tags.div()
 
-    with ui.nav_panel("C"):
+    with ui.nav_panel("Education & Help"):
         pass
 
 # Reactive functions
@@ -2801,6 +3418,79 @@ def on_potency_method_change():
         potency_method_pref.set(input.potency_method_radio())
     except Exception:
         pass
+
+
+# PDF Download handlers
+@reactive.effect
+@reactive.event(input.download_step2_btn)
+def handle_step2_download():
+    """Handle Step 2 PDF download by triggering browser download"""
+    try:
+        pdf_data = generate_step2_pdf()
+        if pdf_data:
+            import base64
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"DST_Calculator_Step2_Results_{timestamp}.pdf"
+            
+            # Create data URL for download
+            b64_data = base64.b64encode(pdf_data).decode()
+            data_url = f"data:application/pdf;base64,{b64_data}"
+            
+            # Trigger download using JavaScript
+            ui.insert_ui(
+                ui.tags.script(f"""
+                    (function() {{
+                        const link = document.createElement('a');
+                        link.href = '{data_url}';
+                        link.download = '{filename}';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }})();
+                """),
+                selector="body",
+                where="beforeEnd"
+            )
+        else:
+            print("No data available for Step 2 PDF")
+    except Exception as e:
+        print(f"Error in handle_step2_download: {e}")
+
+
+@reactive.effect
+@reactive.event(input.download_step4_btn)
+def handle_step4_download():
+    """Handle Step 4 PDF download by triggering browser download"""
+    try:
+        pdf_data = generate_step4_pdf()
+        if pdf_data:
+            import base64
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"DST_Calculator_Step4_Results_{timestamp}.pdf"
+            
+            # Create data URL for download
+            b64_data = base64.b64encode(pdf_data).decode()
+            data_url = f"data:application/pdf;base64,{b64_data}"
+            
+            # Trigger download using JavaScript
+            ui.insert_ui(
+                ui.tags.script(f"""
+                    (function() {{
+                        const link = document.createElement('a');
+                        link.href = '{data_url}';
+                        link.download = '{filename}';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }})();
+                """),
+                selector="body",
+                where="beforeEnd"
+            )
+        else:
+            print("No data available for Step 4 PDF")
+    except Exception as e:
+        print(f"Error in handle_step4_download: {e}")
 
 # Footer
 ui.tags.div(
