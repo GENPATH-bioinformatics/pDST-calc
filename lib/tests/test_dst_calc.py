@@ -59,12 +59,12 @@ class TestDstCalc(unittest.TestCase):
         result = dst_calc.conc_stock(act_drugweight, vol_diluent)
         self.assertEqual(result, expected)
     
-    def test_conc_mgit_known_values(self):
-        """Test MGIT concentration calculation with known values."""
+    def test_conc_ws_known_values(self):
+        """Test working solution concentration calculation with known values."""
         # Test typical critical concentration
         crit_conc = 1.0  # mg/mL
         expected = (1.0 * 8.4) / 0.1  # 84 μg/mL
-        result = dst_calc.conc_mgit(crit_conc)
+        result = dst_calc.conc_ws(crit_conc)
         self.assertEqual(result, expected)
     
     def test_vol_workingsol_known_values(self):
@@ -83,10 +83,10 @@ class TestDstCalc(unittest.TestCase):
         """Test stock solution to working solution volume calculation."""
         # Test typical dilution
         vol_workingsol = 1.0  # mL
-        conc_mgit = 84.0  # μg/mL
+        conc_ws = 84.0  # μg/mL
         conc_stock = 2000.0  # μg/mL
         expected = (1.0 * 84.0) / 2000.0  # 0.042 mL
-        result = dst_calc.vol_ss_to_ws(vol_workingsol, conc_mgit, conc_stock)
+        result = dst_calc.vol_ss_to_ws(vol_workingsol, conc_ws, conc_stock)
         self.assertAlmostEqual(result, expected, places=6)
     
     def test_vol_final_dil_known_values(self):
@@ -157,8 +157,8 @@ class TestDstCalcEdgeCases(unittest.TestCase):
         result = dst_calc.conc_stock(10.0, 5.0)
         self.assertIsInstance(result, float)
         
-        # Test conc_mgit
-        result = dst_calc.conc_mgit(1.0)
+        # Test conc_ws
+        result = dst_calc.conc_ws(1.0)
         self.assertIsInstance(result, float)
         
         # Test vol_workingsol
