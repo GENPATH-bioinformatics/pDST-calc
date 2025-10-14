@@ -213,13 +213,14 @@ def calculate_weights_for_restored_session():
                                     org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
                                     
                                     # Calculate potency
+                                    # [1] potency calculation from dst-calc.py
                                     pot = potency(purch_molw, org_molw)
                                     
                                     # Calculate estimated drug weight
+                                    # [2] est_drugweight calculation from dst-calc.py
                                     est_dw = est_drugweight(custom_crit, stock_vol, pot)
                                     
-                                    # Convert to user's preferred weight unit
-                                    est_dw_user_unit = convert_weight(est_dw, "mg", weight_unit())
+                                    est_dw_user_unit = est_dw
                                     estimated_weights.append(est_dw_user_unit)
                                 else:
                                     estimated_weights.append(0)
@@ -2412,9 +2413,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     )
                 else:
                     return ui.tags.div()
-            
-            # The render functions are automatically called by Shiny Express
-            # when they are defined with @render.ui decorators
 
     with ui.nav_panel("Education & Help"):
         ui.tags.div(
