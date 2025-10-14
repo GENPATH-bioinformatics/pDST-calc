@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -280,7 +280,6 @@ wheels = [
 ]
 
 [[package]]
-
 name = "billiard"
 version = "4.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2088,11 +2087,11 @@ name = "pdst-calc"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-
     { name = "bcrypt" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "reportlab" },
     { name = "shiny" },
     { name = "tabulate" },
 ]
@@ -2126,11 +2125,11 @@ test = [
 
 [package.metadata]
 requires-dist = [
-
     { name = "bcrypt", specifier = ">=4.3.0" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.3.1" },
+    { name = "reportlab", specifier = ">=4.0.0" },
     { name = "shiny", specifier = ">=1.4.0" },
     { name = "tabulate", specifier = ">=0.9.0" },
 ]
@@ -2810,6 +2809,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5a/a9/104ec9234c8448c4379768221ea6df01260cd6c2ce13182d4eac531c8342/readme_renderer-44.0.tar.gz", hash = "sha256:8712034eabbfa6805cacf1402b4eeb2a73028f72d1166d6f5cb7f9c047c5d1e1", size = 32056, upload-time = "2024-07-08T15:00:57.805Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/67/921ec3024056483db83953ae8e48079ad62b92db7880013ca77632921dd0/readme_renderer-44.0-py3-none-any.whl", hash = "sha256:2fbca89b81a08526aadf1357a8c2ae889ec05fb03f5da67f9769c9a592166151", size = 13310, upload-time = "2024-07-08T15:00:56.577Z" },
+]
+
+[[package]]
+name = "reportlab"
+version = "4.4.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "charset-normalizer" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/fa/ed71f3e750afb77497641eb0194aeda069e271ce6d6931140f8787e0e69a/reportlab-4.4.4.tar.gz", hash = "sha256:cb2f658b7f4a15be2cc68f7203aa67faef67213edd4f2d4bdd3eb20dab75a80d", size = 3711935, upload-time = "2025-09-19T10:43:36.502Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/66/e040586fe6f9ae7f3a6986186653791fb865947f0b745290ee4ab026b834/reportlab-4.4.4-py3-none-any.whl", hash = "sha256:299b3b0534e7202bb94ed2ddcd7179b818dcda7de9d8518a57c85a58a1ebaadb", size = 1954981, upload-time = "2025-09-19T10:43:33.589Z" },
 ]
 
 [[package]]
