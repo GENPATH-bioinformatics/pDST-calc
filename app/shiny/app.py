@@ -7,11 +7,6 @@ import pandas as pd
 import sys
 import os
 import io
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.lib.units import inch
 
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -19,6 +14,9 @@ from app.api.drug_database import load_drug_data
 from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_ws, vol_workingsol, vol_ss_to_ws, vol_final_dil
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
+
+# Import PDF generation functions from the separate module
+from app.shiny.generate_pdf import generate_step2_pdf as generate_step2_pdf_module, generate_step4_pdf as generate_step4_pdf_backend
 
 # UI reactive prefs
 make_stock_pref = reactive.Value(False)
@@ -186,13 +184,14 @@ def perform_final_calculations():
                         'Stock_to_WS': round(stock_vol_to_add_to_ws_ml, 2),
                         'Dil_to_WS_µl': round(diluent_vol_to_add_to_ws_ml * 1000, 2),
                         'Dil_to_WS': round(diluent_vol_to_add_to_ws_ml, 2),
+                        'Conc_Ws': round(ws_conc_ugml, 2),
                         'Total_Stock_Vol_µl': round(total_stock_vol * 1000, 2),
                         'Total_Stock_Vol': round(total_stock_vol, 2),
                         'Total_Stock_Left_µl': round(total_stock_left * 1000, 2),
                         'Total_Stock_Left': round(total_stock_left, 2),
                         'MGIT_Tubes': round(mgit_tubes),
                         'Number_of_Ali': round(num_aliquots),
-                        'µl_aliquot': round(ml_ali * 1000, 2),
+                        'ml_aliquot_µl': round(ml_ali * 1000, 2),
                         'ml_aliquot': round(ml_ali, 2),
                     })
                 else:
@@ -243,6 +242,7 @@ def perform_final_calculations():
                         'Vol_Inter_to_WS': round(vol_inter_to_ws, 2),
                         'Dil_to_WS_µl': round(vol_dil_to_ws * 1000, 2),
                         'Dil_to_WS': round(vol_dil_to_ws, 2),
+                        'Conc_Ws': round(ws_conc_ugml, 2),
                         'MGIT_Tubes': round(mgit_tubes),
                         'Number_of_Ali': round(num_aliquots),
                         'ml_aliquot_µl': round(ml_ali * 1000, 2),
@@ -263,6 +263,7 @@ def perform_final_calculations():
                     'Act_Weight': round(actual_weight, 2),
                     'Final_Vol_Dil_µl': round(final_vol_diluent * 1000, 2),
                     'Final_Vol_Dil': round(final_vol_diluent, 2),
+                    'Conc_Ws': round(ws_conc_ugml, 2),
                     'MGIT_Tubes': round(mgit_tubes),
                 })
     
@@ -275,413 +276,33 @@ def perform_final_calculations():
 
 
 def generate_step2_pdf():
-    """Generate PDF for Step 2 results"""
+    """Generate PDF for Step 2 results using modular PDF generation"""
     try:
-        # Create a bytes buffer for the PDF
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
-        
-        # Define styles
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=20,
-            textColor=colors.darkblue,
-            alignment=1  # Center alignment
-        )
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=styles['Heading2'],
-            fontSize=14,
-            spaceAfter=12,
-            textColor=colors.darkblue,
-            alignment=1  # Center alignment
-        )
-            
         selected = input.drug_selection()
         make_stock = bool(make_stock_pref())
-        print(f"generate_step2_pdf: Generating PDF for {len(selected)} drugs with make_stock={make_stock}")
-        drug_data = load_drug_data()
-            
-        # Build content
-        content = []
         
-        # Title
-        content.append(Paragraph("DST Calculator - Step 2 Results", title_style))
-        content.append(Spacer(1, 20))
-        content.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-        content.append(Spacer(1, 20))
+        # Prepare Step 2 data structure for the modular function
+        step2_data = {
+            'CriticalConc': Step2_CriticalConc,
+            'Purch': Step2_Purch,
+            'MgitTubes': Step2_MgitTubes,
+            'Potencies': Step2_Potencies,
+            'ConcWS': Step2_ConcWS,
+            'VolWS': Step2_VolWS,
+            'CalEstWeights': Step2_CalEstWeights,
+            'num_aliquots': Step2_num_aliquots,
+            'mlperAliquot': Step2_mlperAliquot,
+            'TotalStockVolumes': Step2_TotalStockVolumes,
+            'StocktoWS': Step2_StocktoWS,
+            'DiltoWS': Step2_DiltoWS,
+            'Factors': Step2_Factors,
+            'EstWeights': Step2_EstWeights,
+            'PracWeights': Step2_PracWeights,
+            'PracVol': Step2_PracVol
+        }
         
-        if make_stock:
-
-            # Parameters
-            table1_data = [
-                ['Drug', 'Crit. Conc.\n(μg/ml)', 'Org. Mol. Wt.\n(g/mol)', 'Purch. Mol. Wt.\n(g/mol)', 'MGIT Tubes']
-            ]
-            # Calculations
-            table2_data = [
-                ['Drug','Potency', 'Working Solution\nConcentration\n(μg/ml)', 'Working Solution\nVolume (ml)']
-            ]
-            # Working Solution Planning
-            table3_data = [
-                ['Drug', 'Calculated Drug\nWeight (mg)', 'Diluent Volume\n(ml)']
-            ]
-            # Aliquot Planning
-            table4_data = [ 
-                ['Drug', 'Number of\nAliquots', 'Volume per\nAliquot (ml)', 'Total Aliquot\nVolume (ml)']
-            ]
-            # Work Solution Preparation
-            table5_data = [ 
-                ['Drug', 'Volume of\nStock (ml)', 'Volume Diluent\n(ml)']
-            ]
-            # Stock Solution Preparation
-            table6_data = [ 
-                ['Drug', 'Stock Conc.\nIncrease Factor', 'Total Stock\nVolume (ml)', 'Drug to\nWeigh Out\n(mg)']
-            ]
-            # Actual Weighed Value
-            table7_data = [ 
-                ['Drug', 'Weighed Value (mg)']
-            ]
-            
-            for drug_idx, drug_name in enumerate(selected):
-                row = [
-                    drug_name,
-                    f"{Step2_CriticalConc[drug_idx] or 0:.2f}",
-                    drug_data[drug_data['Drug'] == drug_name].iloc[0]['OrgMolecular_Weight'],
-                    f"{Step2_Purch[drug_idx] or 0:.2f}",
-                    f"{Step2_MgitTubes[drug_idx] or 0:.1f}"
-                ] 
-                table1_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table1: {row}")
-                row = [
-                    drug_name,
-                    f"{Step2_Potencies[drug_idx] or 0:.4f}",
-                    f"{Step2_ConcWS[drug_idx] or 0:.2f}",
-                    f"{Step2_VolWS[drug_idx] or 0:.2f}"
-                ]
-                table2_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table2: {row}")
-                row = [
-                    drug_name,
-                    f"{Step2_CalEstWeights[drug_idx] or 0:.2f}",
-                    f"{Step2_VolWS[drug_idx] or 0:.2f}"
-                ]
-                table3_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table3: {row}")
-                row = [
-                    drug_name,
-                    f"{Step2_num_aliquots[drug_idx] or 0:.1f}",
-                    f"{Step2_mlperAliquot[drug_idx] or 0:.2f}",
-                    f"{Step2_TotalStockVolumes[drug_idx] or 0:.2f}"
-                ]
-                table4_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table4: {row}")
-                row = [
-                    drug_name,
-                    f"{Step2_StocktoWS[drug_idx] or 0:.4f}",
-                    f"{Step2_DiltoWS[drug_idx] or 0:.4f}"
-                ]
-                table5_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table5: {row}")
-                row = [ 
-                    drug_name,
-                    f"{Step2_Factors[drug_idx] or 0:.2f}",
-                    f"{Step2_TotalStockVolumes[drug_idx] or 0:.2f}",
-                    f"{Step2_EstWeights[drug_idx] or 0:.2f}"
-                ]
-                table6_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table6: {row}")
-                row = [ 
-                    drug_name,
-                    ""
-                ]
-                table7_data.append(row)
-                print(f"generate_step2_pdf: Adding row to table7: {row}")
-        
-            # Create and style the table
-            table1 = Table(table1_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
-            table1.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-
-            table2 = Table(table2_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch])
-            table2.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-
-            table3 = Table(table3_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
-            table3.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-
-            table4 = Table(table4_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table4.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightcoral),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table5 = Table(table5_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
-            table5.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.red),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table6 = Table(table6_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table6.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.pink),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table7 = Table(table7_data, colWidths=[1.8*inch, 1.8*inch])
-            table7.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            content.append(Paragraph("Parameters", subtitle_style))
-            content.append(table1)
-            content.append(Paragraph("Calculations", subtitle_style))
-            content.append(table2)
-            content.append(Paragraph("Working Solution Planning", subtitle_style))
-            content.append(table3)
-            content.append(Paragraph("Aliquot Planning", subtitle_style))
-            content.append(table4)
-            content.append(Paragraph("Work Solution Preparation", subtitle_style))
-            content.append(table5)
-            content.append(Paragraph("Stock Solution Preparation", subtitle_style))
-            content.append(table6)
-            content.append(Paragraph("Enter Weighed Value", subtitle_style))
-            content.append(table7)
-            
-            print(f"generate_step2_pdf: Finish content appending for make_stock=True")
-        else : 
-            # Parameters
-            table1_data = [
-                ['Drug', 'Crit. Conc.\n(μg/ml)', 'Org. Mol. Wt.\n(g/mol)', 'Purch. Mol. Wt.\n(g/mol)', 'MGIT Tubes']
-            ]
-            # Calculations
-            table2_data = [
-                ['Drug','Potency', 'Working Solution\nConcentration\n(μg/ml)', 'Working Solution\nVolume (ml)']
-            ]
-            # Working Solution Preparation
-            table3_data = [
-                ['Drug', 'Est. Drug\nWeight (mg)', 'Diluent Volume\n(ml)']
-            ]
-            # Practical Weight
-            table4_data = [
-                ['Drug', 'Practical Weight\nto Weigh Out\n(mg)', 'Diluent Volume\n(ml)']
-            ]
-            # Actual Weighed Value
-            table5_data = [ 
-                ['Drug', 'Weighed Value (mg)']
-            ]
-            
-            for drug_idx, drug_name in enumerate(selected):
-                row = [
-                    drug_name,
-                    f"{Step2_CriticalConc[drug_idx]:.2f}",
-                    drug_data[drug_data['Drug'] == drug_name].iloc[0]['OrgMolecular_Weight'],
-                    f"{Step2_Purch[drug_idx]:.2f}",
-                    f"{Step2_MgitTubes[drug_idx]:.1f}"
-                ]
-                table1_data.append(row)
-                row = [
-                    drug_name,
-                    f"{Step2_Potencies[drug_idx]:.4f}",
-                    f"{Step2_ConcWS[drug_idx]:.2f}",
-                    f"{Step2_VolWS[drug_idx]:.2f}"
-                ]
-                table2_data.append(row)
-                row = [
-                    drug_name,
-                    f"{Step2_CalEstWeights[drug_idx]:.2f}",
-                    f"{Step2_VolWS[drug_idx]:.2f}"
-                ]
-                table3_data.append(row)
-                row = [
-                    drug_name,
-                    f"{Step2_PracWeights[drug_idx]:.2f}",
-                    f"{Step2_PracVol[drug_idx]:.4f}"
-                ]
-                table4_data.append(row)
-                row = [ 
-                    drug_name,
-                    ""
-                ]
-                table5_data.append(row)
-        
-            # Create and style the table
-            table1 = Table(table1_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
-            table1.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-
-            table2 = Table(table2_data, colWidths=[1.8*inch, 1.3*inch, 1.3*inch, 1.3*inch])
-            table2.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-
-            table3 = Table(table3_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
-            table3.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-
-            table4 = Table(table4_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
-            table4.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightcoral),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table5 = Table(table5_data, colWidths=[1.8*inch, 1.8*inch])
-            table5.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-        
-            content.append(Paragraph("Parameters", subtitle_style))
-            content.append(table1)
-            content.append(Paragraph("Calculations", subtitle_style))
-            content.append(table2)
-            content.append(Paragraph("Working Solution Planning", subtitle_style))
-            content.append(table3)
-            content.append(Paragraph("Practical Weight", subtitle_style))
-            content.append(table4)
-            content.append(Paragraph("Enter Weighed Value", subtitle_style))
-            content.append(table5)
-            
-        # Add instructions
-        content.append(Paragraph("Instructions:", styles['Heading2']))
-        content.append(Paragraph("1. Review the calculated values above", styles['Normal']))
-        content.append(Paragraph("2. Ensure all equipment and materials are prepared according to your laboratory protocols", styles['Normal']))
-        content.append(Paragraph("3. Weigh out the required amounts of each drug according to above calculations", styles['Normal']))
-        content.append(Paragraph("4. Return to this session and enter actual weights in Step 3", styles['Normal']))
-            
-        # Build PDF
-        doc.build(content)
-        buffer.seek(0)
-        return buffer.getvalue()
+        # Call the modular PDF generation function
+        return generate_step2_pdf_module(selected, make_stock, step2_data)
         
     except Exception as e:
         print(f"Error generating Step 2 PDF: {e}")
@@ -689,495 +310,35 @@ def generate_step2_pdf():
 
 
 def generate_step4_pdf():
-    """Generate PDF for Step 4 final results - modeled after Step 2 comprehensive structure"""
+    """Generate PDF for Step 4 final results using modular PDF generation"""
     try:
-        print("generate_step4_pdf: Starting PDF generation")
+        selected = input.drug_selection()
+        make_stock = bool(make_stock_pref())
         
-        # Create a bytes buffer for the PDF
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
-        
-        # Define styles - matching Step 2 exactly
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=20,
-            textColor=colors.darkblue,
-            alignment=1  # Center alignment
-        )
-        
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=styles['Heading2'],
-            fontSize=12,
-            spaceAfter=10,
-            textColor=colors.darkgreen,
-            alignment=0  # Left alignment
-        )
-        
-        # Get the final results by calling perform_final_calculations directly
         final_results = perform_final_calculations()
-        print(f"generate_step4_pdf: Got final_results: {final_results}")
         
-        if not final_results:
-            print("generate_step4_pdf: No final results available")
-            return None
+        # Prepare Step 2 data structure for the modular function
+        step2_data = {
+            'CriticalConc': Step2_CriticalConc,
+            'Purch': Step2_Purch,
+            'MgitTubes': Step2_MgitTubes,
+            'Potencies': Step2_Potencies,
+            'ConcWS': Step2_ConcWS,
+            'VolWS': Step2_VolWS,
+            'CalEstWeights': Step2_CalEstWeights,
+            'num_aliquots': Step2_num_aliquots,
+            'mlperAliquot': Step2_mlperAliquot,
+            'TotalStockVolumes': Step2_TotalStockVolumes,
+            'StocktoWS': Step2_StocktoWS,
+            'DiltoWS': Step2_DiltoWS,
+            'Factors': Step2_Factors,
+            'EstWeights': Step2_EstWeights,
+            'PracWeights': Step2_PracWeights,
+            'PracVol': Step2_PracVol
+        }
         
-        # Get selected drugs list
-        selected = input.selected_drugs() or []
-        print(f"generate_step4_pdf: Selected drugs: {selected}")
-            
-        # Build content
-        content = []
-        
-        # Title
-        content.append(Paragraph("DST Calculator - Final Results (Step 4)", title_style))
-        content.append(Spacer(1, 20))
-        content.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-        content.append(Spacer(1, 20))
-        
-        # Determine if stock solutions were made
-        make_stock = any(result.get('Intermediate') is not None for result in final_results)
-        print(f"generate_step4_pdf: make_stock = {make_stock}")
-        
-        if make_stock:
-            print("generate_step4_pdf: Creating tables for stock solution pathway")
-
-            # Table 1: Stock Solution Calculations
-            table1_data = [
-                ['Drug', 'Total Stock Volume\n(ml)', 'Stock Concentration\n(μg/ml)', 'Dilution Factor']
-            ]
-            
-            # Table 2: Intermediate Solutions (if any)
-            table2_data = [
-                ['Drug', 'Stock to Add\n(ml)', 'Diluent to\n Add(ml)', 'Intermediate Vol.\n(ml)', 'Intermediate Conc.\n(μg/ml)', 'Dilution Factor']
-            ]
-            
-            # Table 3: Working Solution Preparation with inter
-            table3_data = [
-                ['Drug', 'Intermediate to\nAdd (ml)', 'Diluent to\nAdd (ml)', 'Volume of WS\n(ml)', 'Conc. WS.\n(μg/ml)']
-            ]
-            
-            # Table 4: Working Solution Preparation
-            table4_data = [
-                ['Drug', 'Stock to Add\n(ml)', 'Diluent to\nAdd (ml)', 'Volume of WS\n(ml)', 'Conc. WS.\n(μg/ml)']
-            ]
-
-            # Table 5: Aliquoting
-            table5_data = [
-                ['Drug', 'Number of\nAliquots', 'Volume Stock\nper Aliquot(ml)']
-            ]
-            
-            # Table 6: MGIT Tube Preparation
-            table6_data = [
-                ['Drug', 'Number of MGIT Tubes', 'Volume WS per\nMGIT Tube (ml)', 'Volume OADC\n(growth suppl) (ml)', 'Volume Culture\n(ml)']
-            ]
-            ###########################################
-            # Populate tables with data
-            for result in final_results:
-                drug_name = result.get('Drug', '')
-                print(f"generate_step4_pdf: Processing drug {drug_name}")
-                
-                # Table 1: Input Parameters
-                critical_conc = result.get('Crit_Conc', 0) or 0
-                actual_weight = result.get('Act_Weight', 0) or 0
-                mgit_tubes = result.get('MGIT_Tubes', 0) or 0
-                pathway = "Stock → WS" if result.get('Intermediate') is not None else "Direct"
-                
-                row = [
-                    drug_name,
-                    pathway
-                    f"{critical_conc:.2f}",
-                    f"{actual_weight:.2f}",
-                    f"{mgit_tubes:.0f}",
-                ]
-                table1_data.append(row)
-                
-                # Table 2: Stock Solution Calculations (only for stock pathway)
-                if result.get('Intermediate') is not None:
-                    stock_conc = result.get('Stock_Conc', 0) or 0
-                    total_stock_vol = result.get('Total_Stock_Vol', 0) or 0
-                    stock_used = result.get('Stock_to_WS', 0) or result.get('Vol_Inter_to_WS', 0) or 0
-                    stock_remaining = result.get('Total_Stock_Left', 0) or 0
-                    
-                    row = [
-                        drug_name,
-                        f"{stock_conc:.1f}",
-                        f"{total_stock_vol:.4f}",
-                        f"{stock_used:.4f}",
-                        f"{stock_remaining:.4f}"
-                    ]
-                    table2_data.append(row)
-                    
-                    # Table 3: Intermediate Solutions (only if intermediate step exists)
-                    if result.get('Intermediate') == True:
-                        intermediate_conc = result.get('Inter_Conc', 0) or 0
-                        intermediate_vol = result.get('Inter_Vol', 0) or 0
-                        vol_to_ws = result.get('Vol_Inter_to_WS', 0) or 0
-                        
-                        row = [
-                            drug_name,
-                            f"{intermediate_conc:.2f}",
-                            f"{intermediate_vol:.4f}",
-                            f"{vol_to_ws:.4f}"
-                        ]
-                        table3_data.append(row)
-                
-                # Table 4: Working Solution Preparation
-                if result.get('Intermediate') == False:
-                    source_vol = result.get('Stock_to_WS', 0) or 0
-                    source_type = "Stock"
-                elif result.get('Intermediate') == True:
-                    source_vol = result.get('Vol_Inter_to_WS', 0) or 0
-                    source_type = "Intermediate"
-                else:
-                    source_vol = 0
-                    source_type = "Direct"
-                
-                diluent_vol = result.get('Dil_to_WS', 0) or 0
-                final_conc = critical_conc  # Target concentration
-                
-                row = [
-                    drug_name,
-                    f"{source_vol:.4f} ({source_type})",
-                    f"{diluent_vol:.4f}",
-                    f"{final_conc:.2f}"
-                ]
-                table4_data.append(row)
-                
-                # Table 5: Final Verification (calculate accuracy)
-                target_conc = critical_conc
-                achieved_conc = critical_conc  # Assuming calculation is correct
-                accuracy = 100.0 if target_conc > 0 else 0
-                status = "✓ Pass" if abs(accuracy - 100) < 5 else "⚠ Check"
-                
-                row = [
-                    drug_name,
-                    f"{target_conc:.2f}",
-                    f"{achieved_conc:.2f}",
-                    f"{accuracy:.1f}",
-                    status
-                ]
-                table5_data.append(row)
-                
-                # Table 6: Solution Summary
-                ws_volume = (mgit_tubes * 1.0) + 1.0  # Assuming 1ml per tube + 1ml excess
-                vol_per_tube = 1.0
-                total_required = ws_volume
-                
-                row = [
-                    drug_name,
-                    f"{ws_volume:.1f}",
-                    f"{vol_per_tube:.1f}",
-                    f"{total_required:.1f}"
-                ]
-                table6_data.append(row)
-                
-                # Table 7: Quality Control (placeholders for user to fill)
-                row = [
-                    drug_name,
-                    "________",
-                    "________",
-                    "2-8°C"
-                ]
-                table7_data.append(row)
-            
-            # Create and style all tables with unique colors
-            table1 = Table(table1_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 1.0*inch, 1.1*inch])
-            table1.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table2 = Table(table2_data, colWidths=[1.5*inch, 1.3*inch, 1.3*inch, 1.2*inch, 1.2*inch])
-            table2.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            # Only add intermediate table if there are intermediate solutions
-            has_intermediate = any(result.get('Intermediate') == True for result in final_results)
-            if has_intermediate:
-                table3 = Table(table3_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-                table3.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 10),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (-1, -1), 9),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
-
-            table4 = Table(table4_data, colWidths=[1.5*inch, 1.8*inch, 1.5*inch, 1.2*inch])
-            table4.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightcoral),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table5 = Table(table5_data, colWidths=[1.5*inch, 1.3*inch, 1.3*inch, 1.2*inch, 0.7*inch])
-            table5.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table6 = Table(table6_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table6.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.pink),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table7 = Table(table7_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table7.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            # Add all tables to content
-            content.append(Paragraph("Input Parameters", subtitle_style))
-            content.append(table1)
-            content.append(Paragraph("Stock Solution Details", subtitle_style))
-            content.append(table2)
-            
-            if has_intermediate:
-                content.append(Paragraph("Intermediate Solutions", subtitle_style))
-                content.append(table3)
-                
-            content.append(Paragraph("Working Solution Preparation", subtitle_style))
-            content.append(table4)
-            content.append(Paragraph("Final Verification", subtitle_style))
-            content.append(table5)
-            content.append(Paragraph("Solution Summary", subtitle_style))
-            content.append(table6)
-            content.append(Paragraph("Quality Control Record", subtitle_style))
-            content.append(table7)
-            
-            print("generate_step4_pdf: Finished content appending for make_stock=True")
-            
-        else:
-            print("generate_step4_pdf: Creating tables for direct dilution pathway")
-            
-            # Direct dilution pathway - simplified but comprehensive tables
-            
-            # Table 1: Input Parameters 
-            table1_data = [
-                ['Drug', 'Critical Conc.\n(μg/ml)', 'Actual Weight\n(mg)', 'MGIT Tubes']
-            ]
-            
-            # Table 2: Direct Dilution Calculations
-            table2_data = [
-                ['Drug', 'Working Conc.\n(μg/ml)', 'Total Volume\n(ml)', 'Diluent Volume\n(ml)']
-            ]
-            
-            # Table 3: Solution Distribution
-            table3_data = [
-                ['Drug', 'Volume per Tube\n(ml)', 'Number of Tubes', 'Total Required\n(ml)']
-            ]
-            
-            # Table 4: Quality Control
-            table4_data = [
-                ['Drug', 'Batch ID', 'Prepared By', 'Date/Time']
-            ]
-            
-            # Populate tables with data
-            for result in final_results:
-                drug_name = result.get('Drug', '')
-                
-                # Table 1: Input Parameters
-                critical_conc = result.get('Crit_Conc', 0) or 0
-                actual_weight = result.get('Act_Weight', 0) or 0
-                mgit_tubes = result.get('MGIT_Tubes', 0) or 0
-                
-                row = [
-                    drug_name,
-                    f"{critical_conc:.2f}",
-                    f"{actual_weight:.2f}",
-                    f"{mgit_tubes:.0f}"
-                ]
-                table1_data.append(row)
-                
-                # Table 2: Direct Dilution Calculations
-                working_conc = critical_conc
-                final_vol_dil = result.get('Final_Vol_Dil', 0) or 0
-                total_volume = final_vol_dil
-                
-                row = [
-                    drug_name,
-                    f"{working_conc:.2f}",
-                    f"{total_volume:.4f}",
-                    f"{final_vol_dil:.4f}"
-                ]
-                table2_data.append(row)
-                
-                # Table 3: Solution Distribution
-                vol_per_tube = 1.0  # Standard 1ml per tube
-                total_required = mgit_tubes * vol_per_tube
-                
-                row = [
-                    drug_name,
-                    f"{vol_per_tube:.1f}",
-                    f"{mgit_tubes:.0f}",
-                    f"{total_required:.1f}"
-                ]
-                table3_data.append(row)
-                
-                # Table 4: Quality Control (placeholders)
-                row = [
-                    drug_name,
-                    "________",
-                    "________",
-                    datetime.now().strftime('%Y-%m-%d %H:%M')
-                ]
-                table4_data.append(row)
-            
-            # Create and style tables
-            table1 = Table(table1_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1*inch])
-            table1.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table2 = Table(table2_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table2.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table3 = Table(table3_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table3.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            table4 = Table(table4_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-            table4.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-
-            # Add all tables to content
-            content.append(Paragraph("Input Parameters", subtitle_style))
-            content.append(table1)
-            content.append(Paragraph("Direct Dilution Calculations", subtitle_style))
-            content.append(table2)
-            content.append(Paragraph("Solution Distribution", subtitle_style))
-            content.append(table3)
-            content.append(Paragraph("Quality Control Record", subtitle_style))
-            content.append(table4)
-            
-            print("generate_step4_pdf: Finished content appending for make_stock=False")
-        
-        # Add comprehensive instructions - matching Step 2 format
-        content.append(Paragraph("Final Instructions:", styles['Heading2']))
-        content.append(Paragraph("1. Review all calculated values above and verify accuracy", styles['Normal']))
-        content.append(Paragraph("2. Follow your laboratory's standard operating procedures for drug susceptibility testing", styles['Normal']))
-        content.append(Paragraph("3. Ensure proper sterile technique throughout the preparation process", styles['Normal']))
-        content.append(Paragraph("4. Label all solutions clearly with drug name, concentration, preparation date, and expiry", styles['Normal']))
-        content.append(Paragraph("5. Store solutions according to manufacturer recommendations and laboratory protocols", styles['Normal']))
-        content.append(Paragraph("6. Complete quality control records in the designated fields above", styles['Normal']))
-        content.append(Paragraph("7. Retain this protocol sheet with your laboratory records", styles['Normal']))
-            
-        # Build PDF
-        doc.build(content)
-        buffer.seek(0)
-        print("generate_step4_pdf: PDF generation completed successfully")
-        return buffer.getvalue()
+        # Call the modular PDF generation function with final results
+        return generate_step4_pdf_backend(selected, make_stock, step2_data, Step3_ActDrugWeights, final_results)
         
     except Exception as e:
         print(f"Error generating Step 4 PDF: {e}")
@@ -1444,8 +605,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                 def unit_preferences():
                     return ui.tags.div()
             
-            # Main content area with additional top padding
-            ui.tags.div(style="padding-top: 30px;")
+            # Main content area with minimal top padding
+            ui.tags.div(style="padding-top: 5px;")
             
             # Main content area - render functions will be called directly
             
@@ -1715,21 +876,13 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     )
                 elif current_step() == 2:
                     print("Returning step 2 interface (input parameters)")
-                    return ui.tags.div(
-                        ui.tags.h2("Input Parameters", style="color: #2c3e50; margin-bottom: 20px;"),
-                        ui.tags.p("Enter the required parameters for each drug:", style="color: #7f8c8d; margin-bottom: 20px;"),
-                        style="margin-bottom: 30px;"
-                    )
+                    return ui.tags.h3()
                 elif current_step() == 3:
                     print("Returning step 3 interface (final inputs)")
-                    return ui.tags.div(
-                        ui.tags.h2("Final Input", style="color: #2c3e50; margin-bottom: 20px;"),
-                        ui.tags.p("Enter the actual drug weight and calculate final results:", style="color: #7f8c8d; margin-bottom: 20px;"),
-                        style="margin-bottom: 30px;"
-                    )
+                    return ui.tags.h3()
                 else:
                     print("Returning default interface")
-                    return ui.tags.div()
+                    return ui.tags.h3()
             
             # Display selected drugs in a table
             @render.ui
@@ -1960,7 +1113,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         table_rows.append(row)
 
                     return ui.tags.div(
-                        ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                        ui.tags.h3("Enter Parameters", style="color: #2c3e50; margin-bottom: 15px;"),
                         ui.tags.p("Select how you want to calculate potency:", style="color: #7f8c8d; margin-bottom: 10px; font-weight: bold;"),
                         ui.tags.div(
                             ui.input_radio_buttons(
@@ -1974,7 +1127,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 selected=potency_method_pref(),
                                 inline=True
                             ),
-                            style="margin-bottom: 20px;"
+                            style="margin-bottom: 10px;"
                         ),
                         ui.tags.p("Enter the required parameters for each selected drug:", style="color: #7f8c8d; margin-bottom: 15px;"),
                         ui.tags.div(
@@ -2090,31 +1243,32 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     style="color: #8e44ad; margin-top: 15px; margin-bottom: 10px;"),
                                             ui.tags.ol(
                                                 *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline (BDQ)" else [] ),
-                                                ui.tags.li(f"Label a clean container: '{result['Drug']} Stock Solution'"),
-                                                *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
+                                                ui.tags.li(f"Label a clean tube: '{result['Drug']} Stock Solution'"),
+                                                *( [ui.tags.li("DMSO is light sensitive- Wrap the tube in foil or use a light-resistant tube to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
                                                 ui.tags.li(f"Record the drug details:",
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Drug: {result['Drug']}"),
-                                                        ui.tags.li(f"Weight used: {result['Act_Weight']}mg"),
                                                         ui.tags.li(f"Diluent: {result['Diluent']}"),
+                                                        ui.tags.li(f"Concentration: {result['Stock_Conc']:.2f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result['Stock_Factor']:.1f}"),
                                                         ui.tags.li(f"Initials")
                                                     )
                                                 ),
-                                                ui.tags.li(f"Add the {result['Act_Weight']:.4f} mg weighed drug powder to a clean container"),
+                                                ui.tags.li(f"Add the {result['Act_Weight']:.2f} mg weighed drug powder to a clean tube"),
                                                 ui.tags.li(
-                                                    f"Add {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) of {result['Diluent']} to the same container"
+                                                    f"Add {result['Total_Stock_Vol']:.2f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) of {result['Diluent']} to the same tube"
                                                 ),
                                                 ui.tags.li("Mix thoroughly:",
                                                     ui.tags.ul(
                                                         ui.tags.li("For bedaquiline:",
                                                             ui.tags.ul(
-                                                                ui.tags.li("Cap the tube securely"),
-                                                                ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                ui.tags.li("Close the tube securely"),
+                                                                ui.tags.li("Do not invert the tubes as bedaquiline may adhere to plastic surfaces"),
                                                                 ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
                                                             )
                                                         ) if result['Drug'] == "Bedaquiline (BDQ)" else [
-                                                            ui.tags.li("Cap the tube securely"),
+                                                            ui.tags.li("Close the tube securely"),
                                                             ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
                                                             ui.tags.li("Do not shake vigorously to avoid foam formation"),
                                                             ui.tags.li("Check that drug powder is completely dissolved"),
@@ -2144,34 +1298,34 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;"),
                                             ui.tags.ol(
                                                 *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline (BDQ)" else [] ),
-                                                ui.tags.li(f"Label a clean container: '{result['Drug']} Intermediate Solution'"),
-                                                *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
+                                                ui.tags.li(f"Label a clean tube: '{result['Drug']} Intermediate Solution'"),
+                                                *( [ui.tags.li("DMSO is light sensitive- Wrap the tube in foil or use a light-resistant tube to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
                                                 ui.tags.li("Record solution details:",
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Drug: {result['Drug']}"),
                                                         ui.tags.li(f"Diluent: {result['Diluent']}"),
-                                                        ui.tags.li(f"Concentration: {result['Inter_Conc']:.4f} μg/ml"),
-                                                        ui.tags.li(f"Dilution Factor: 1:{result['Inter_Factor']:.4f}"),
+                                                        ui.tags.li(f"Concentration: {result['Inter_Conc']:.2f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result['Inter_Factor']:.1f}"),
                                                         ui.tags.li(f"Initials")
                                                     )
                                                 ),
                                                 *(
                                                     [
-                                                        ui.tags.li(f"Add {result['Stock_to_Inter']:.4f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) of stock solution to a new clean tube"),
-                                                        ui.tags.li(f"Add {result['Dil_to_Inter']:.4f} ml (= {result['Dil_to_Inter_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                        ui.tags.li(f"Add {result['Stock_to_Inter']:.2f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) of stock solution to a new clean tube"),
+                                                        ui.tags.li(f"Add {result['Dil_to_Inter']:.2f} ml (= {result['Dil_to_Inter_µl']:.2f} µl) of {result['Diluent']} to the same tube")
                                                     ]
                                                 ),
                                                 ui.tags.li("Mix solution:",
                                                     ui.tags.ul(
                                                             ui.tags.li("For bedaquiline:",
                                                                 ui.tags.ul(
-                                                                    ui.tags.li("Cap the tube securely"),
-                                                                    ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                    ui.tags.li("Close the tube securely"),
+                                                                    ui.tags.li("Do not invert the tubes as bedaquiline may adhere to plastic surfaces"),
                                                                     ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
                                                                 )
                                                             ) if result['Drug'] == "Bedaquiline (BDQ)" else [
-                                                                ui.tags.li("Cap the tube securely"),
+                                                                ui.tags.li("Close the tube securely"),
                                                                 ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
                                                                 ui.tags.li("Do not shake vigorously to avoid foam formation"),
                                                                 ui.tags.li("Check that drug powder is completely dissolved"),
@@ -2199,40 +1353,41 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                 style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;"),
                                         ui.tags.ol(
                                             *( [ui.tags.li("Use polystyrene tubes (1.5ml or 5ml) as bedaquiline binds strongly to glass surfaces, which can cause loss of drug and inaccurate (lower) effective concentrations in solution.")] if result['Drug'] == "Bedaquiline (BDQ)" else [] ),
-                                            ui.tags.li(f"Label a clean container: '{result['Drug']} Working Solution'"),
-                                            *( [ui.tags.li("Wrap the tube in foil or use a light-resistant container to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
+                                            ui.tags.li(f"Label a clean tube: '{result['Drug']} Working Solution'"),
+                                            *( [ui.tags.li("DMSO is light sensitive- Wrap the tube in foil or use a light-resistant tube to protect DMSO from degradation caused by light exposure.")] if result['Diluent'] == "DMSO" else [] ),
                                             ui.tags.li("Record solution details:",
                                                 ui.tags.ul(
                                                     ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                     ui.tags.li(f"Drug: {result['Drug']}"),
                                                     ui.tags.li(f"Diluent: {result['Diluent']}"),
+                                                    ui.tags.li(f"Concentration: {result['Conc_Ws']:.2f} μg/ml"),
                                                     ui.tags.li(f"Initials")
                                                 )
                                             ),
                                             *(
                                                 [
-                                                    ui.tags.li(f"Add {result['Stock_to_WS']:.4f} ml (= {result['Stock_to_WS_µl']:.2f} µl) of stock solution to a new clean tube"),
-                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.4f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                    ui.tags.li(f"Add {result['Stock_to_WS']:.2f} ml (= {result['Stock_to_WS_µl']:.2f} µl) of stock solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.2f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
                                                 ] if make_stock and result['Intermediate'] == False else
                                                 [
-                                                    ui.tags.li(f"Add {result['Vol_Inter_to_WS']:.4f} ml (= {result['Vol_Inter_to_WS_µl']:.2f} µl) of intermediate solution to a new clean tube"),
-                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.4f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                    ui.tags.li(f"Add {result['Vol_Inter_to_WS']:.2f} ml (= {result['Vol_Inter_to_WS_µl']:.2f} µl) of intermediate solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.2f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
                                                 ] if result['Intermediate'] == True and make_stock else
                                                 [
-                                                    ui.tags.li(f"Add the {result['Act_Weight']:.4f} mg weighed drug powder to a clean container"),
-                                                    ui.tags.li(f"Add {result['Final_Vol_Dil']:.4f} ml (= {result['Final_Vol_Dil_µl']:.2f} µl) of {result['Diluent']} to the same container")
+                                                    ui.tags.li(f"Add the {result['Act_Weight']:.2f} mg weighed drug powder to a clean tube"),
+                                                    ui.tags.li(f"Add {result['Final_Vol_Dil']:.2f} ml (= {result['Final_Vol_Dil_µl']:.2f} µl) of {result['Diluent']} to the same tube")
                                                 ] if not make_stock and result['Intermediate'] == False else []
                                             ),
                                             ui.tags.li("Mix solution:",
                                                 ui.tags.ul(
                                                         ui.tags.li("For bedaquiline:",
                                                             ui.tags.ul(
-                                                                ui.tags.li("Cap the tube securely"),
-                                                                ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                ui.tags.li("Close the tube securely"),
+                                                                ui.tags.li("Do not invert the tubes as bedaquiline may adhere to plastic surfaces"),
                                                                 ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes")
                                                             )
                                                         ) if result['Drug'] == "Bedaquiline (BDQ)" else [
-                                                            ui.tags.li("Cap the tube securely"),
+                                                            ui.tags.li("Close the tube securely"),
                                                             ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
                                                             ui.tags.li("Do not shake vigorously to avoid foam formation"),
                                                             ui.tags.li("Check that drug powder is completely dissolved"),
@@ -2263,9 +1418,9 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ui.tags.ol(
                                                 ui.tags.li("Remaining stock solution:",
                                                     ui.tags.ul(
-                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Used for working solution: {result['Stock_to_WS']:.4f} ml (= {result['Stock_to_WS_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.4f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
+                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.1f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Used for working solution: {result['Stock_to_WS']:.2f} ml (= {result['Stock_to_WS_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.2f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
                                                     ) if result['Intermediate'] == False else
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
@@ -2278,17 +1433,17 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Drug name: {result['Drug']}"),
                                                         ui.tags.li("Stock solution"),
-                                                        ui.tags.li(f"Volume: {result['ml_aliquot']:.4f} ml (= {result['ml_aliquot_µl']:.2f} µl)"),
-                                                        ui.tags.li(f"Concentration: {result['Stock_Conc']:.4f} μg/ml"),
-                                                        ui.tags.li(f"Dilution Factor: 1:{result['Stock_Factor']:.4f}"),
+                                                        ui.tags.li(f"Volume: {result['ml_aliquot']:.1f} ml (= {result['ml_aliquot_µl']:.1f} µl)"),
+                                                        ui.tags.li(f"Concentration: {result['Stock_Conc']:.2f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result['Stock_Factor']:.1f}"),
                                                         ui.tags.li(f"Date prepared: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Storage temperature: -20°C or -80°C"),
                                                         ui.tags.li(f"Expiry: {(datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Initials")
                                                     )
                                                 ),
-                                                ui.tags.li(f"Dispense {result['ml_aliquot']:.4f} ml (= {result['ml_aliquot_µl']:.2f} µl) of remaining stock solution into each of the {result['Number_of_Ali']} tubes"),
-                                                ui.tags.li("Cap tubes tightly and check for proper sealing"),
+                                                ui.tags.li(f"Dispense {result['ml_aliquot']:.1f} ml (= {result['ml_aliquot_µl']:.1f} µl) of remaining stock solution into each of the {result['Number_of_Ali']} tubes"),
+                                                ui.tags.li("Close tubes tightly and check for proper sealing"),
                                                 ui.tags.li("Storage instructions:",
                                                     ui.tags.ul(
                                                         ui.tags.li("Store aliquots at -20°C or -80°C"),
@@ -2318,7 +1473,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ui.tags.li(f"Label {result['MGIT_Tubes']} MGIT tubes with:",
                                                 ui.tags.ul(
                                                     ui.tags.li(f"Drug name: {result['Drug']}"),
-                                                    ui.tags.li(f"Critical concentration: {result['Crit_Conc']:.4f} μg/ml"),
+                                                    ui.tags.li(f"Critical concentration: {result['Crit_Conc']:.2f} μg/ml"),
                                                     ui.tags.li(f"Sample ID"),
                                                     ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                     ui.tags.li(f"Initials")
@@ -2335,14 +1490,14 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                 ui.tags.ul(
                                                         ui.tags.li("For bedaquiline:",
                                                             ui.tags.ul(
-                                                                ui.tags.li("Cap the tube securely"),
+                                                                ui.tags.li("Close the tube securely"),
                                                                 ui.tags.li("Check for proper sealing"),
-                                                                ui.tags.li("Do not invert tubes as drug will attach to sides"),
+                                                                ui.tags.li("Do not invert the tubes as bedaquiline may adhere to plastic surfaces"),
                                                                 ui.tags.li("If crystal doesn't dissolve after 1 hour, use sonicator for ~3 minutes"),
                                                                 ui.tags.li("Place in MGIT machine as soon as possible after adding culture")
                                                             )
                                                         ) if result['Drug'] == "Bedaquiline (BDQ)" else [
-                                                            ui.tags.li("Cap the tube securely"),
+                                                            ui.tags.li("Close the tube securely"),
                                                             ui.tags.li("Check for proper sealing"),
                                                             ui.tags.li("Invert tube gently 2-4 times or vortex briefly"),
                                                             ui.tags.li("Do not shake vigorously to avoid foam formation"),
@@ -2438,7 +1593,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     except Exception as e:
                         # Handle SilentException - inputs not ready yet
                         print(f"results_section: SilentException - inputs not ready yet: {e}")
-                        return ui.tags.div()
+                        return ui.tags.h3()
                 
                 if not selected:
                     print("results_section: No selected drugs, returning empty div")
@@ -2763,12 +1918,12 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             # Validation 1: Check if drug to weigh out is less than 2 mg (WITH aliquots)
                                             if drug_to_weigh < 2.0:
                                                 validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the ml per aliquot, or (3) increasing the stock concentration factor to achieve a more realistic weighing value."
+                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the volume per aliquot, or (3) increasing the stock concentration factor to achieve a practical weight."
                                                 )
                                                 # Validation 2: Check if stock volume is less than 250 microliters (0.25 ml) when aliquots are NOT being made
                                             if stock_vol_ml < 0.2:
                                                 validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the amount of working solutions by increasing MGIT tube count, otherwise an intermediate dilution will be needed."
+                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the volume of working solution by increasing the number of MGIT tubes.\nAlternatively, an intermediate dilution will be generated."
                                                 )
                                             
                                             # Validation 3: Check Bedaquiline volume constraints (polystyrene tube limits)
@@ -2799,7 +1954,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                         )
 
                                 return ui.tags.div(
-                                    ui.tags.h3("Calculations", style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px;"),
+                                    ui.tags.h3("Calculations", style="color: #2c3e50; margin-top: 10px; margin-bottom: 15px;"),
                                     ui.tags.div(
                                         ui.tags.table(
                                             main_headers,
@@ -2827,7 +1982,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ),
                                             (
                                                 ui.tags.p(
-                                                    "Note: The values above are the minimum required weight per drug based on the inputs. For practical weighing, 2 mg would be recommended, but this would in turn increase the diluent volume. Adjust the inputs below to help you decide on a realistic outcome.",
+                                                    "Note: The values above are the minimum required weight per drug based on the inputs. For practical weighing, 2 mg would be recommended, but this would in turn increase the diluent volume. Adjust the inputs below to help you decide on a practical outcome.",
                                                     style="color: #e67e22; margin: 10px 0; font-weight: 600;"
                                                 )
                                             ) if not make_stock else ui.tags.div(),
@@ -2835,7 +1990,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                         ),                                            
                                             # First show Aliquot Planning if making stock solution
                                             (ui.tags.div(
-                                                ui.tags.h4("Aliquot Planning", style="color: #008080; margin-top: 20px; margin-bottom: 10px;"),
+                                                ui.tags.h4("Stock Aliquot Planning", style="color: #008080; margin-top: 20px; margin-bottom: 10px;"),
                                                 ui.tags.table(
                                                     ui.tags.thead(
                                                         ui.tags.tr(
@@ -2895,7 +2050,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                         ui.tags.thead(
                                                             ui.tags.tr(
                                                                 ui.tags.th("Drug", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 180px; border-bottom: none;", rowspan="2"),
-                                                                ui.tags.th("Stock Concentration Increase Factor", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 200px; border-bottom: none;", rowspan="2"),
+                                                                ui.tags.th("Stock Concentration Factor", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 200px; border-bottom: none;", rowspan="2"),
                                                                 ui.tags.th("Working Solution Make Up", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; text-align: center;", colspan="2"),
                                                             ),
                                                             ui.tags.tr(
@@ -2934,8 +2089,29 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                 )
                                             ) if (make_stock) else ui.tags.div(),
                                         ) if any_low_mass else ui.tags.div(),
-                                    ui.tags.div("INSTRUCTION: Weigh out drug according to above values. Then proceed to Step 3 to enter the actual weights.", 
-                                              style="color: #1e90ff; margin-top: 10px; margin-bottom: 15px; font-weight: bold; font-size: 16px;")
+                                    ui.tags.h3("Proper Weighing Practices", 
+                                             style="color: #8e44ad; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #8e44ad; padding-bottom: 5px;"),
+                                    ui.tags.div(
+                                        ui.tags.ol(
+                                            ui.tags.li("Ensure analytical balance is properly calibrated and leveled"),
+                                            ui.tags.li("Use appropriate weighing containers:",
+                                                ui.tags.ul(
+                                                    ui.tags.li("Clean, dry weighing boats or papers"),
+                                                    ui.tags.li("Anti-static weighing boats for fine powders"),
+                                                    ui.tags.li("Tared containers when necessary")
+                                                )
+                                            ),
+                                            ui.tags.li("Record weights immediately and accurately"),
+                                            ui.tags.li("For hygroscopic drugs, weigh quickly to minimize moisture absorption"),
+                                            ui.tags.li("Clean balance and work area after each use"),
+                                            style="color: #2c3e50;"
+                                        ),
+                                        style="background-color: #f5eef8; padding: 20px; border-radius: 5px; margin-bottom: 20px;"
+                                    ),
+                                    ui.tags.p(
+                                                    "User Action:\nWeigh out the drug according to above values, return to session and proceed to step 3. Then enter the actual drug weights.",
+                                                    style="color: #8e44ad; margin: 10px 0; font-weight: 600;"
+                                                )
                                 )
                         
                     except Exception as e:
@@ -3153,9 +2329,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         )
                 elif current_step() == 4:
                     print("Step 4 action buttons logic")
-                    # Show Back and Download buttons
+                    # Show Download and Reset buttons
                     return ui.tags.div(
-                        ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
                         ui.input_action_button("download_step4_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
                         ui.input_action_button("reset_btn", "Start New Calculation", class_="btn-warning", style="background-color: #f39c12; border-color: #f39c12;"),
                         style="text-align: center; margin-top: 30px;"

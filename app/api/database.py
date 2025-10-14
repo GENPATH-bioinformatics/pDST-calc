@@ -71,27 +71,27 @@ class DatabaseManager:
                     logger.info("Populating drugs table with default drug data...")
                     
                     default_drugs = [
-                        ('Amikacin (AMK)', 'Water', 585.6, 1.0, True),
+                        ('Amikacin (AMK)', 'WATER', 585.6, 1.0, True),
                         ('Bedaquiline (BDQ)', 'DMSO', 555.5, 1.0, True),
                         ('Clofazimine (CFZ)', 'DMSO', 473.39, 1.0, True),
-                        ('Cycloserine (CYC)', 'Water', 102.09, 1.0, True),
+                        ('Cycloserine (CYC)', 'WATER', 102.09, 1.0, True),
                         ('Delamanid (DMD)', 'DMSO', 534.48, 0.06, True),
-                        ('Ethambutol hydrochloride (EMB hyd)', 'Water', 204.31, 5.0, True),
+                        ('Ethambutol hydrochloride (EMB hyd)', 'WATER', 204.31, 5.0, True),
                         ('Ethionamide (ETH)', 'DMSO', 166.24, 5.0, True),
-                        ('Imipenem (IPM)', 'Phosphate pH 7.2', 299.35, 1.0, True),
-                        ('Isoniazid CC (INH)-cc', 'Water', 137.14, 1.0, True),
-                        ('Isoniazid high (INH)-h', 'Water', 137.14, 10.0, True),
-                        ('Isoniazid low (INH)-l', 'Water', 137.14, 0.05, True),
-                        ('Levofloxacin (LVX)', '1/2 volume of water then 0.1 mol/L NaOH dropwise to dissolve/Water', 361.37, 1.0, True),
-                        ('Linezolid (LZD)', 'Water', 337.35, 1.0, True),
-                        ('Meropenem (MRP)', 'Water', 383.46, 1.0, True),
-                        ('Moxifloxacin hydrochloride (MFX hyd)', 'Water', 437.89, 0.25, True),
-                        ('Para-aminosalicylic Acid (PAS)', 'Water or DMSO', 153.14, 4.0, True),
+                        ('Imipenem (IPM)', 'PHOSPHATE PH 7.2', 299.35, 1.0, True),
+                        ('Isoniazid CC (INH)-cc', 'WATER', 137.14, 1.0, True),
+                        ('Isoniazid high (INH)-h', 'WATER', 137.14, 10.0, True),
+                        ('Isoniazid low (INH)-l', 'WATER', 137.14, 0.05, True),
+                        ('Levofloxacin (LVX)', '1/2 VOLUME OF WATER THEN 0.1 MOL/L NAOH DROPWISE TO DISSOLVE/WATER', 361.37, 1.0, True),
+                        ('Linezolid (LZD)', 'WATER', 337.35, 1.0, True),
+                        ('Meropenem (MRP)', 'WATER', 383.46, 1.0, True),
+                        ('Moxifloxacin hydrochloride (MFX hyd)', 'WATER', 437.89, 0.25, True),
+                        ('Para-aminosalicylic Acid (PAS)', 'WATER OR DMSO', 153.14, 4.0, True),
                         ('Pretomanid (PA-824)', 'DMSO', 359.3, 1.0, True),
-                        ('Prothionamide (PTO)', 'DMSO and Water', 180.27, 2.5, True),
+                        ('Prothionamide (PTO)', 'DMSO AND WATER', 180.27, 2.5, True),
                         ('Rifabutin (RBT)', 'DMSO', 847.02, 0.5, True),
-                        ('Rifampicin (RIF)', 'Water', 822.94, 2.0, True),
-                        ('Streptomycin sulfate salt (STM)', 'Water', 1457.38, 1.0, True)
+                        ('Rifampicin (RIF)', 'WATER', 822.94, 2.0, True),
+                        ('Streptomycin sulfate salt (STM)', 'WATER', 1457.38, 1.0, True)
                     ]
                     
                     # Insert all default drugs
