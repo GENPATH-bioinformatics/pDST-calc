@@ -11,12 +11,68 @@ import io
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from app.api.drug_database import load_drug_data
-from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_ws, vol_workingsol, vol_ss_to_ws, vol_final_dil
+from lib.dst_calc import (
+    potency, est_drugweight, vol_diluent, conc_stock, conc_ws, vol_workingsol, 
+    vol_ss_to_ws, calc_volume_difference, calc_adjusted_volume, calc_stock_factor, 
+    calc_volume_divided_by_factor, calc_concentration_times_factor,
+    calc_intermediate_factor, calc_intermediate_volume
+)
+from lib.supp_calc import ml_to_ul, ul_to_ml
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
 
 # Import PDF generation functions from the separate module
 from app.shiny.generate_pdf import generate_step2_pdf as generate_step2_pdf_module, generate_step4_pdf as generate_step4_pdf_backend
+
+# Helper functions for common operations
+def get_drug_inputs(drug_index, fallback_session_data=None):
+    """Get all inputs for a specific drug with session fallback."""
+    try:
+        inputs = {
+            'custom_crit': input[f"custom_critical_{drug_index}"](),
+            'purch_molw': input[f"purchased_molw_{drug_index}"](),
+            'stock_vol': input[f"stock_volume_{drug_index}"](),
+            'actual_weight': input[f"actual_weight_{drug_index}"](),
+            'mgit_tubes': input[f"mgit_tubes_{drug_index}"]()
+        }
+        
+        # Apply session fallbacks for None values
+        if fallback_session_data:
+            for key, session_key in [
+                ('custom_crit', 'Crit_Conc(mg/ml)'),
+                ('purch_molw', 'PurMol_W(g/mol)'),
+                ('stock_vol', 'St_Vol(ml)'),
+                ('actual_weight', 'Act_DrugW(mg)'),
+                ('mgit_tubes', 'Total Mgit tubes')
+            ]:
+                if inputs[key] is None and session_key in fallback_session_data:
+                    inputs[key] = fallback_session_data[session_key]
+        
+        return inputs
+    except Exception as e:
+        print(f"Error getting drug inputs for index {drug_index}: {e}")
+        return None
+
+def build_step2_data_structure():
+    """Build standardized Step 2 data structure for PDF generation."""
+    return {
+        'CriticalConc': Step2_CriticalConc,
+        'Purch': Step2_Purch,
+        'MgitTubes': Step2_MgitTubes,
+        'Potencies': Step2_Potencies,
+        'ConcWS': Step2_ConcWS,
+        'VolWS': Step2_VolWS,
+        'CalEstWeights': Step2_CalEstWeights,
+        'num_aliquots': Step2_num_aliquots,
+        'mlperAliquot': Step2_mlperAliquot,
+        'TotalStockVolumes': Step2_TotalStockVolumes,
+        'StocktoWS': Step2_StocktoWS,
+        'DiltoWS': Step2_DiltoWS,
+        'Factors': Step2_Factors,
+        'EstWeights': Step2_EstWeights,
+        'PracWeights': Step2_PracWeights,
+        'PracVol': Step2_PracVol
+    }
 
 # UI reactive prefs
 make_stock_pref = reactive.Value(False)
@@ -161,15 +217,14 @@ def perform_final_calculations():
                 pot = Step2_Potencies[drug_idx]
                 ml_ali = Step2_mlperAliquot[drug_idx]
 
-                total_volWS = (actual_weight / est_weight) * ws_vol_ml
-
-                new_a_val = (actual_weight * 1000) / (total_stock_vol * ws_conc_ugml * pot)
-
-                stock_vol_to_add_to_ws_ml = total_volWS / new_a_val
+                # Use modular calculation functions
+                total_volWS = calc_adjusted_volume(actual_weight, est_weight, ws_vol_ml)
+                new_a_val = calc_stock_factor(actual_weight, total_stock_vol, ws_conc_ugml, pot)
+                stock_vol_to_add_to_ws_ml = calc_volume_divided_by_factor(total_volWS, new_a_val)
                 diluent_vol_to_add_to_ws_ml = total_volWS - stock_vol_to_add_to_ws_ml
                 total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
                 num_aliquots = floor(total_stock_left / ml_ali)
-                Final_stock_conc = new_a_val*ws_conc_ugml
+                Final_stock_conc = calc_concentration_times_factor(ws_conc_ugml, new_a_val)
                 
                 if stock_vol_to_add_to_ws_ml >= 0.2:
                     final_results.append({
@@ -180,45 +235,33 @@ def perform_final_calculations():
                         'Act_Weight': round(actual_weight, 2),
                         'Stock_Conc': round(Final_stock_conc, 2),
                         'Stock_Factor' : round(new_a_val, 1),
-                        'Stock_to_WS_µl': round(stock_vol_to_add_to_ws_ml * 1000, 2),
+                        'Stock_to_WS_µl': ml_to_ul(stock_vol_to_add_to_ws_ml),
                         'Stock_to_WS': round(stock_vol_to_add_to_ws_ml, 2),
-                        'Dil_to_WS_µl': round(diluent_vol_to_add_to_ws_ml * 1000, 2),
+                        'Dil_to_WS_µl': ml_to_ul(diluent_vol_to_add_to_ws_ml),
                         'Dil_to_WS': round(diluent_vol_to_add_to_ws_ml, 2),
                         'Conc_Ws': round(ws_conc_ugml, 2),
-                        'Total_Stock_Vol_µl': round(total_stock_vol * 1000, 2),
+                        'Total_Stock_Vol_µl': ml_to_ul(total_stock_vol),
                         'Total_Stock_Vol': round(total_stock_vol, 2),
-                        'Total_Stock_Left_µl': round(total_stock_left * 1000, 2),
+                        'Total_Stock_Left_µl': ml_to_ul(total_stock_left),
                         'Total_Stock_Left': round(total_stock_left, 2),
                         'MGIT_Tubes': round(mgit_tubes),
                         'Number_of_Ali': round(num_aliquots),
-                        'ml_aliquot_µl': round(ml_ali * 1000, 2),
+                        'ml_aliquot_µl': ml_to_ul(ml_ali),
                         'ml_aliquot': round(ml_ali, 2),
                     })
                 else:
                     intermediate = True
-                    InterFactor = new_a_val
-
-                    while InterFactor > 1.1: 
-                        InterFactor -= 0.5
-
-                        stock_to_inter = total_volWS / InterFactor
-
-                        if stock_to_inter > 0.2:
-                            break
                     
-                    # If we couldn't find a valid InterFactor, fall back to simple calculation
-                    if InterFactor <= 1.1:
-                        InterFactor = 2
-                        stock_to_inter = total_volWS / InterFactor
-
+                    # Use modular intermediate calculation functions
+                    InterFactor = calc_intermediate_factor(new_a_val, total_volWS)
+                    stock_to_inter = calc_volume_divided_by_factor(total_volWS, InterFactor)
                     total_stock_left = total_stock_vol - stock_to_inter
                     num_aliquots = floor(total_stock_left / ml_ali)
-                    inter_conc = ws_conc_ugml * InterFactor
-                    Vol_of_inter = (stock_to_inter * Final_stock_conc) / (InterFactor * ws_conc_ugml)
-                    dil_to_inter = Vol_of_inter - stock_to_inter
-
-                    vol_inter_to_ws = (total_volWS * ws_conc_ugml) / (ws_conc_ugml * InterFactor)
-                    vol_dil_to_ws = total_volWS - vol_inter_to_ws
+                    inter_conc = calc_concentration_times_factor(ws_conc_ugml, InterFactor)
+                    Vol_of_inter = calc_intermediate_volume(stock_to_inter, Final_stock_conc, InterFactor, ws_conc_ugml)
+                    dil_to_inter = calc_volume_difference(Vol_of_inter, stock_to_inter)
+                    vol_inter_to_ws = calc_volume_divided_by_factor(total_volWS, InterFactor)
+                    vol_dil_to_ws = calc_volume_difference(total_volWS, vol_inter_to_ws)
 
                     final_results.append({
                         'Intermediate': True,
@@ -228,31 +271,31 @@ def perform_final_calculations():
                         'Act_Weight': round(actual_weight, 2),
                         'Stock_Conc': round(Final_stock_conc, 2),
                         'Stock_Factor' : round(new_a_val, 2),
-                        'Total_Stock_Vol_µl': round(total_stock_vol * 1000, 2),
+                        'Total_Stock_Vol_µl': ml_to_ul(total_stock_vol),
                         'Total_Stock_Vol': round(total_stock_vol, 2),
-                        'Total_Stock_Left_µl': round(total_stock_left * 1000, 2),
+                        'Total_Stock_Left_µl': ml_to_ul(total_stock_left),
                         'Total_Stock_Left': round(total_stock_left, 2),
-                        'Stock_to_Inter_µl': round(stock_to_inter * 1000, 2),
+                        'Stock_to_Inter_µl': ml_to_ul(stock_to_inter),
                         'Stock_to_Inter': round(stock_to_inter, 2),
                         'Inter_Factor': round(InterFactor, 1),
                         'Inter_Conc': round(inter_conc, 2),
-                        'Dil_to_Inter_µl': round(dil_to_inter * 1000, 2),
+                        'Dil_to_Inter_µl': ml_to_ul(dil_to_inter),
                         'Dil_to_Inter': round(dil_to_inter, 2),
-                        'Vol_Inter_to_WS_µl': round(vol_inter_to_ws * 1000, 2),
+                        'Vol_Inter_to_WS_µl': ml_to_ul(vol_inter_to_ws),
                         'Vol_Inter_to_WS': round(vol_inter_to_ws, 2),
-                        'Dil_to_WS_µl': round(vol_dil_to_ws * 1000, 2),
+                        'Dil_to_WS_µl': ml_to_ul(vol_dil_to_ws),
                         'Dil_to_WS': round(vol_dil_to_ws, 2),
                         'Conc_Ws': round(ws_conc_ugml, 2),
                         'MGIT_Tubes': round(mgit_tubes),
                         'Number_of_Ali': round(num_aliquots),
-                        'ml_aliquot_µl': round(ml_ali * 1000, 2),
+                        'ml_aliquot_µl': ml_to_ul(ml_ali),
                         'ml_aliquot': round(ml_ali, 2),
                     })
 
             else:
                 # No stock solution calculations
                 est_weight = Step2_CalEstWeights[drug_idx]
-                final_vol_diluent = (actual_weight/ est_weight)*ws_vol_ml
+                final_vol_diluent = calc_adjusted_volume(actual_weight, est_weight, ws_vol_ml)
                 print(f"perform_final_calculations: Drug {drug_name}, actual_weight={actual_weight}, est_weight={est_weight}, ws_vol_ml={ws_vol_ml}, final_vol_diluent={final_vol_diluent}")   
                 
                 final_results.append({
@@ -261,7 +304,7 @@ def perform_final_calculations():
                     'Diluent': drug_data[drug_data['Drug'] == drug_name].iloc[0]['Diluent'],
                     'Crit_Conc': round(crit_conc, 2),
                     'Act_Weight': round(actual_weight, 2),
-                    'Final_Vol_Dil_µl': round(final_vol_diluent * 1000, 2),
+                    'Final_Vol_Dil_µl': ml_to_ul(final_vol_diluent),
                     'Final_Vol_Dil': round(final_vol_diluent, 2),
                     'Conc_Ws': round(ws_conc_ugml, 2),
                     'MGIT_Tubes': round(mgit_tubes),
@@ -282,24 +325,7 @@ def generate_step2_pdf():
         make_stock = bool(make_stock_pref())
         
         # Prepare Step 2 data structure for the modular function
-        step2_data = {
-            'CriticalConc': Step2_CriticalConc,
-            'Purch': Step2_Purch,
-            'MgitTubes': Step2_MgitTubes,
-            'Potencies': Step2_Potencies,
-            'ConcWS': Step2_ConcWS,
-            'VolWS': Step2_VolWS,
-            'CalEstWeights': Step2_CalEstWeights,
-            'num_aliquots': Step2_num_aliquots,
-            'mlperAliquot': Step2_mlperAliquot,
-            'TotalStockVolumes': Step2_TotalStockVolumes,
-            'StocktoWS': Step2_StocktoWS,
-            'DiltoWS': Step2_DiltoWS,
-            'Factors': Step2_Factors,
-            'EstWeights': Step2_EstWeights,
-            'PracWeights': Step2_PracWeights,
-            'PracVol': Step2_PracVol
-        }
+        step2_data = build_step2_data_structure()
         
         # Call the modular PDF generation function
         return generate_step2_pdf_module(selected, make_stock, step2_data)
@@ -318,24 +344,7 @@ def generate_step4_pdf():
         final_results = perform_final_calculations()
         
         # Prepare Step 2 data structure for the modular function
-        step2_data = {
-            'CriticalConc': Step2_CriticalConc,
-            'Purch': Step2_Purch,
-            'MgitTubes': Step2_MgitTubes,
-            'Potencies': Step2_Potencies,
-            'ConcWS': Step2_ConcWS,
-            'VolWS': Step2_VolWS,
-            'CalEstWeights': Step2_CalEstWeights,
-            'num_aliquots': Step2_num_aliquots,
-            'mlperAliquot': Step2_mlperAliquot,
-            'TotalStockVolumes': Step2_TotalStockVolumes,
-            'StocktoWS': Step2_StocktoWS,
-            'DiltoWS': Step2_DiltoWS,
-            'Factors': Step2_Factors,
-            'EstWeights': Step2_EstWeights,
-            'PracWeights': Step2_PracWeights,
-            'PracVol': Step2_PracVol
-        }
+        step2_data = build_step2_data_structure()
         
         # Call the modular PDF generation function with final results
         return generate_step4_pdf_backend(selected, make_stock, step2_data, Step3_ActDrugWeights, final_results)
@@ -782,8 +791,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                     vol_working_sol_ml = vol_workingsol(mgit_tubes)
                                     # [7] vol_ss_to_ws calculation from dst-calc.py
                                     vol_stock_to_ws_ml = vol_ss_to_ws(vol_working_sol_ml, conc_ws_ugml, conc_stock_ugml)
-                                    # [8] vol_final_dil calculation from dst-calc.py
-                                    vol_diluent_to_add_ml = vol_final_dil(vol_stock_to_ws_ml, vol_working_sol_ml)
+                                    # [8] calc_volume_difference calculation from dst-calc.py
+                                    vol_diluent_to_add_ml = calc_volume_difference(vol_working_sol_ml, vol_stock_to_ws_ml)
                                     
                                     # Keep values in base units (ml)
                                     stock_vol_user = vol_stock_to_ws_ml
@@ -1423,9 +1432,9 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                         ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.2f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
                                                     ) if result['Intermediate'] == False else
                                                     ui.tags.ul(
-                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.4f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Used for intermediate solution: {result['Stock_to_Inter']:.4f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.4f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
+                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.1f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Used for intermediate solution: {result['Stock_to_Inter']:.2f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) "),
+                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.2f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
                                                     )
                                                 ),
                                                 ui.tags.li(f"Prepare {result['Number_of_Ali']} sterile tubes"),
@@ -2863,19 +2872,17 @@ def calculate_results():
                             if not drug_row.empty:
                                 drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
                                 
-                                # Get input values
-                                custom_crit = input[f"custom_critical_{i}"]()
-                                purch_molw = input[f"purchased_molw_{i}"]()
-                                stock_vol = input[f"stock_volume_{i}"]()
-                                
-                                # Store in session format similar to CLI
-                                session_data[drug_id] = {
-                                    'Crit_Conc(mg/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
-                                    'PurMol_W(g/mol)': purch_molw if purch_molw is not None else 0.0,
-                                    'St_Vol(ml)': stock_vol if stock_vol is not None else 0.0,
-                                    'Act_DrugW(mg)': 0.0,  # Not yet entered
-                                    'Total Mgit tubes': 0  # Not yet entered
-                                }
+                                # Get input values using helper function
+                                drug_inputs = get_drug_inputs(i)
+                                if drug_inputs:
+                                    # Store in session format similar to CLI
+                                    session_data[drug_id] = {
+                                        'Crit_Conc(mg/ml)': drug_inputs['custom_crit'] if drug_inputs['custom_crit'] is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                        'PurMol_W(g/mol)': drug_inputs['purch_molw'] if drug_inputs['purch_molw'] is not None else 0.0,
+                                        'St_Vol(ml)': drug_inputs['stock_vol'] if drug_inputs['stock_vol'] is not None else 0.0,
+                                        'Act_DrugW(mg)': 0.0,  # Not yet entered
+                                        'Total Mgit tubes': 0  # Not yet entered
+                                    }
                         except Exception as e:
                             print(f"Error processing drug {drug_name} for session: {e}")
                     
@@ -2965,42 +2972,28 @@ def calculate_final_results():
                                 drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
                                 
                                 # Get values from session data first (for restored sessions)
-                                custom_crit = None
-                                purch_molw = None
-                                stock_vol = None
-                                actual_weight = None
-                                mgit_tubes = None
-                                
+                                session_drug_data = None
                                 if preparation:
                                     try:
                                         session_inputs = preparation.get('inputs', {})
-                                        drug_inputs = session_inputs.get(str(i), {})
-                                        custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', None)
-                                        purch_molw = drug_inputs.get('PurMol_W(g/mol)', None)
-                                        stock_vol = drug_inputs.get('St_Vol(ml)', None)
-                                        print(f"calculate_final_results: Got session values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, stock_vol: {stock_vol}")
+                                        session_drug_data = session_inputs.get(str(i), {})
+                                        print(f"calculate_final_results: Got session values: {session_drug_data}")
                                     except Exception as e:
                                         print(f"calculate_final_results: Error getting session values: {e}")
                                 
-                                # Get actual weight and MGIT tubes from input (these are step 3 inputs)
-                                try:
-                                    actual_weight = input[f"actual_weight_{i}"]()
-                                    mgit_tubes = input[f"mgit_tubes_{i}"]()
-                                    print(f"calculate_final_results: Got input values - actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}")
-                                except Exception as e:
-                                    print(f"calculate_final_results: Error getting input values: {e}")
+                                # Get all inputs using helper function with session fallback
+                                drug_inputs = get_drug_inputs(i, session_drug_data)
+                                if not drug_inputs:
+                                    print(f"calculate_final_results: Could not get inputs for drug {i}")
                                     continue
                                 
-                                # Fallback to input fields if session data not available
-                                if custom_crit is None or purch_molw is None or stock_vol is None:
-                                    try:
-                                        custom_crit = input[f"custom_critical_{i}"]()
-                                        purch_molw = input[f"purchased_molw_{i}"]()
-                                        stock_vol = input[f"stock_volume_{i}"]()
-                                        print(f"calculate_final_results: Got fallback input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, stock_vol: {stock_vol}")
-                                    except Exception as e:
-                                        print(f"calculate_final_results: Error getting fallback input values: {e}")
-                                        continue
+                                custom_crit = drug_inputs['custom_crit']
+                                purch_molw = drug_inputs['purch_molw']
+                                stock_vol = drug_inputs['stock_vol']
+                                actual_weight = drug_inputs['actual_weight']
+                                mgit_tubes = drug_inputs['mgit_tubes']
+                                
+                                print(f"calculate_final_results: Final input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, stock_vol: {stock_vol}, actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}")
                                 
                                 # Store complete session data
                                 session_data[drug_id] = {
