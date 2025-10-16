@@ -85,26 +85,116 @@ def vol_ss_to_ws(vol_workingsol, conc_ws, conc_stock):
     """
     return (vol_workingsol * conc_ws) / conc_stock
 
-def vol_final_dil(vol_ss_to_ws, vol_workingsol):
-    """
-    Calculate the volume of diluent needed to complete the working solution.
-    Formula: working_solution_volume - stock_solution_volume
-    Args:
-        vol_ss_to_ws (float): Volume of stock solution added to working solution (mL).
-        vol_workingsol (float): Total volume of working solution (mL).
-    Returns:
-        float: Volume of diluent to add (mL).
-    """
-    return vol_workingsol - vol_ss_to_ws
 
-def vol_ssleft(vol_ss_to_ws, vol_diluent):
+def calc_adjusted_volume(actual_weight, est_weight, base_volume):
     """
-    Calculate the volume of stock solution remaining after preparing working solution.
-    Formula: total_diluent_volume - stock_solution_volume_used
+    Calculate adjusted volume based on actual vs estimated weight ratio.
+    This is a general function for scaling volumes when actual weight differs from estimated.
+    Formula: (actual_weight / estimated_weight) * base_volume
+    
     Args:
-        vol_ss_to_ws (float): Volume of stock solution used for working solution (mL).
-        vol_diluent (float): Total volume of diluent originally prepared (mL).
+        actual_weight (float): Actual drug weight (mg).
+        est_weight (float): Estimated drug weight (mg).
+        base_volume (float): Base volume to adjust (mL).
     Returns:
-        float: Volume of stock solution remaining (mL).
+        float: Adjusted volume (mL).
     """
-    return vol_diluent - vol_ss_to_ws
+    return (actual_weight / est_weight) * base_volume
+
+def calc_stock_factor(actual_weight, total_stock_vol, ws_conc_ugml, potency):
+    """
+    Calculate the stock solution factor (concentration multiplier).
+    Formula: (actual_weight * 1000) / (total_stock_volume * working_solution_concentration * potency)
+    Args:
+        actual_weight (float): Actual drug weight (mg).
+        total_stock_vol (float): Total stock volume (mL).
+        ws_conc_ugml (float): Working solution concentration (μg/mL).
+        potency (float): Drug potency (dimensionless).
+    Returns:
+        float: Stock factor (dimensionless multiplier).
+    """
+    return (actual_weight * 1000) / (total_stock_vol * ws_conc_ugml * potency)
+
+def calc_volume_divided_by_factor(volume, factor):
+    """
+    Calculate volume divided by a factor (general dilution calculation).
+    Used for stock-to-working solutions, stock-to-intermediate solutions, etc.
+    Formula: volume / factor
+    
+    Args:
+        volume (float): Volume to divide (mL).
+        factor (float): Factor to divide by (dimensionless).
+    Returns:
+        float: Divided volume (mL).
+    """
+    return volume / factor
+
+def calc_concentration_times_factor(concentration, factor):
+    """
+    Calculate concentration multiplied by a factor (general concentration scaling).
+    Used for stock concentrations, intermediate concentrations, etc.
+    Formula: concentration * factor
+    
+    Args:
+        concentration (float): Base concentration (μg/mL).
+        factor (float): Multiplication factor (dimensionless).
+    Returns:
+        float: Scaled concentration (μg/mL).
+    """
+    return concentration * factor
+
+
+def calc_intermediate_factor(initial_factor, total_ws_volume, min_volume_threshold=0.2):
+    """
+    Calculate the intermediate dilution factor for cases requiring intermediate dilutions.
+    Iteratively reduces the factor until the resulting volume meets the minimum threshold.
+    Args:
+        initial_factor (float): Initial stock factor.
+        total_ws_volume (float): Total working solution volume (mL).
+        min_volume_threshold (float): Minimum volume threshold (mL). Default 0.2.
+    Returns:
+        float: Intermediate factor that produces volumes above threshold.
+    """
+    inter_factor = initial_factor
+    
+    # Iteratively reduce factor until we get acceptable volume
+    while inter_factor > 1.1:
+        inter_factor -= 0.5
+        stock_to_inter = total_ws_volume / inter_factor
+        
+        if stock_to_inter > min_volume_threshold:
+            break
+    
+    # If we couldn't find a valid factor, fall back to 2
+    if inter_factor <= 1.1:
+        inter_factor = 2
+    
+    return inter_factor
+
+def calc_intermediate_volume(stock_to_inter, final_stock_conc, inter_factor, ws_conc_ugml):
+    """
+    Calculate the total volume of intermediate dilution.
+    Formula: (stock_to_intermediate * final_stock_concentration) / (intermediate_factor * working_solution_concentration)
+    Args:
+        stock_to_inter (float): Volume of stock solution for intermediate (mL).
+        final_stock_conc (float): Final stock concentration (μg/mL).
+        inter_factor (float): Intermediate dilution factor.
+        ws_conc_ugml (float): Working solution concentration (μg/mL).
+    Returns:
+        float: Total intermediate volume (mL).
+    """
+    return (stock_to_inter * final_stock_conc) / (inter_factor * ws_conc_ugml)
+
+def calc_volume_difference(total_volume, volume_to_subtract):
+    """
+    Calculate the difference between two volumes (general diluent calculation).
+    This is a general function for calculating diluent volumes or remaining volumes.
+    Formula: total_volume - volume_to_subtract
+    
+    Args:
+        total_volume (float): Total volume (mL).
+        volume_to_subtract (float): Volume to subtract (mL).
+    Returns:
+        float: Volume difference (mL).
+    """
+    return total_volume - volume_to_subtract

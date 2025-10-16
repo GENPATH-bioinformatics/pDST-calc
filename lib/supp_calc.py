@@ -559,3 +559,12 @@ def cal_mgit_ws(selected_df):
     available_cols = [col for col in summary_cols if col in selected_df.columns]
     if available_cols:
         logger.info("\n" + tabulate(selected_df[available_cols], headers='keys', tablefmt='grid', showindex=False, stralign='left', numalign='left') + "\n")
+
+def ml_to_ul(volume_ml, precision=2):
+    """Convert milliliters to microliters with rounding."""
+    return round(volume_ml * 1000, precision)
+
+def ul_to_ml(volume_ul, precision=4):
+    """Convert microliters to milliliters with rounding."""
+    return round(volume_ul / 1000, precision)
+

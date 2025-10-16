@@ -21,7 +21,7 @@ from reportlab.lib.units import inch
 # Add the project root to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from app.api.drug_database import load_drug_data
-from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_ws, vol_workingsol, vol_ss_to_ws, vol_final_dil
+from lib.dst_calc import potency, est_drugweight, vol_diluent, conc_stock, conc_ws, vol_workingsol, vol_ss_to_ws, calc_volume_difference
 
 
 
