@@ -178,6 +178,184 @@ def get_estimated_weight(drug_index):
             return estimated_weights[drug_index]
     return 0
 
+def build_step4_data_tables(final_results, make_stock):
+    """Build HTML tables for Step 4 data that match the PDF tables."""
+    drug_data = load_drug_data()
+    
+    tables = {}
+    
+    # Table 1: Stock Solution Calculations
+    if make_stock:
+        table1_data = []
+        for result in final_results:
+            drug_name = result.get('Drug', '')
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            
+            table1_data.append({
+                'Drug': drug_name,
+                'Diluent': diluent,
+                'Drug_Weight': f"{result.get('Act_Weight', 0):.2f}",
+                'Total_Stock_Vol': f"{result.get('Total_Stock_Vol', 0):.2f}",
+                'Stock_Conc': f"{result.get('Stock_Conc', 0):.2f}",
+                'Dilution_Factor': f"{result.get('Stock_Factor', 0):.1f}"
+            })
+        tables['stock_solution'] = table1_data
+    
+    # Table 2: Intermediate Solutions
+    intermediate_data = []
+    for result in final_results:
+        if result.get('Intermediate') == True:
+            drug_name = result.get('Drug', '')
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            
+            intermediate_data.append({
+                'Drug': drug_name,
+                'Diluent': diluent,
+                'Stock_to_Add': f"{result.get('Stock_to_Inter', 0):.2f}",
+                'Diluent_to_Add': f"{result.get('Dil_to_Inter', 0):.2f}",
+                'Intermediate_Vol': f"{result.get('Dil_to_Inter', 0):.2f}",
+                'Intermediate_Conc': f"{result.get('Inter_Conc', 0):.2f}",
+                'Dilution_Factor': f"{result.get('Inter_Factor', 0):.1f}"
+            })
+    if intermediate_data:
+        tables['intermediate_solution'] = intermediate_data
+    
+    # Table 3: Working Solution from Intermediate
+    ws_intermediate_data = []
+    for result in final_results:
+        if result.get('Intermediate') == True:
+            drug_name = result.get('Drug', '')
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            
+            ws_intermediate_data.append({
+                'Drug': drug_name,
+                'Diluent': diluent,
+                'Intermediate_to_Add': f"{result.get('Vol_Inter_to_WS', 0):.2f}",
+                'Diluent_to_Add': f"{result.get('Dil_to_WS', 0):.4f}",
+                'Volume_WS': f"{result.get('Dil_to_WS', 0) + result.get('Vol_Inter_to_WS', 0):.4f}",
+                'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
+            })
+    if ws_intermediate_data:
+        tables['working_solution_intermediate'] = ws_intermediate_data
+    
+    # Table 4: Working Solution from Stock
+    ws_stock_data = []
+    for result in final_results:
+        if make_stock and result.get('Intermediate') == False:
+            drug_name = result.get('Drug', '')
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            
+            ws_stock_data.append({
+                'Drug': drug_name,
+                'Diluent': diluent,
+                'Stock_to_Add': f"{result.get('Stock_to_WS', 0):.2f}",
+                'Diluent_to_Add': f"{result.get('Dil_to_WS', 0):.2f}",
+                'Volume_WS': f"{result.get('Dil_to_WS', 0) + result.get('Stock_to_WS', 0):.2f}",
+                'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
+            })
+    if ws_stock_data:
+        tables['working_solution_stock'] = ws_stock_data
+    
+    # Table 5: Working Solution No Stock
+    ws_no_stock_data = []
+    for result in final_results:
+        if not make_stock:
+            drug_name = result.get('Drug', '')
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            
+            ws_no_stock_data.append({
+                'Drug': drug_name,
+                'Diluent': diluent,
+                'Drug_Weight': f"{result.get('Act_Weight', 0):.4f}",
+                'Diluent_to_Add': f"{result.get('Final_Vol_Dil', 0):.4f}",
+                'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
+            })
+    if ws_no_stock_data:
+        tables['working_solution_no_stock'] = ws_no_stock_data
+    
+    # Table 6: Aliquoting
+    if make_stock:
+        aliquot_data = []
+        for result in final_results:
+            drug_name = result.get('Drug', '')
+            aliquot_data.append({
+                'Drug': drug_name,
+                'Number_of_Aliquots': f"{result.get('Number_of_Ali', 0):.0f}",
+                'Volume_per_Aliquot': f"{result.get('ml_aliquot', 0):.1f}"
+            })
+        tables['aliquoting'] = aliquot_data
+    
+    # Table 7: MGIT Tube Preparation
+    mgit_data = []
+    for result in final_results:
+        drug_name = result.get('Drug', '')
+        mgit_data.append({
+            'Drug': drug_name,
+            'Number_of_MGITs': f"{result.get('MGIT_Tubes', 0):.0f}",
+            'Volume_WS_per_MGIT': "0.1",
+            'Volume_OADC_per_MGIT': "0.8",
+            'Volume_Culture_per_MGIT': "0.5"
+        })
+    tables['mgit_preparation'] = mgit_data
+    
+    return tables
+
+def create_html_table(data, headers, table_style="", header_style="", row_style=""):
+    """Create an HTML table from data."""
+    if not data:
+        return ui.tags.div()
+    
+    # Create header row
+    header_row = ui.tags.tr(
+        *[ui.tags.th(header, style=f"padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; text-align: center; {header_style}") 
+          for header in headers]
+    )
+    
+    # Create data rows
+    data_rows = []
+    for row_data in data:
+        cells = []
+        for header in headers:
+            # Convert header to key format - specific mapping for each header
+            key_mapping = {
+                'Drug': 'Drug',
+                'Diluent': 'Diluent',
+                'Drug Weight\n(mg)': 'Drug_Weight',
+                'Total Stock\nVolume (ml)': 'Total_Stock_Vol',
+                'Stock\nConcentration\n(μg/ml)': 'Stock_Conc',
+                'Dilution Factor': 'Dilution_Factor',
+                'Stock to\nAdd (ml)': 'Stock_to_Add',
+                'Diluent to\nAdd(ml)': 'Diluent_to_Add',
+                'Intermediate\nVol. (ml)': 'Intermediate_Vol',
+                'Intermediate\nConc. (μg/ml)': 'Intermediate_Conc',
+                'Intermediate to\nAdd (ml)': 'Intermediate_to_Add',
+                'Volume WS\n(ml)': 'Volume_WS',
+                'Conc. WS\n(μg/ml)': 'Conc_WS',
+                'Number of\nAliquots': 'Number_of_Aliquots',
+                'Volume per\nAliquot (ml)': 'Volume_per_Aliquot',
+                'Number of\nMGITs': 'Number_of_MGITs',
+                'Volume WS\nper MGIT (ml)': 'Volume_WS_per_MGIT',
+                'Volume OADC\nper MGIT (ml)': 'Volume_OADC_per_MGIT',
+                'Volume Culture\nper MGIT (ml)': 'Volume_Culture_per_MGIT'
+            }
+            
+            key = key_mapping.get(header, header)
+            value = row_data.get(key, '')
+            cells.append(ui.tags.td(str(value), style=f"padding: 8px; border: 1px solid #ddd; text-align: center; {row_style}"))
+        data_rows.append(ui.tags.tr(*cells))
+    
+    # Create complete table
+    return ui.tags.table(
+        header_row,
+        *data_rows,
+        style=f"border-collapse: collapse; margin: 15px 0; width: 100%; {table_style}"
+    )
+
 def perform_final_calculations():
     """Perform final calculations for MGIT tubes and working solutions based on two categories:
     1. No stock solution: Recalculate diluent volume using actual weight
@@ -208,12 +386,12 @@ def perform_final_calculations():
             crit_conc = Step2_CriticalConc[drug_idx]
             actual_weight = Step3_ActDrugWeights[drug_idx]
             ws_vol_ml = Step2_VolWS[drug_idx]
+            ws_conc_ugml = Step2_ConcWS[drug_idx]
 
             if make_stock:
                 # Stock solution calculations
                 est_weight = Step2_EstWeights[drug_idx]
                 total_stock_vol = Step2_TotalStockVolumes[drug_idx]
-                ws_conc_ugml = Step2_ConcWS[drug_idx]
                 pot = Step2_Potencies[drug_idx]
                 ml_ali = Step2_mlperAliquot[drug_idx]
 
@@ -1214,6 +1392,9 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         # Create instruction sections
                         instruction_sections = []
 
+                        # Build tables data for display
+                        tables = build_step4_data_tables(final_results, make_stock)
+
                         # 1. Safety Precautions Section
                         instruction_sections.append(
                             ui.tags.div(
@@ -1246,6 +1427,12 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 ui.tags.div(
                                     ui.tags.h3("B. Stock Solution Preparation", 
                                              style="color: #8e44ad; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #8e44ad; padding-bottom: 5px;"),
+                                    # Add Stock Solution table
+                                    create_html_table(
+                                        tables.get('stock_solution', []),
+                                        ['Drug', 'Diluent', 'Drug Weight\n(mg)', 'Total Stock\nVolume (ml)', 'Stock\nConcentration\n(μg/ml)', 'Dilution Factor'],
+                                        table_style="margin-bottom: 20px;"
+                                    ) if 'stock_solution' in tables else ui.tags.div(),
                                     ui.tags.div(
                                         *[ui.tags.div(
                                             ui.tags.h4(f"{result['Drug']} Stock Solution",
@@ -1301,6 +1488,12 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 ui.tags.div(
                                     ui.tags.h3(section_title, 
                                             style="color: #2980b9; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #2980b9; padding-bottom: 5px;"),
+                                    # Add Intermediate Solution table
+                                    create_html_table(
+                                        tables.get('intermediate_solution', []),
+                                        ['Drug', 'Diluent', 'Stock to\nAdd (ml)', 'Diluent to\nAdd(ml)', 'Intermediate\nVol. (ml)', 'Intermediate\nConc. (μg/ml)', 'Dilution Factor'],
+                                        table_style="margin-bottom: 20px;"
+                                    ) if 'intermediate_solution' in tables else ui.tags.div(),
                                     ui.tags.div(
                                         *[ui.tags.div(
                                             ui.tags.h4(f"{result['Drug']} Intermediate Solution",
@@ -1356,6 +1549,22 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             ui.tags.div(
                                 ui.tags.h3(section_title, 
                                          style="color: #2980b9; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #2980b9; padding-bottom: 5px;"),
+                                # Add Working Solution tables based on conditions
+                                create_html_table(
+                                    tables.get('working_solution_intermediate', []),
+                                    ['Drug', 'Diluent', 'Intermediate to\nAdd (ml)', 'Diluent to\nAdd(ml)', 'Volume WS\n(ml)', 'Conc. WS\n(μg/ml)'],
+                                    table_style="margin-bottom: 20px;"
+                                ) if 'working_solution_intermediate' in tables else ui.tags.div(),
+                                create_html_table(
+                                    tables.get('working_solution_stock', []),
+                                    ['Drug', 'Diluent', 'Stock to\nAdd (ml)', 'Diluent to\nAdd(ml)', 'Volume WS\n(ml)', 'Conc. WS\n(μg/ml)'],
+                                    table_style="margin-bottom: 20px;"
+                                ) if 'working_solution_stock' in tables else ui.tags.div(),
+                                create_html_table(
+                                    tables.get('working_solution_no_stock', []),
+                                    ['Drug', 'Diluent', 'Drug Weight\n(mg)', 'Diluent to\nAdd(ml)', 'Conc. WS\n(μg/ml)'],
+                                    table_style="margin-bottom: 20px;"
+                                ) if 'working_solution_no_stock' in tables else ui.tags.div(),
                                 ui.tags.div(
                                     *[ui.tags.div(
                                         ui.tags.h4(f"{result['Drug']} Working Solution",
@@ -1418,6 +1627,12 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 ui.tags.div(
                                     ui.tags.h3("D. Aliquoting Remaining Stock", 
                                              style="color: #27ae60; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #27ae60; padding-bottom: 5px;"),
+                                    # Add Aliquoting table
+                                    create_html_table(
+                                        tables.get('aliquoting', []),
+                                        ['Drug', 'Number of\nAliquots', 'Volume per\nAliquot (ml)'],
+                                        table_style="margin-bottom: 20px;"
+                                    ) if 'aliquoting' in tables else ui.tags.div(),
                                     ui.tags.div(
                                         *[ui.tags.div(
 
@@ -1474,6 +1689,12 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             ui.tags.div(
                                 ui.tags.h3(mgit_section_title, 
                                          style="color: #16a085; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #16a085; padding-bottom: 5px;"),
+                                # Add MGIT Preparation table
+                                create_html_table(
+                                    tables.get('mgit_preparation', []),
+                                    ['Drug', 'Number of\nMGITs', 'Volume WS\nper MGIT (ml)', 'Volume OADC\nper MGIT (ml)', 'Volume Culture\nper MGIT (ml)'],
+                                    table_style="margin-bottom: 20px;"
+                                ),
                                 ui.tags.div(
                                     *[ui.tags.div(
                                         ui.tags.h4(f"{result['Drug']} MGIT Preparation",
