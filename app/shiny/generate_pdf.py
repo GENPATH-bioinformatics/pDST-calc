@@ -88,21 +88,13 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
             table2_data = [
                 ['Drug','Potency', 'Working Solution\nConcentration\n(μg/ml)', 'Working Solution\nVolume (ml)']
             ]
-            # Working Solution Planning
-            table3_data = [
-                ['Drug', 'Calculated Drug\nWeight (mg)', 'Diluent Volume\n(ml)']
-            ]
             # Aliquot Planning
             table4_data = [ 
                 ['Drug', 'Number of\nAliquots', 'Volume per\nAliquot (ml)', 'Total Aliquot\nVolume (ml)']
             ]
-            # Work Solution Preparation
-            table5_data = [ 
-                ['Drug', 'Volume of\nStock (ml)', 'Volume Diluent\n(ml)']
-            ]
             # Stock Solution Preparation
             table6_data = [ 
-                ['Drug', 'Stock Conc.\nIncrease Factor', 'Total Stock\nVolume (ml)', 'Drug to\nWeigh Out\n(mg)']
+                ['Drug', 'Drug to\nWeigh Out\n(mg)']
             ]
             # Actual Weighed Value
             table7_data = [ 
@@ -133,14 +125,6 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                     ]
                     table2_data.append(row)
                     
-                    # Table 3: Working Solution Planning
-                    row = [
-                        Paragraph(drug_name, styles['Normal']),
-                        f"{step2_data['CalEstWeights'][drug_idx] or 0:.2f}",
-                        f"{step2_data['VolWS'][drug_idx]:.2f}"
-                    ]
-                    table3_data.append(row)
-                    
                     # Table 4: Aliquot Planning
                     row = [
                         Paragraph(drug_name, styles['Normal']),
@@ -150,19 +134,9 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                     ]
                     table4_data.append(row)
                     
-                    # Table 5: Working Solution Preparation
-                    row = [
-                        Paragraph(drug_name, styles['Normal']),
-                        f"{step2_data['StocktoWS'][drug_idx] or 0:.4f}",
-                        f"{step2_data['DiltoWS'][drug_idx] or 0:.4f}"
-                    ]
-                    table5_data.append(row)
-                    
                     # Table 6: Stock Solution Preparation
                     row = [ 
                         Paragraph(drug_name, styles['Normal']),
-                        f"{step2_data['Factors'][drug_idx] or 0:.2f}",
-                        f"{step2_data['TotalStockVolumes'][drug_idx] or 0:.2f}",
                         f"{step2_data['EstWeights'][drug_idx] or 0:.2f}"
                     ]
                     table6_data.append(row)
@@ -211,23 +185,6 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                 ('WORDWRAP', (0, 0), (-1, -1), True),
             ]))
 
-            table3 = Table(table3_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
-            table3.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('WORDWRAP', (0, 0), (-1, -1), True),
-            ]))
-
-
             table4 = Table(table4_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
             table4.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightyellow),
@@ -244,23 +201,7 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                 ('WORDWRAP', (0, 0), (-1, -1), True),
             ]))
 
-            table5 = Table(table5_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch])
-            table5.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('WORDWRAP', (0, 0), (-1, -1), True),
-            ]))
-
-            table6 = Table(table6_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+            table6 = Table(table6_data, colWidths=[1.8*inch, 1.5*inch])
             table6.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.pink),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
@@ -296,12 +237,8 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
             content.append(table1)
             content.append(Paragraph("Calculations", subtitle_style))
             content.append(table2)
-            content.append(Paragraph("Working Solution Planning", subtitle_style))
-            content.append(table3)
             content.append(Paragraph("Aliquot Planning", subtitle_style))
             content.append(table4)
-            content.append(Paragraph("Work Solution Preparation", subtitle_style))
-            content.append(table5)
             content.append(Paragraph("Stock Solution Preparation", subtitle_style))
             content.append(table6)
             content.append(Paragraph("Enter Weighed Value", subtitle_style))
