@@ -226,7 +226,7 @@ def perform_final_calculations():
                 num_aliquots = floor(total_stock_left / ml_ali)
                 Final_stock_conc = calc_concentration_times_factor(ws_conc_ugml, new_a_val)
                 
-                if stock_vol_to_add_to_ws_ml >= 0.2:
+                if stock_vol_to_add_to_ws_ml >= 0.1:
                     final_results.append({
                         'Intermediate': False,
                         'Drug': drug_name,
@@ -1930,7 +1930,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the volume per aliquot, or (3) increasing the stock concentration factor to achieve a practical weight."
                                                 )
                                                 # Validation 2: Check if stock volume is less than 250 microliters (0.25 ml) when aliquots are NOT being made
-                                            if stock_vol_ml < 0.2:
+                                            if stock_vol_ml < 0.1:
                                                 validation_messages.append(
                                                     f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the volume of working solution by increasing the number of MGIT tubes.\nAlternatively, an intermediate dilution will be generated."
                                                 )
