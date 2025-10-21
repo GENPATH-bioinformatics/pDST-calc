@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -300,6 +300,48 @@ class DatabaseManager:
                 return sessiones
         except sqlite3.Error as e:
             logger.error(f"Error getting sessiones: {e}")
+            return []
+
+    def create_session(self, user_id: int, session_name: str, preparation: Dict[str, Any] = None) -> Optional[int]:
+        """Create a new session and return session ID."""
+        try:
+            prep_json = json.dumps(preparation) if preparation else json.dumps({})
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "INSERT INTO session (user_id, session_name, preparation) VALUES (?, ?, ?)",
+                    (user_id, session_name, prep_json)
+                )
+                conn.commit()
+                return cursor.lastrowid
+        except sqlite3.Error as e:
+            logger.error(f"Error creating session: {e}")
+            return None
+
+    def delete_session(self, session_id: int, user_id: int) -> bool:
+        """Delete a session (with user verification for security)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "DELETE FROM session WHERE session_id = ? AND user_id = ?",
+                    (session_id, user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"Error deleting session: {e}")
+            return False
+
+    def get_user_sessions(self, user_id: int) -> List[Tuple]:
+        """Get all sessions for a user as list of tuples (session_id, session_name, session_date, preparation)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "SELECT session_id, session_name, session_date, preparation FROM session WHERE user_id = ? ORDER BY session_date DESC",
+                    (user_id,)
+                )
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logger.error(f"Error getting user sessions: {e}")
             return []
 
 # Global database manager instance

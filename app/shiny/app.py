@@ -20,6 +20,10 @@ from lib.dst_calc import (
 from lib.supp_calc import ml_to_ul, ul_to_ml
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
+from app.shiny.session_handler import SessionHandler
+
+# Create session handler instance
+session_handler = SessionHandler(db_manager)
 
 # Import PDF generation functions from the separate module
 from app.shiny.generate_pdf import generate_step2_pdf as generate_step2_pdf_module, generate_step4_pdf as generate_step4_pdf_backend
@@ -28,6 +32,7 @@ from app.shiny.generate_pdf import generate_step2_pdf as generate_step2_pdf_modu
 def get_drug_inputs(drug_index, fallback_session_data=None):
     """Get all inputs for a specific drug with session fallback."""
     try:
+        # Try to get inputs from Shiny controls
         inputs = {
             'custom_crit': input[f"custom_critical_{drug_index}"](),
             'purch_molw': input[f"purchased_molw_{drug_index}"](),
@@ -51,6 +56,18 @@ def get_drug_inputs(drug_index, fallback_session_data=None):
         return inputs
     except Exception as e:
         print(f"Error getting drug inputs for index {drug_index}: {e}")
+        
+        # If Shiny controls fail, try to use session data directly
+        if fallback_session_data:
+            print(f"Using session data directly for drug {drug_index}")
+            return {
+                'custom_crit': fallback_session_data.get('Crit_Conc(mg/ml)'),
+                'purch_molw': fallback_session_data.get('PurMol_W(g/mol)'),
+                'stock_vol': fallback_session_data.get('St_Vol(ml)'),
+                'actual_weight': fallback_session_data.get('Act_DrugW(mg)'),
+                'mgit_tubes': fallback_session_data.get('Total Mgit tubes')
+            }
+        
         return None
 
 def build_step2_data_structure():
@@ -243,183 +260,99 @@ def get_estimated_weight(drug_index):
             return estimated_weights[drug_index]
     return 0
 
-def build_step4_data_tables(final_results, make_stock):
-    """Build HTML tables for Step 4 data that match the PDF tables."""
-    drug_data = load_drug_data()
+def perform_final_calculations_from_session(session_data):
+    """Perform final calculations using data directly from session instead of global arrays"""
+    print("perform_final_calculations_from_session: Starting")
     
-    tables = {}
-    
-    # Table 1: Stock Solution Calculations
-    if make_stock:
-        table1_data = []
-        for result in final_results:
-            drug_name = result.get('Drug', '')
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+    try:
+        # Extract data from session
+        selected_drugs = session_data.get('selected_drugs', [])
+        inputs = session_data.get('inputs', {})
+        
+        if not selected_drugs:
+            print("perform_final_calculations_from_session: No drugs in session")
+            return []
+        
+        print(f"perform_final_calculations_from_session: Processing {len(selected_drugs)} drugs")
+        
+        drug_data = load_drug_data()
+        final_results = []
+        make_stock = False  # For completed sessions, typically no stock solution
+        
+        # Process each drug using session data
+        for drug_idx, drug_name in enumerate(selected_drugs):
+            # Get drug data from session inputs (need to check both formats)
+            drug_inputs = inputs.get(str(drug_idx), {})
             
-            table1_data.append({
-                'Drug': drug_name,
-                'Diluent': diluent,
-                'Drug_Weight': f"{result.get('Act_Weight', 0):.2f}",
-                'Total_Stock_Vol': f"{result.get('Total_Stock_Vol', 0):.2f}",
-                'Stock_Conc': f"{result.get('Stock_Conc', 0):.2f}",
-                'Dilution_Factor': f"{result.get('Stock_Factor', 0):.1f}"
-            })
-        tables['stock_solution'] = table1_data
-    
-    # Table 2: Intermediate Solutions
-    intermediate_data = []
-    for result in final_results:
-        if result.get('Intermediate') == True:
-            drug_name = result.get('Drug', '')
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            # Also check by drug name or ID as key
+            if not drug_inputs:
+                # Look for drug data by name or find first matching entry
+                drug_data_obj = load_drug_data()
+                drug_row = drug_data_obj[drug_data_obj['Drug'] == drug_name]
+                if not drug_row.empty:
+                    drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(drug_idx)
+                    drug_inputs = inputs.get(drug_id, {})
             
-            intermediate_data.append({
-                'Drug': drug_name,
-                'Diluent': diluent,
-                'Stock_to_Add': f"{result.get('Stock_to_Inter', 0):.2f}",
-                'Diluent_to_Add': f"{result.get('Dil_to_Inter', 0):.2f}",
-                'Intermediate_Vol': f"{result.get('Dil_to_Inter', 0):.2f}",
-                'Intermediate_Conc': f"{result.get('Inter_Conc', 0):.2f}",
-                'Dilution_Factor': f"{result.get('Inter_Factor', 0):.1f}"
-            })
-    if intermediate_data:
-        tables['intermediate_solution'] = intermediate_data
-    
-    # Table 3: Working Solution from Intermediate
-    ws_intermediate_data = []
-    for result in final_results:
-        if result.get('Intermediate') == True:
-            drug_name = result.get('Drug', '')
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            if not drug_inputs:
+                print(f"perform_final_calculations_from_session: No inputs for drug {drug_idx} ({drug_name})")
+                print(f"perform_final_calculations_from_session: Available input keys: {list(inputs.keys())}")
+                continue
             
-            ws_intermediate_data.append({
-                'Drug': drug_name,
-                'Diluent': diluent,
-                'Intermediate_to_Add': f"{result.get('Vol_Inter_to_WS', 0):.2f}",
-                'Diluent_to_Add': f"{result.get('Dil_to_WS', 0):.4f}",
-                'Volume_WS': f"{result.get('Dil_to_WS', 0) + result.get('Vol_Inter_to_WS', 0):.4f}",
-                'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
-            })
-    if ws_intermediate_data:
-        tables['working_solution_intermediate'] = ws_intermediate_data
-    
-    # Table 4: Working Solution from Stock
-    ws_stock_data = []
-    for result in final_results:
-        if make_stock and result.get('Intermediate') == False:
-            drug_name = result.get('Drug', '')
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            print(f"perform_final_calculations_from_session: Found inputs for drug {drug_idx}: {drug_inputs}")
             
-            ws_stock_data.append({
-                'Drug': drug_name,
-                'Diluent': diluent,
-                'Stock_to_Add': f"{result.get('Stock_to_WS', 0):.2f}",
-                'Diluent_to_Add': f"{result.get('Dil_to_WS', 0):.2f}",
-                'Volume_WS': f"{result.get('Dil_to_WS', 0) + result.get('Stock_to_WS', 0):.2f}",
-                'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
-            })
-    if ws_stock_data:
-        tables['working_solution_stock'] = ws_stock_data
-    
-    # Table 5: Working Solution No Stock
-    ws_no_stock_data = []
-    for result in final_results:
-        if not make_stock:
-            drug_name = result.get('Drug', '')
-            drug_row = drug_data[drug_data['Drug'] == drug_name]
-            diluent = drug_row['Diluent'].iloc[0] if not drug_row.empty else 'Unknown'
+            # Extract values from session data (handle both key formats)
+            actual_weight = drug_inputs.get('Act_DrugW(mg)', drug_inputs.get('actual_weight', 0))
+            mgit_tubes = drug_inputs.get('Total Mgit tubes', drug_inputs.get('mgit_tubes', 2))
+            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', drug_inputs.get('custom_crit', None))
+            purch_molw = drug_inputs.get('PurMol_W(g/mol)', drug_inputs.get('purch_molw', None))
             
-            ws_no_stock_data.append({
+            # Get default values from drug database if not in session
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            if drug_row.empty:
+                print(f"perform_final_calculations_from_session: Drug {drug_name} not found in database")
+                continue
+                
+            if custom_crit is None:
+                custom_crit = drug_row.iloc[0]['Critical_Concentration']
+            if purch_molw is None:
+                purch_molw = drug_row.iloc[0]['OrgMolecular_Weight']
+            
+            print(f"perform_final_calculations_from_session: Drug {drug_name} - actual_weight={actual_weight}, mgit_tubes={mgit_tubes}, custom_crit={custom_crit}")
+            
+            # Calculate working solution values
+            org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
+            pot = potency(purch_molw, org_molw)
+            ws_conc_ugml = conc_ws(custom_crit)
+            vol_ws_ml = vol_workingsol(mgit_tubes)
+            est_dw_mg = (ws_conc_ugml * vol_ws_ml * pot) / 1000.0
+            
+            # Calculate final diluent volume
+            final_vol_diluent = calc_adjusted_volume(actual_weight, est_dw_mg, vol_ws_ml)
+            
+            print(f"perform_final_calculations_from_session: Calculated - ws_conc={ws_conc_ugml}, vol_ws={vol_ws_ml}, est_weight={est_dw_mg}, final_vol_diluent={final_vol_diluent}")
+            
+            # Create result entry
+            final_results.append({
+                'Intermediate': False,
                 'Drug': drug_name,
-                'Diluent': diluent,
-                'Drug_Weight': f"{result.get('Act_Weight', 0):.4f}",
-                'Diluent_to_Add': f"{result.get('Final_Vol_Dil', 0):.4f}",
-                'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
+                'Diluent': drug_row.iloc[0]['Diluent'],
+                'Crit_Conc': round(custom_crit, 2),
+                'Act_Weight': round(actual_weight, 2),
+                'Final_Vol_Dil_µl': ml_to_ul(final_vol_diluent),
+                'Final_Vol_Dil': round(final_vol_diluent, 2),
+                'Conc_Ws': round(ws_conc_ugml, 2),
+                'MGIT_Tubes': round(mgit_tubes),
             })
-    if ws_no_stock_data:
-        tables['working_solution_no_stock'] = ws_no_stock_data
-    
-    # Table 6: Aliquoting
-    if make_stock:
-        aliquot_data = []
-        for result in final_results:
-            drug_name = result.get('Drug', '')
-            aliquot_data.append({
-                'Drug': drug_name,
-                'Number_of_Aliquots': f"{result.get('Number_of_Ali', 0):.0f}",
-                'Volume_per_Aliquot': f"{result.get('ml_aliquot', 0):.1f}"
-            })
-        tables['aliquoting'] = aliquot_data
-    
-    # Table 7: MGIT Tube Preparation
-    mgit_data = []
-    for result in final_results:
-        drug_name = result.get('Drug', '')
-        mgit_data.append({
-            'Drug': drug_name,
-            'Number_of_MGITs': f"{result.get('MGIT_Tubes', 0):.0f}",
-            'Volume_WS_per_MGIT': "0.1",
-            'Volume_OADC_per_MGIT': "0.8",
-            'Volume_Culture_per_MGIT': "0.5"
-        })
-    tables['mgit_preparation'] = mgit_data
-    
-    return tables
+        
+        print(f"perform_final_calculations_from_session: Generated {len(final_results)} results")
+        return final_results
+        
+    except Exception as e:
+        import traceback
+        print(f"perform_final_calculations_from_session: Error: {e}")
+        print(f"perform_final_calculations_from_session: Traceback: {traceback.format_exc()}")
+        return []
 
-def create_html_table(data, headers, table_style="", header_style="", row_style=""):
-    """Create an HTML table from data."""
-    if not data:
-        return ui.tags.div()
-    
-    # Create header row
-    header_row = ui.tags.tr(
-        *[ui.tags.th(header, style=f"padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; text-align: center; {header_style}") 
-          for header in headers]
-    )
-    
-    # Create data rows
-    data_rows = []
-    for row_data in data:
-        cells = []
-        for header in headers:
-            # Convert header to key format - specific mapping for each header
-            key_mapping = {
-                'Drug': 'Drug',
-                'Diluent': 'Diluent',
-                'Drug Weight\n(mg)': 'Drug_Weight',
-                'Total Stock\nVolume (ml)': 'Total_Stock_Vol',
-                'Stock\nConcentration\n(μg/ml)': 'Stock_Conc',
-                'Dilution Factor': 'Dilution_Factor',
-                'Stock to\nAdd (ml)': 'Stock_to_Add',
-                'Diluent to\nAdd(ml)': 'Diluent_to_Add',
-                'Intermediate\nVol. (ml)': 'Intermediate_Vol',
-                'Intermediate\nConc. (μg/ml)': 'Intermediate_Conc',
-                'Intermediate to\nAdd (ml)': 'Intermediate_to_Add',
-                'Volume WS\n(ml)': 'Volume_WS',
-                'Conc. WS\n(μg/ml)': 'Conc_WS',
-                'Number of\nAliquots': 'Number_of_Aliquots',
-                'Volume per\nAliquot (ml)': 'Volume_per_Aliquot',
-                'Number of\nMGITs': 'Number_of_MGITs',
-                'Volume WS\nper MGIT (ml)': 'Volume_WS_per_MGIT',
-                'Volume OADC\nper MGIT (ml)': 'Volume_OADC_per_MGIT',
-                'Volume Culture\nper MGIT (ml)': 'Volume_Culture_per_MGIT'
-            }
-            
-            key = key_mapping.get(header, header)
-            value = row_data.get(key, '')
-            cells.append(ui.tags.td(str(value), style=f"padding: 8px; border: 1px solid #ddd; text-align: center; {row_style}"))
-        data_rows.append(ui.tags.tr(*cells))
-    
-    # Create complete table
-    return ui.tags.table(
-        header_row,
-        *data_rows,
-        style=f"border-collapse: collapse; margin: 15px 0; width: 100%; {table_style}"
-    )
 
 def perform_final_calculations():
     """Perform final calculations for MGIT tubes and working solutions based on two categories:
@@ -428,9 +361,23 @@ def perform_final_calculations():
     """
     print("perform_final_calculations: Starting")
     
-    print(f"perform_final_calculations: Processing {len(selected)} drugs")
-    
     try:
+        # First check if this is a completed session with session data available
+        cs = current_session()
+        if cs and current_step() == 4:
+            try:
+                with db_manager.get_connection() as conn:
+                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        import json
+                        preparation = json.loads(row[0])
+                        if preparation.get('inputs') and preparation.get('selected_drugs'):
+                            print("perform_final_calculations: Using session data for completed session")
+                            return perform_final_calculations_from_session(preparation)
+            except Exception as e:
+                print(f"perform_final_calculations: Could not use session data: {e}")
+        
         # Get selected drugs and preferences
         selected = input.drug_selection()
         if not selected:
@@ -443,6 +390,10 @@ def perform_final_calculations():
         # Debug: Check if Step3 data exists
         print(f"perform_final_calculations: Step3_ActDrugWeights = {Step3_ActDrugWeights[:len(selected)]}")
         print(f"perform_final_calculations: Step2_MgitTubes = {Step2_MgitTubes[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_CriticalConc = {Step2_CriticalConc[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_VolWS = {Step2_VolWS[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_ConcWS = {Step2_ConcWS[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_EstWeights = {Step2_EstWeights[:len(selected)]}")
         
         drug_data = load_drug_data()
         final_results = []
@@ -453,6 +404,7 @@ def perform_final_calculations():
             crit_conc = Step2_CriticalConc[drug_idx]
             actual_weight = Step3_ActDrugWeights[drug_idx]
             ws_vol_ml = Step2_VolWS[drug_idx]
+            ws_conc_ugml = Step2_ConcWS[drug_idx]
             ws_conc_ugml = Step2_ConcWS[drug_idx]
 
             if make_stock:
@@ -559,7 +511,9 @@ def perform_final_calculations():
         return final_results
         
     except Exception as e:
+        import traceback
         print(f"perform_final_calculations: Error: {e}")
+        print(f"perform_final_calculations: Traceback: {traceback.format_exc()}")
         return []
 
 
@@ -3380,34 +3334,14 @@ def handle_session_card_click():
         completed = bool(preparation and preparation.get('step', 0) >= 3 and preparation.get('results'))
         
         if completed:
-            # View results for completed session - show read-only results
-            # Set a flag to show results view instead of editable form
-            show_results_view.set(True)
-            current_session.set({'session_id': int(clicked_sid), 'session_name': preparation.get('session_name') or ''})
-            
-            # Store the session data for the results view
-            session_data.set({
-                'preparation': preparation,
-                'selected_drugs': preparation.get('selected_drugs', []),
-                'volume_unit': preparation.get('volume_unit', 'ml'),
-                'weight_unit': preparation.get('weight_unit', 'mg'),
-                'inputs': preparation.get('inputs', {}),
-                'results': preparation.get('results', {}),
-                'step': preparation.get('step', 3)
-            })
-            
-            ui.update_navs("tab", selected="B")
-        else:
-            # Continue incomplete session
-            print(f"Continuing incomplete session: {clicked_sid}")
-            print(f"Session preparation data: {preparation}")
+            # View completed session as step 4
+            print(f"Viewing completed session: {clicked_sid}")
             
             # Make sure we're not in results view mode
             show_results_view.set(False)
-            print(f"Set show_results_view to: {show_results_view()}")
             
-            # First, navigate to Tab B
-            ui.update_navs("tab", selected="B")
+            # Navigate to Calculator tab
+            ui.update_navs("tab", selected="Calculator")
             
             # Update current session
             current_session.set({'session_id': int(clicked_sid), 'session_name': preparation.get('session_name') or ''})
@@ -3424,9 +3358,94 @@ def handle_session_card_click():
                 print(f"Restoring weight unit: {preparation['weight_unit']}")
                 weight_unit.set(preparation['weight_unit'])
                 ui.update_select("weight_unit", selected=preparation['weight_unit'])
-            if 'step' in preparation:
-                print(f"Restoring step: {preparation['step']}")
-                current_step.set(preparation['step'])
+            
+            # Set to step 4 to show final results
+            current_step.set(4)
+            print(f"Set completed session to step 4")
+            
+            # Store inputs for later restoration after UI is ready
+            if 'inputs' in preparation:
+                print(f"Restoring inputs: {preparation['inputs']}")
+                session_inputs.set(preparation['inputs'])
+                
+                # Calculate final results directly from session data
+                print("Calculating final results from session data")
+                session_final_results = perform_final_calculations_from_session(preparation)
+                if session_final_results:
+                    print(f"Calculated {len(session_final_results)} final results from session")
+                    calculation_results.set({'final_results': session_final_results})
+                    calculate_clicked.set(True)
+                    final_calculation_done.set(True)
+                else:
+                    print("No final results calculated from session")
+            
+            # Restore results if they exist in the session
+            if 'results' in preparation and preparation['results']:
+                print(f"Also restoring stored results: {preparation['results']}")
+                stored_results = preparation['results']
+                if 'final_results' in stored_results:
+                    calculation_results.set(stored_results)
+                    calculate_clicked.set(True)
+                    final_calculation_done.set(True)
+            
+            print(f"Successfully loaded completed session {clicked_sid} at step 4")
+        else:
+            # Continue incomplete session
+            print(f"Continuing incomplete session: {clicked_sid}")
+            print(f"Session preparation data: {preparation}")
+            
+            # Make sure we're not in results view mode
+            show_results_view.set(False)
+            print(f"Set show_results_view to: {show_results_view()}")
+            
+            # Navigate to Calculator tab
+            ui.update_navs("tab", selected="Calculator")
+            
+            # Update current session
+            current_session.set({'session_id': int(clicked_sid), 'session_name': preparation.get('session_name') or ''})
+            
+            # Restore session state
+            if 'selected_drugs' in preparation:
+                print(f"Restoring selected drugs: {preparation['selected_drugs']}")
+                ui.update_selectize("drug_selection", selected=preparation['selected_drugs'])
+            if 'volume_unit' in preparation:
+                print(f"Restoring volume unit: {preparation['volume_unit']}")
+                volume_unit.set(preparation['volume_unit'])
+                ui.update_select("vol_unit", selected=preparation['volume_unit'])
+            if 'weight_unit' in preparation:
+                print(f"Restoring weight unit: {preparation['weight_unit']}")
+                weight_unit.set(preparation['weight_unit'])
+                ui.update_select("weight_unit", selected=preparation['weight_unit'])
+            
+            # Intelligent step determination based on actual data content
+            selected_drugs_data = preparation.get('selected_drugs', [])
+            inputs = preparation.get('inputs', {})
+            
+            if not selected_drugs_data or len(selected_drugs_data) == 0:
+                # No drugs selected - start from step 1 (drug selection)
+                current_step_val = 1
+                print(f"Session has no drugs selected - starting from step 1")
+            else:
+                # Check if any drugs have actual weights
+                has_weights = False
+                for drug_name in selected_drugs_data:
+                    drug_data = inputs.get(drug_name, {})
+                    actual_weight = drug_data.get('Act_DrugW(mg)')
+                    if actual_weight is not None and actual_weight != "" and actual_weight != 0:
+                        has_weights = True
+                        break
+                
+                if not has_weights:
+                    # Drugs selected but no weights entered - start from step 3 (weight entry)
+                    current_step_val = 3
+                    print(f"Session has drugs but no weights - starting from step 3")
+                else:
+                    # Has drugs and weights - start from step 4 (final results/calculations)
+                    current_step_val = 4
+                    print(f"Session has weights - starting from step 4")
+            
+            print(f"Determined step: {current_step_val}")
+            current_step.set(current_step_val)
             
             # Store inputs for later restoration after UI is ready
             if 'inputs' in preparation and preparation['inputs']:
