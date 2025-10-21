@@ -2171,7 +2171,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                 validation_messages.append(
                                                     f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.2f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the volume per aliquot, or (3) increasing the stock concentration factor to achieve a practical weight."
                                                 )
-                                                # Validation 2: Check if stock volume is less than 250 microliters (0.25 ml) when aliquots are NOT being made
+                                                # Validation 2: Check if stock volume is less than 100 microliters (0.1 ml) when aliquots are NOT being made
                                             if stock_vol_ml < 0.1:
                                                 validation_messages.append(
                                                     f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.2f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the volume of working solution by increasing the number of MGIT tubes.\nAlternatively, an intermediate dilution will be generated."
