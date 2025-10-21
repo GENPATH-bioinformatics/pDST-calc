@@ -471,7 +471,7 @@ def perform_final_calculations():
                 num_aliquots = floor(total_stock_left / ml_ali)
                 Final_stock_conc = calc_concentration_times_factor(ws_conc_ugml, new_a_val)
                 
-                if stock_vol_to_add_to_ws_ml >= 0.2:
+                if stock_vol_to_add_to_ws_ml >= 0.1:
                     final_results.append({
                         'Intermediate': False,
                         'Drug': drug_name,
@@ -2215,24 +2215,24 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             # Validation 1: Check if drug to weigh out is less than 2 mg (WITH aliquots)
                                             if drug_to_weigh < 2.0:
                                                 validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.4f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the volume per aliquot, or (3) increasing the stock concentration factor to achieve a practical weight."
+                                                    f"⚠️ {r['Drug']}: Drug weight ({drug_to_weigh:.2f} mg) is less than 2 mg.\nConsider (1) increasing the number of aliquots, (2) increasing the volume per aliquot, or (3) increasing the stock concentration factor to achieve a practical weight."
                                                 )
-                                                # Validation 2: Check if stock volume is less than 250 microliters (0.25 ml) when aliquots are NOT being made
-                                            if stock_vol_ml < 0.2:
+                                                # Validation 2: Check if stock volume is less than 100 microliters (0.1 ml) when aliquots are NOT being made
+                                            if stock_vol_ml < 0.1:
                                                 validation_messages.append(
-                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.4f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the volume of working solution by increasing the number of MGIT tubes.\nAlternatively, an intermediate dilution will be generated."
+                                                    f"⚠️ {r['Drug']}: Stock solution volume ({stock_vol_ml:.2f} ml = {stock_vol_ml * 1000:.1f} μl) might be too small to pipette.\nConsider (1) decreasing the stock concentration factor, or (2) increasing the volume of working solution by increasing the number of MGIT tubes.\nAlternatively, an intermediate dilution will be generated."
                                                 )
                                             
                                             # Validation 3: Check Bedaquiline volume constraints (polystyrene tube limits)
                                             if r['Drug'] == "Bedaquiline (BDQ)":
                                                 if total_stock_vol > 5.0:
                                                     validation_messages.append(
-                                                        f"❌ {r['Drug']}: Total stock volume ({total_stock_vol:.4f} ml) exceeds 5ml polystyrene tube limit.\nReduce the stock concentration factor or number of aliquots tubes to keep volume ≤ 5ml."
+                                                        f"❌ {r['Drug']}: Total stock volume ({total_stock_vol:.2f} ml) exceeds 5ml polystyrene tube limit.\nReduce the stock concentration factor or number of aliquots tubes to keep volume ≤ 5ml."
                                                     )
                                                 vol_ws_ml = r.get('Vol_WS_ml_num', 0)
                                                 if vol_ws_ml > 5.0:
                                                     validation_messages.append(
-                                                        f"❌ {r['Drug']}: Working solution volume ({vol_ws_ml:.4f} ml) exceeds 5ml polystyrene tube limit.\nReduce the number of MGIT tubes to keep volume ≤ 5ml."
+                                                        f"❌ {r['Drug']}: Working solution volume ({vol_ws_ml:.2f} ml) exceeds 5ml polystyrene tube limit.\nReduce the number of MGIT tubes to keep volume ≤ 5ml."
                                                     )
                                         
                                         aliquot_summary_rows.append(
