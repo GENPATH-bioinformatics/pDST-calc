@@ -153,7 +153,5 @@ Calculates the remaining stock solution volume for inventory management and wast
 - **Volumes:** mL for all volume measurements
 - **Weights:** mg for drug weights
 - **Molecular Weights:** g/mol
-- **Potency:** Dimensionless ratio
-- **Factors:** Dimensionless multipliers
 
 All calculations maintain unit consistency and include appropriate conversion factors (e.g., ×1000 for mg to μg conversions).
