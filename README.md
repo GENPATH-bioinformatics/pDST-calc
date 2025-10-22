@@ -1,75 +1,95 @@
 # DST Calculator
 
-This project provides a Drug Susceptibility Testing (DST) calculator with both a command-line interface (CLI) and a Shiny for Python web app.
+A comprehensive **Phenotypic Drug Susceptibility Testing (pDST) Calculator** for tuberculosis research and clinical laboratories. This project provides both command-line and web-based interfaces for calculating drug concentrations, solution preparations, and laboratory protocols.
+
+## Key Features
+
+- **🧪 4-Step Laboratory Workflow:** Drug selection → Parameters → Weight entry → Solution preparation guide
+- **👤 User Authentication & Sessions:** Secure user accounts with persistent session management
+- **🔄 Intelligent Session Restoration:** Automatically resume work at the correct step based on saved data
+- **📊 Comprehensive Calculations:** Stock solutions, working solutions, intermediate dilutions with safety considerations
+- **📄 PDF Protocol Generation:** Professional laboratory protocols for Steps 2 and 4
+- **⚡ Real-time Validation:** Input validation with helpful warnings and error messages
+- **🔧 Flexible Unit Support:** Customizable units for weight, volume, and concentration measurements
+- **💻 Dual Interface:** Full-featured web app and command-line interface for different workflows
+
+## Quick Start
+
+1. **Clone and install:**
+   ```bash
+   git clone <repo-url> dstcalc
+   cd dstcalc
+   uv sync
+   ```
+
+2. **Launch the web app:**
+   ```bash
+   uv run shiny run app/shiny/app.py --port 8001
+   ```
+
+3. **Open your browser:** http://localhost:8001
+
+4. **Get started:**
+   - Sign up for an account in the "Account & Sessions" tab
+   - Create a new session and start calculating!
 
 ## Requirements
 
 - Python 3.11+
-- [uv](https://docs.astral.sh/uv/)
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 ## Installation
 
+### Option 1: Using uv (Recommended)
 1. Clone the repository:
    ```bash
    git clone <repo-url> dstcalc
    cd dstcalc
    ```
-2. Install dependencies (for development or quick setup):
+2. Install dependencies:
    ```bash
    uv sync
    ```
-   - `uv.lock` is provided for developer convenience and compatibility with tools and platforms that expect it.
+
+### Option 2: Using pip
+1. Clone the repository:
+   ```bash
+   git clone <repo-url> dstcalc
+   cd dstcalc
+   ```
+2. Create virtual environment and install:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -e .
+   ```
 
 ## Using the CLI
 
-The CLI supports multiple modes of operation:
+The command-line interface provides a text-based workflow for automated processing and batch operations:
 
-### 1. Interactive Mode (Default)
+### Interactive Mode
 
-Run the CLI interactively, answering prompts as you go:
-
-```bash
-uv run pdst-calc
-```
-
-This will prompt you for:
-- Session name for logging
-- Drug selection
-- Custom critical values (optional)
-- Purchased molecular weights
-- Stock solution volumes
-- Actual weighed drug amounts
-- Number of MGIT tubes
-
-### 2. File-Based Mode
-
-#### Using Custom Drug Data
-
-Load drug data from a custom CSV file instead of the default database:
+Run the CLI interactively with step-by-step prompts:
 
 ```bash
-uv run pdst-calc --drug-data data/my_drugs.csv
+uv run python app/cli/main.py
 ```
 
-#### Single Test Input
+**Features:**
+- **User Authentication:** Login to existing accounts or create new ones
+- **Session Management:** Create and load previous calculation sessions  
+- **Step-by-step Input:** Guided prompts for all calculation parameters
+- **Automatic Calculations:** Real-time computation of drug weights and dilutions
+- **File Output:** Results saved to structured log files and CSV formats
 
-Run one automated test case from a CSV file:
-
-```bash
-uv run python src/cli/main.py --single-test-input tests/my_test.csv
-(eg. uv run python src/cli/main.py --single-test-input tests/test_2.csv)
-uv run pdst-calc --single-test-input tests/my_test.csv
-(eg. uv run pdst-calc --single-test-input tests/test_2.csv)
-```
-
-#### Batch Testing
-
-Run multiple test cases from a CSV file:
-
-```bash
-uv run pdst-calc --test-input tests/batch_tests.csv --test-output results.log
-
-```
+**Interactive Workflow:**
+1. **Authentication:** Sign in or create account
+2. **Session Selection:** Start new session or continue existing one
+3. **Drug Selection:** Choose from comprehensive drug database
+4. **Parameter Input:** Enter critical concentrations, molecular weights, volumes
+5. **Weight Entry:** Input actual weighed amounts and tube counts
+6. **Results:** View formatted results and save to files
 
 #### With Custom Session Name
 
@@ -79,77 +99,75 @@ Bypass the interactive session name prompt:
 uv run pdst-calc --session-name "experiment_001"
 ```
 
-### 3. Combined Modes
-
-You can combine different options:
-
-```bash
-# Custom drug data + single test + custom session
-uv run python src/cli/main.py --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
-uv run pdst-calc --drug-data data/my_drugs.csv --single-test-input tests/test.csv --session-name "john_experiment"
-
-# Batch testing with error logging
-uv run pdst-calc --test-input tests/all_tests.csv --test-output test_results.log --session-name "batch_run"
-```
-
 ## Using the Shiny App
 
-- Run the app:
-  ```bash
-  uv run shiny run app/shiny/app.py --port 8001
-  ```
-- Workflow (3 steps):
-  - Drug Selection: choose one or more drugs. The table shows original molecular weight, default diluent, and critical concentration. Header units reflect your sidebar unit choices.
-  - Parameters: enter stock volume, purchased molecular weight, and critical concentration. Click "Calculate" to see estimated weights; then click "Next".
-  - Final Results: enter actual weighed values and number of MGIT tubes, then click "Calculate Final Results" to show final volumes. After results are shown, the button becomes "New Calculation" to reset and start again.
-- Unit preferences (sidebar):
+1. **Start the application:**
+   ```bash
+   uv run shiny run app/shiny/app.py --port 8001
+   ```
+   
+2. **Open your web browser and visit:** `http://localhost:8001`
+
+### Application Workflow
+
+The DST Calculator features a comprehensive 4-step workflow with user authentication and intelligent session management:
+
+#### Account & Sessions Tab
+- **User Authentication:** 
+  - Sign up for a new account or log in to existing credentials
+  - User management with secure password handling
+- **Session Management:** 
+  - View all your calculation sessions in organized cards
+  - Create new sessions with custom names
+  - Sessions show completion status (In Progress vs Completed)
+- **Intelligent Session Restoration:** 
+  - Click any session to continue exactly where you left off
+  - Automatic step detection based on saved data:
+    - **Empty sessions** → Start at Step 1 (Drug Selection)
+    - **Drugs selected, no actual weights** → Resume at Step 3 (Weight Entry)
+    - **Complete sessions** → View in Step 4 results format
+  - All inputs and calculations are automatically preserved
+
+#### Calculator Tab - 4-Step Process
+**Step 1 - Drug Selection:**
+- Choose one or more drugs from the comprehensive database
+- View drug properties: molecular weight, default diluent, critical concentrations
+- Selected drugs displayed in organized summary table
+
+**Step 2 - Parameters:**
+- Input calculation parameters for each selected drug:
+  - Critical concentrations (customizable)
+  - Purchased molecular weights
+  - Stock solution volumes  
+  - Number of MGIT tubes
+- Calculate estimated drug weights and working solution parameters
+- **Stock Solution Option:** Toggle to create stock solutions for practical weighing when estimated weights are too small
+- Download Step 2 results as formatted PDF protocol
+
+**Step 3 - Weight Entry:**
+- Enter actual weighed drug amounts for each compound
+- Input actual MGIT tube counts (if different from planned)
+- Real-time validation of required inputs
+
+**Step 4 - Solution Guide:**
+- Comprehensive laboratory preparation instructions
+- **Safety Precautions:** PPE requirements, ventilation, spill procedures
+- **Step-by-step Protocols:** 
+  - Stock solution preparation (when applicable)
+  - Working solution preparation
+  - Intermediate dilutions (for very concentrated solutions)
+- **Final Results Tables:** Precise volumes and concentrations for laboratory use
+- Download complete Step 4 protocol as formatted PDF
+
+#### Advanced Features
+- **Unit Preferences (Sidebar):** Customize display units for all measurements
   - Molecular Weight: g/mol, kg/mol, mg/mol
-  - Volume: ml, L, μl
+  - Volume: ml, L, μl  
   - Concentration: mg/ml, g/L, μg/ml, ng/ml
   - Weight: mg, g, μg
-  Internally, calculations are performed in mg/ml (concentration), ml (volume), and mg (weight), with automatic conversions to/from your selections.
-- Warnings: If calculations are not feasible (e.g., required stock aliquot exceeds available stock, or negative diluent), warnings appear above the results. Warnings clear when you navigate between steps or recalculate.
-
-## Input File Formats
-
-### Single Test Input CSV Format
-
-Test input files should be semicolon-separated with these columns:
-
-```csv
-id;logfile_name;selected_numerals;reselect_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;results_filename;weighed_drug;mgit_tubes;final_results_filename
-1;test1;1,2;2,3;y;1.0,1.5;300,310;10,10;results1;9.8,10.2;2,2;final1
-2;test2;3;4;n;;320;12;results2;12.1;3;final2
-```
-
-**Column Descriptions:**
-- `id`: Test case identifier
-- `logfile_name`: Name for the log file
-- `selected_numerals`: Drug selection numbers (e.g., "1,2,3")
-- `reselect_numerals`: Alternative drug selection if reselection needed
-- `own_cc`: Whether to use custom critical values (y/n)
-- `cc_values`: Custom critical concentration values (comma-separated)
-- `purch_mol_weights`: Purchased molecular weights (comma-separated)
-- `stock_vol`: Stock solution volumes (comma-separated)
-- `results_filename`: Filename for intermediate results
-- `weighed_drug`: Actual weighed drug amounts (comma-separated)
-- `mgit_tubes`: Number of MGIT tubes (comma-separated)
-- `final_results_filename`: Filename for final results
-
-### Header vs No Header
-
-The CLI supports both formats:
-
-**With Header:**
-```csv
-id;logfile_name;selected_numerals;own_cc;cc_values;purch_mol_weights;stock_vol;weighed_drug;mgit_tubes
-1;test1;1,2;y;1.0,1.5;300,310;10,10;9.8,10.2;2,2
-```
-
-**Without Header (just data):**
-```csv
-1;test1;1,2;y;1.0,1.5;300,310;10,10;9.8,10.2;2,2
-```
+- **Smart Calculations:** Internal calculations use standard units (mg/ml, ml, mg) with automatic conversions
+- **Validation & Warnings:** Real-time feedback for infeasible calculations (insufficient stock, negative diluent volumes, etc.)
+- **Session Persistence:** All work automatically saved, supporting interrupted workflows and collaborative use
 
 ## Logging
 
@@ -159,15 +177,6 @@ All operations are logged to:
 - **Log files**: `logs/pdst-calc-{session_name}.log` in the project root
 - **Output files**: `results/{filename}.txt` 
 
-## Command Line Arguments
-
-| Argument | Description | Example |
-|----------|-------------|---------|
-| `--drug-data` | Path to custom drug data CSV | `--drug-data data/my_drugs.csv` |
-| `--single-test-input` | Path to single test input CSV | `--single-test-input tests/test.csv` |
-| `--test-output` | Path to error log file | `--test-output results.log` |
-| `--session-name` | Session name for logging | `--session-name "experiment_001"` |
-
 ## Running Tests
 
 If you have test files (e.g., in `tests/`):
@@ -175,28 +184,45 @@ If you have test files (e.g., in `tests/`):
 uv run pytest --cov=lib
 ```
 
-## Troubleshooting
-- **ModuleNotFoundError:** Use `uv run` to automatically handle Python path and dependencies.
-- **Port already in use:** Use a different port with `--port`.
-- **Data not found:** Ensure your `drug_data.csv` is in the correct `data/` directory.
-- **Dependency issues:** Reinstall requirements with `pip install -r requirements.txt` or `pip install -e .`
-- **Input file errors:** Check that your CSV file uses semicolon separators and has the correct column names or data format.
-
 ## Project Structure
 
-- `lib/` — Core logic, calculation functions, and data utilities
-- `app/cli/` — Command-line interface entry point (`main.py`)
-- `app/shiny/` — Shiny for Python web app
-- `data/` — Drug data CSV and reference files
-- `requirements.txt` — Python dependencies for development and quick setup
-- `setup.py` and `pyproject.toml` — Packaging and distribution configuration
-- `tests/` — Unit and integration tests
-- `docs/` — Documentation, user manual, and development log
+### Core Components
+- **`lib/`** — Core calculation library and data utilities
+  - `dst_calc.py` — Primary DST calculation functions
+  - `supp_calc.py` — Supplementary calculation and UI functions
+  - `tests/` — Comprehensive unit and property-based tests
+
+- **`app/`** — Application interfaces and APIs
+  - `api/` — Backend services and database management
+    - `auth.py` — User authentication system
+    - `database.py` — SQLite database operations
+    - `drug_database.py` — Drug data management
+  - `cli/` — Command-line interface (`main.py`)
+  - `shiny/` — Web application
+    - `app.py` — Main Shiny application with 4-step workflow
+    - `session_handler.py` — Session management and restoration logic
+    - `generate_pdf.py` — PDF protocol generation
+    - `tests/` — Shiny app test suite
+
+### Docs
+- **`docs/`** — Comprehensive documentation
+  - `USER_MANUAL.md` — Detailed usage instructions
+  - `DEVELOPMENT_LOG.md` — Development history and changes
+  - `TESTING.md` — Testing procedures and guidelines
+  - `CALCULATION_FORMULAE.md` — Mathematical formulations
+
+### Development and Distribution
+- **`pyproject.toml`** — Modern Python packaging and dependency management
+- **`uv.lock`** — Lockfile for reproducible environments
+- **`tests/`** — Integration tests and test data
+- **`publication/`** — Academic publication materials
 
 ## Documentation
 
-- [User Manual](docs/USER_MANUAL.md)
-- [Development Log](docs/DEVELOPMENT_LOG.md)
+- [User Manual](docs/USER_MANUAL.md) — Complete usage instructions for CLI and Shiny app
+- [Calculation Formulae](docs/CALCULATION_FORMULAE.md) — Mathematical formulations and algorithms
+- [Development Log](docs/DEVELOPMENT_LOG.md) — Development history and changelog  
+- [Testing Guide](docs/TESTING.md) — Testing procedures and guidelines
 
 ---
 For more details, see the documentation in `docs/`.

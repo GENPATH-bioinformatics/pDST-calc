@@ -39,7 +39,7 @@ def get_drug_inputs(drug_index, fallback_session_data=None):
         # Apply session fallbacks for None values
         if fallback_session_data:
             for key, session_key in [
-                ('custom_crit', 'Crit_Conc(mg/ml)'),
+                ('custom_crit', 'Crit_Conc(μg/ml)'),
                 ('purch_molw', 'PurMol_W(g/mol)'),
                 ('stock_vol', 'St_Vol(ml)'),
                 ('actual_weight', 'Act_DrugW(mg)'),
@@ -852,7 +852,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         ui.tags.div(
                             ui.tags.h4(f"Drug: {drug_name}", style="color: #2c3e50; margin-bottom: 10px; font-size: 16px;"),
                             ui.tags.div(
-                                ui.tags.p(f"Critical Concentration: {drug_inputs.get('Crit_Conc(mg/ml)', 'N/A')} mg/ml", style="margin-bottom: 5px;"),
+                                ui.tags.p(f"Critical Concentration: {drug_inputs.get('Crit_Conc(mg/ml)', 'N/A')} μg/ml", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Purchased Molecular Weight: {drug_inputs.get('PurMol_W(g/mol)', 'N/A')} g/mol", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Stock Volume: {drug_inputs.get('St_Vol(ml)', 'N/A')} {volume_unit_val}", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Actual Drug Weight: {drug_inputs.get('Act_DrugW(mg)', 'N/A')} {weight_unit_val}", style="margin-bottom: 5px;"),
@@ -2388,7 +2388,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             if purity is None or purity <= 0 or purity > 100:
                                 return False
                         
-                        # Critical concentration (mg/ml)
+                        # Critical concentration (μg/ml)
                         try:
                             custom_crit = input[f"custom_critical_{i}"]()
                         except Exception:
@@ -3098,7 +3098,7 @@ def calculate_results():
                                 if drug_inputs:
                                     # Store in session format similar to CLI
                                     session_data[drug_id] = {
-                                        'Crit_Conc(mg/ml)': drug_inputs['custom_crit'] if drug_inputs['custom_crit'] is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                        'Crit_Conc(μg/ml)': drug_inputs['custom_crit'] if drug_inputs['custom_crit'] is not None else drug_row.iloc[0]['Critical_Concentration'],
                                         'PurMol_W(g/mol)': drug_inputs['purch_molw'] if drug_inputs['purch_molw'] is not None else 0.0,
                                         'St_Vol(ml)': drug_inputs['stock_vol'] if drug_inputs['stock_vol'] is not None else 0.0,
                                         'Act_DrugW(mg)': 0.0,  # Not yet entered
@@ -3218,7 +3218,7 @@ def calculate_final_results():
                                 
                                 # Store complete session data
                                 session_data[drug_id] = {
-                                    'Crit_Conc(mg/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                    'Crit_Conc(μg/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
                                     'PurMol_W(g/mol)': purch_molw if purch_molw is not None else 0.0,
                                     'St_Vol(ml)': stock_vol if stock_vol is not None else 0.0,
                                     'Act_DrugW(mg)': actual_weight if actual_weight is not None else 0.0,
@@ -3496,7 +3496,7 @@ def start_session():
                                         drug_index = selected.index(drug_name)
                                         
                                         # Update inputs based on session data
-                                        if 'Crit_Conc(mg/ml)' in drug_inputs:
+                                        if 'Crit_Conc(μg/ml)' in drug_inputs:
                                             ui.update_numeric(f"custom_critical_{drug_index}", value=drug_inputs['Crit_Conc(mg/ml)'])
                                         if 'PurMol_W(g/mol)' in drug_inputs:
                                             ui.update_numeric(f"purchased_molw_{drug_index}", value=drug_inputs['PurMol_W(g/mol)'])
