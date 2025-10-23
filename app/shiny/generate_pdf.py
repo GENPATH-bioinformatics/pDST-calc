@@ -119,7 +119,7 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                     # Table 2: Calculations
                     row = [
                         Paragraph(drug_name, styles['Normal']),
-                        f"{step2_data['Potencies'][drug_idx]:.4f}",
+                        f"{step2_data['Potencies'][drug_idx]:.2f}",
                         f"{step2_data['ConcWS'][drug_idx]:.2f}",
                         f"{step2_data['VolWS'][drug_idx]:.2f}"
                     ]
@@ -280,7 +280,7 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                 
                 row = [
                     Paragraph(drug_name, styles['Normal']),
-                    f"{step2_data['Potencies'][drug_idx]:.4f}",
+                    f"{step2_data['Potencies'][drug_idx]:.2f}",
                     f"{step2_data['ConcWS'][drug_idx]:.2f}",
                     f"{step2_data['VolWS'][drug_idx]:.2f}"
                 ]
@@ -296,7 +296,7 @@ def generate_step2_pdf(selected_drugs, make_stock_preference, step2_data):
                 row = [
                     Paragraph(drug_name, styles['Normal']),
                     f"{step2_data['PracWeights'][drug_idx]:.2f}",
-                    f"{step2_data['PracVol'][drug_idx]:.4f}"
+                    f"{step2_data['PracVol'][drug_idx]:.2f}"
                 ]
                 table4_data.append(row)
                 

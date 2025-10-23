@@ -2172,11 +2172,11 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ui.tags.tr(
                                                 ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #d35400; font-weight: bold; font-size: 14px;"),
                                                 ui.tags.td(
-                                                    f"{total_stock_vol:.4f}",
+                                                    f"{total_stock_vol:.2f}",
                                                     style="padding: 8px; border: 2px solid #d35400; text-align: center; font-size: 14px;"
                                                 ),
                                                 ui.tags.td(
-                                                    f"{drug_to_weigh:.4f}",
+                                                    f"{drug_to_weigh:.2f}",
                                                     style="padding: 8px; border: 2px solid #d35400; text-align: center; font-size: 14px;"
                                                 ),
                                                 style="background-color: #ffffff;"
@@ -2274,7 +2274,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     ui.tags.tr(
                                                         ui.tags.th("Drug", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 180px;"),
                                                         ui.tags.th("Weight to Weigh Out (mg)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                        ui.tags.th(f"Volume of Diluent Needed ({volume_unit()})", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                        ui.tags.th(f"Volume of Diluent Needed (ml)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 200px;"),
                                                     ) if not make_stock else (
                                                         ui.tags.h3("Stock Solution Planning", style="color: #8e44ad; margin-top: 10px; margin-bottom: 10px;"),
                                                         ui.tags.thead(
@@ -2284,8 +2284,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                                 ui.tags.th("Working Solution Make Up", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; text-align: center;", colspan="2"),
                                                             ),
                                                             ui.tags.tr(
-                                                                ui.tags.th(f"Volume of Stock ({volume_unit()})", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
-                                                                ui.tags.th(f"Volume Diluent ({volume_unit()})", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                                ui.tags.th(f"Volume of Stock (ml)", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                                ui.tags.th(f"Volume Diluent (ml)", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
                                                             )
                                                         )
                                                     )
@@ -2301,7 +2301,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                             ui.tags.table(
                                                                 ui.tags.tr(
                                                                     ui.tags.th("Drug", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                                    ui.tags.th(f"Total Stock Volume ({volume_unit()})", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 250px;"),
+                                                                    ui.tags.th(f"Total Stock Volume (ml)", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 250px;"),
                                                                     ui.tags.th("Drug to Weigh Out (mg)", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 200px;"),
                                                                 ),
                                                                 *aliquot_summary_rows,
