@@ -2599,140 +2599,197 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             ui.tags.tr(
                                 ui.tags.td("Borderline result", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A DST result that falls close to the defined breakpoint or critical concentration, where technical variability may influence interpretation (e.g., between \"susceptible\" and \"resistant\"). Such results should be repeated or confirmed using another method (e.g., sequencing or a repeat MIC test).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Clinical breakpoint", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The concentration of an anti-TB drug that separates strains likely to respond to treatment from those likely not to respond. It integrates clinical outcome data, MIC distributions, PK/PD parameters, and dosing information. When resistance can be overcome by increasing the dose up to the maximum tolerated level, a higher clinical breakpoint may be defined. Clinical breakpoints guide individual treatment decisions and are not used for resistance surveillance.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023); CLSI M23 (2022)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A, B", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Clinical concentration", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The amount of drug per defined volume of body fluid, often expressed as mass per mL of plasma or serum.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Critical concentration", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The lowest concentration of an anti-TB drug that inhibits ≥99% (or 90% for pyrazinamide) of phenotypically wild-type M. tuberculosis strains in vitro. It is primarily used for surveillance and DST standardization, not clinical decision-making.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Dilution or conversion factor", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A numerical factor used to convert between concentrations or dilutions of a drug when preparing DST stock or working solutions (e.g., converting µg/mL to mg/mL or preparing serial twofold dilutions).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Drug – potency factor", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A correction factor representing the drug's true biological activity relative to its weight. The potency factor (e.g., 0.95 µg active/mg powder) is used when calculating the amount to weigh for accurate drug concentrations.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Drug – purity", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The percentage of material that is the active compound, free from impurities or contaminants. Purity ensures accurate and reliable DST results.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Drug resistance evolution", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The gradual emergence and selection of genetic mutations or adaptive mechanisms in M. tuberculosis that reduce susceptibility to anti-TB drugs, often accelerated by inadequate or incomplete treatment.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Global TB Report (2024)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("C", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Drug", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("Any chemical substance that affects biological functions of living organisms or pathogens. In DST, \"drug\" refers to anti-TB agents used to inhibit M. tuberculosis growth.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("Britannica, \"Drug – chemical agent\"; WHO TB Glossary", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("D, E", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("ECOFF", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The epidemiological cut-off value (ECOFF) corresponds to the highest MIC defining the phenotypically wild-type (pWT) population. Isolates with MICs above the ECOFF are considered non-wild type (pNWT) and may harbor resistance mechanisms.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023); EUCAST (2024)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A, F", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Heteroresistance", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The presence of subpopulations within a clonal bacterial isolate that show differing levels of susceptibility to the same antimicrobial agent. It represents an early or mixed stage of resistance development.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("ScienceDirect (2022)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("G", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("High-level resistance", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("Resistance where the MIC is substantially above achievable serum concentrations, indicating that even high drug doses cannot overcome it.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("CLSI M23 (2022); WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("B, A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Indeterminate result", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A DST result that cannot be confidently classified as susceptible or resistant due to technical issues (e.g., contamination, growth failure, or borderline MIC). Repeat testing is required.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Intermediate resistance", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("An MIC that falls between susceptible and resistant categories, suggesting reduced sensitivity. Clinical outcome may depend on exposure or dose adjustment.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("CLSI M23 (2022); EUCAST (2024)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("B, F", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Low-level resistance", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("Resistance characterized by MICs slightly above the susceptible range, often linked to minimal inhibitory mutations that may still be overcome by higher doses.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("Baquero F., Drug Resistance Updates (2001)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("H", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Minimum inhibitory concentration (MIC)", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The lowest concentration of an antimicrobial agent that prevents visible growth of ≥99% of bacteria in vitro. MIC defines susceptibility levels and underpins breakpoint and ECOFF definitions.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Monoresistance", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("Resistance to a single first-line anti-TB drug while remaining susceptible to all others.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Global TB Programme", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("I", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Control", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A standard sample used in DST to verify that test conditions and reagents are performing correctly. Includes positive controls (known resistant strain) and negative controls (susceptible strain, e.g., H37Rv).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Negative control", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A drug-free condition designed to confirm the expected absence of inhibition, ensuring that observed inhibition is due to the drug rather than technical error. In M. tuberculosis DST, this is typically the drug-free control containing the reference strain (H37Rv).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023); CLSI M24 (2021); EUCAST MIC Methods (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A, J, K", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Positive control", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A culture or sample known to show a resistant or inhibited growth outcome under test conditions. Used to verify that the assay can detect true resistance or inhibition. In M. tuberculosis DST, this typically involves a strain with a known resistance mutation (e.g., rpoB S450L for rifampicin).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023); CLSI M24 (2021); EUCAST MIC Methods (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A, J, K", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Potency", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The biological activity or strength of an antimicrobial agent per unit weight. Laboratories must standardize drug solutions based on the potency of the specific lot, considering purity, water content, and salt form. Potency may be expressed as a percentage or in µg per mg (w/w).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("WHO Technical Manual for DST (2023)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("A", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Purity", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("The extent to which a substance is free from contaminants or inactive material, typically expressed as a percentage. High purity ensures reproducibility and accuracy in DST.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("ScienceDirect – Purity (Chemistry)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("L", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Resistant", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A category defined by an MIC or zone diameter indicating that therapeutic success is unlikely at normal or increased drug exposure, usually due to resistance mechanisms.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("CLSI M23 (2022)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("B", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Resistance", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A microorganism is categorized as \"Resistant\" when there is a high likelihood of therapeutic failure even with increased drug exposure.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("EUCAST (2024)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("F", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Susceptible", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("A category defined by an MIC or zone diameter indicating that isolates are inhibited by drug concentrations achievable with the standard treatment regimen, predicting therapeutic success.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("CLSI M23 (2022)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("B", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Susceptible, standard dosing regimen", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("Indicates a high likelihood of therapeutic success when the standard dosing regimen is used.", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("EUCAST (2024)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("F", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             ),
                             ui.tags.tr(
                                 ui.tags.td("Susceptible, increased exposure", style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f8f9fa;"),
                                 ui.tags.td("Indicates a high likelihood of therapeutic success when exposure to the agent is increased (e.g., by higher dose or increased drug concentration at the infection site).", style="padding: 10px; border: 1px solid #ddd; line-height: 1.5;"),
-                                ui.tags.td("EUCAST (2024)", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;")
+                                ui.tags.td("F", style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em; text-align: center; font-weight: bold;")
                             )
                         ),
                         style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 0.95em;"
+                    ),
+                    
+                    # Reference Key
+                    ui.tags.div(
+                        ui.tags.h4("Reference Key", style="color: #2c3e50; margin: 20px 0 15px 0; font-size: 1.1em; font-weight: bold;"),
+                        ui.tags.div(
+                            ui.tags.div(
+                                ui.tags.strong("A", style="color: #3498db; font-size: 1.1em;"), " - WHO Technical Manual for DST (2023)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("B", style="color: #3498db; font-size: 1.1em;"), " - CLSI M23 (2022)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("C", style="color: #3498db; font-size: 1.1em;"), " - WHO Global TB Report (2024)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("D", style="color: #3498db; font-size: 1.1em;"), " - Britannica, \"Drug – chemical agent\"",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("E", style="color: #3498db; font-size: 1.1em;"), " - WHO TB Glossary",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("F", style="color: #3498db; font-size: 1.1em;"), " - EUCAST (2024)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("G", style="color: #3498db; font-size: 1.1em;"), " - ScienceDirect (2022)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("H", style="color: #3498db; font-size: 1.1em;"), " - Baquero F., Drug Resistance Updates (2001)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("I", style="color: #3498db; font-size: 1.1em;"), " - WHO Global TB Programme",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("J", style="color: #3498db; font-size: 1.1em;"), " - CLSI M24 (2021)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("K", style="color: #3498db; font-size: 1.1em;"), " - EUCAST MIC Methods (2023)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            ui.tags.div(
+                                ui.tags.strong("L", style="color: #3498db; font-size: 1.1em;"), " - ScienceDirect – Purity (Chemistry)",
+                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ),
+                            style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 4px solid #3498db; font-size: 0.9em; line-height: 1.4;"
+                        ),
+                        style="margin-bottom: 30px;"
                     ),
                     style="overflow-x: auto; margin-bottom: 30px;"
                 ),
@@ -2983,17 +3040,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         ),
                         style="overflow-x: auto;"
                     )
-                ),
-                                
-                ui.tags.h3("Additional Resources", style="color: #34495e; margin-bottom: 15px;"),
-                ui.tags.ul(
-                    ui.tags.li("WHO Technical Manual for Drug Susceptibility Testing of Medicines used in the treatment of tuberculosis (2023)"),
-                    ui.tags.li("Clinical and Laboratory Standards Institute (CLSI) M23 and M24 Guidelines"),
-                    ui.tags.li("European Committee on Antimicrobial Susceptibility Testing (EUCAST) Guidelines"),
-                    ui.tags.li("WHO Global Tuberculosis Report (2024)"),
-                    style="line-height: 1.8; margin-bottom: 30px;"
-                ),
-                
+                ),                
                 style="max-width: 1200px; margin: 0 auto; padding: 20px;"
             )
 
