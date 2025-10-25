@@ -2,6 +2,10 @@
 
 A comprehensive **Phenotypic Drug Susceptibility Testing (pDST) Calculator** for tuberculosis research and clinical laboratories. This project provides both command-line and web-based interfaces for calculating drug concentrations, solution preparations, and laboratory protocols.
 
+## 🌐 Live Demo & Educational Resources
+
+**🚀 [Visit the Educational Guide Website](https://genpath-bioinformatics.github.io/pDST-calc/)** - Interactive web portal with comprehensive DST terminology and resources
+
 ## Key Features
 
 - **🧪 4-Step Laboratory Workflow:** Drug selection → Parameters → Weight entry → Solution preparation guide

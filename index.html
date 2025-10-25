@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DST Calculator - Educational Resources</title>
+    <title>DST Calculator - Comprehensive Educational Resources</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
             line-height: 1.6;
             color: #333;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f8f9fa;
@@ -22,13 +22,23 @@
             border-radius: 10px;
             text-align: center;
             margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         
         .content {
             background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            background: white;
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
         }
         
         .cta-button {
@@ -39,137 +49,559 @@
             text-decoration: none;
             border-radius: 5px;
             margin: 10px;
-            transition: background 0.3s;
+            transition: all 0.3s;
+            font-weight: 500;
         }
         
         .cta-button:hover {
             background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
         
         .feature-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
             margin: 30px 0;
         }
         
         .feature-card {
             background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 25px;
+            border-radius: 10px;
             border-left: 4px solid #3498db;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
         
-        table {
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .terminology-table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
+            font-size: 0.95em;
         }
         
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border: 1px solid #ddd;
-        }
-        
-        th {
+        .terminology-table th {
             background-color: #3498db;
             color: white;
+            padding: 15px 12px;
+            border: 1px solid #ddd;
+            font-weight: bold;
+            text-align: left;
         }
         
-        tr:nth-child(even) {
+        .terminology-table td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+            line-height: 1.5;
+        }
+        
+        .terminology-table tr:nth-child(even) {
             background-color: #f8f9fa;
+        }
+        
+        .terminology-table .term-col {
+            font-weight: bold;
+            background-color: #f8f9fa;
+            width: 20%;
+        }
+        
+        .terminology-table .ref-col {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            width: 10%;
+        }
+        
+        .section-header {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin: 40px 0 25px 0;
+        }
+        
+        .subsection-header {
+            color: #34495e;
+            margin: 30px 0 15px 0;
+            font-size: 1.2em;
+        }
+        
+        .reference-key {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            margin: 20px 0;
+        }
+        
+        .reference-key .ref-item {
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+        
+        .ref-letter {
+            color: #3498db;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        
+        .highlight-box {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+            margin: 20px 0;
+        }
+        
+        .example-box {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-style: italic;
+        }
+        
+        .media-section {
+            background-color: #fdf2e9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .nav-menu {
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .nav-menu a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            margin: 0 5px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-menu a:hover {
+            background: #34495e;
+        }
+        
+        @media (max-width: 768px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .terminology-table {
+                font-size: 0.85em;
+            }
+            
+            .terminology-table th,
+            .terminology-table td {
+                padding: 8px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🧪 DST Calculator Educational Resources</h1>
-        <p>Comprehensive Drug Susceptibility Testing Guide for Tuberculosis Research</p>
+        <h1>🧪 DST Calculator Educational Portal</h1>
+        <p>Comprehensive Drug Susceptibility Testing Guide for Tuberculosis Research & Clinical Practice</p>
         <a href="https://github.com/GENPATH-bioinformatics/pDST-calc" class="cta-button">📂 View Repository</a>
-        <a href="docs/DST_EDUCATIONAL_GUIDE.md" class="cta-button">📚 Full Educational Guide</a>
+        <a href="docs/DST_EDUCATIONAL_GUIDE.md" class="cta-button">📚 Download Full Guide</a>
+    </div>
+    
+    <div class="nav-menu">
+        <a href="#terminology">📖 Key Terminology</a>
+        <a href="#dst-overview">🔬 DST Overview</a>
+        <a href="#culture-media">🧫 Culture Media</a>
+        <a href="#calculator">🧮 Try Calculator</a>
+        <a href="#references">📚 References</a>
     </div>
     
     <div class="content">
-        <h2>🎯 Quick Access to Educational Content</h2>
+        <h2>🎯 Educational Resources at Your Fingertips</h2>
         
         <div class="feature-grid">
             <div class="feature-card">
-                <h3>📖 DST Terminology</h3>
-                <p>Comprehensive glossary of Drug Susceptibility Testing terms with definitions from WHO, CLSI, and EUCAST guidelines.</p>
-                <a href="docs/DST_EDUCATIONAL_GUIDE.md#glossary-of-terms" class="cta-button">View Glossary</a>
+                <h3>📖 Comprehensive DST Terminology</h3>
+                <p>Complete glossary with 27+ essential terms from WHO, CLSI, and EUCAST guidelines including critical concentrations, breakpoints, MIC interpretations, and resistance mechanisms.</p>
+                <a href="#terminology" class="cta-button">Explore Terms</a>
             </div>
             
             <div class="feature-card">
-                <h3>🔬 Culture Systems</h3>
-                <p>Overview of liquid and solid media systems used for M. tuberculosis DST with advantages and disadvantages.</p>
-                <a href="docs/DST_EDUCATIONAL_GUIDE.md#dst-by-culture-system" class="cta-button">Learn More</a>
+                <h3>🔬 Laboratory Methods</h3>
+                <p>Detailed coverage of liquid and solid culture systems, MGIT procedures, Middlebrook media, potency calculations, and quality control protocols.</p>
+                <a href="#dst-overview" class="cta-button">Learn Methods</a>
             </div>
             
             <div class="feature-card">
-                <h3>📋 Reference Standards</h3>
-                <p>Complete reference key linking all definitions to authoritative sources including WHO Technical Manual and CLSI guidelines.</p>
-                <a href="docs/DST_EDUCATIONAL_GUIDE.md#reference-key" class="cta-button">View References</a>
+                <h3>🧫 Culture Media Guide</h3>
+                <p>In-depth explanations of culture systems for M. tuberculosis including MGIT, 7H9 broth, Löwenstein-Jensen, and 7H10/7H11 agar with practical examples.</p>
+                <a href="#culture-media" class="cta-button">View Media</a>
+            </div>
+            
+            <div class="feature-card">
+                <h3>🧮 Interactive Calculator</h3>
+                <p>Access the full pDST Calculator application with 4-step workflow, session management, PDF generation, and comprehensive calculation support.</p>
+                <a href="#calculator" class="cta-button">Try Now</a>
             </div>
         </div>
         
-        <h2>🚀 Try the DST Calculator</h2>
-        <p>Experience the full interactive application with step-by-step drug susceptibility testing calculations:</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-            <a href="https://forms.office.com/r/sMfCywFy4H" class="cta-button">📝 Submit Feedback</a>
-            <a href="https://github.com/GENPATH-bioinformatics/pDST-calc/releases" class="cta-button">⬇️ Download Latest Release</a>
+        <div class="highlight-box">
+            <h3>💡 Why This Resource?</h3>
+            <p>The pDST Calculator Educational Portal consolidates authoritative DST knowledge from leading organizations (WHO, CLSI, EUCAST) into an accessible, searchable format. Perfect for students, researchers, and laboratory professionals working with tuberculosis drug susceptibility testing.</p>
         </div>
-        
-        <h2>📊 Key DST Terms at a Glance</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Term</th>
-                    <th>Category</th>
-                    <th>Key Concept</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Critical Concentration</strong></td>
-                    <td>Testing Standard</td>
-                    <td>Lowest concentration inhibiting ≥99% of wild-type strains</td>
-                </tr>
-                <tr>
-                    <td><strong>Clinical Breakpoint</strong></td>
-                    <td>Treatment Decision</td>
-                    <td>Concentration separating treatable from non-treatable strains</td>
-                </tr>
-                <tr>
-                    <td><strong>MIC</strong></td>
-                    <td>Laboratory Result</td>
-                    <td>Minimum concentration preventing visible growth</td>
-                </tr>
-                <tr>
-                    <td><strong>ECOFF</strong></td>
-                    <td>Population Analysis</td>
-                    <td>Highest MIC defining wild-type population</td>
-                </tr>
-                <tr>
-                    <td><strong>Potency</strong></td>
-                    <td>Drug Quality</td>
-                    <td>Biological activity per unit weight</td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #27ae60;">
-            <h3>💡 Did You Know?</h3>
-            <p>The pDST Calculator automates complex drug susceptibility testing calculations that traditionally require manual computation, reducing errors and saving laboratory time. All educational content is derived from the latest WHO, CLSI, and EUCAST guidelines.</p>
-        </div>
-        
-        <hr style="margin: 40px 0; border: none; border-top: 2px solid #ecf0f1;">
-        
-        <footer style="text-align: center; color: #7f8c8d;">
-            <p>📧 Questions or suggestions? <a href="https://forms.office.com/r/sMfCywFy4H">Submit feedback</a> or create an issue on GitHub.</p>
-            <p>🔗 Repository: <a href="https://github.com/GENPATH-bioinformatics/pDST-calc">GENPATH-bioinformatics/pDST-calc</a></p>
-        </footer>
     </div>
+
+    <div class="section" id="terminology">
+        <h2 class="section-header">📖 Key Definitions in Drug Susceptibility Testing (DST)</h2>
+        <p>The following comprehensive table provides essential definitions adapted from WHO, CLSI, and EUCAST guidelines:</p>
+        
+        <div style="overflow-x: auto;">
+            <table class="terminology-table">
+                <thead>
+                    <tr>
+                        <th>Term</th>
+                        <th>Definition (adapted from WHO, CLSI, EUCAST)</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="term-col">Borderline result</td>
+                        <td>A DST result that falls close to the defined breakpoint or critical concentration, where technical variability may influence interpretation (e.g., between "susceptible" and "resistant"). Such results should be repeated or confirmed using another method (e.g., sequencing or a repeat MIC test).</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Clinical breakpoint</td>
+                        <td>The concentration of an anti-TB drug that separates strains likely to respond to treatment from those likely not to respond. It integrates clinical outcome data, MIC distributions, PK/PD parameters, and dosing information. When resistance can be overcome by increasing the dose up to the maximum tolerated level, a higher clinical breakpoint may be defined. Clinical breakpoints guide individual treatment decisions and are not used for resistance surveillance.</td>
+                        <td class="ref-col">A, B</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Clinical concentration</td>
+                        <td>The amount of drug per defined volume of body fluid, often expressed as mass per mL of plasma or serum.</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Critical concentration</td>
+                        <td>The lowest concentration of an anti-TB drug that inhibits ≥99% (or 90% for pyrazinamide) of phenotypically wild-type M. tuberculosis strains in vitro. It is primarily used for surveillance and DST standardization, not clinical decision-making.</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Dilution or conversion factor</td>
+                        <td>A numerical factor used to convert between concentrations or dilutions of a drug when preparing DST stock or working solutions (e.g., converting µg/mL to mg/mL or preparing serial twofold dilutions).</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Drug – potency factor</td>
+                        <td>A correction factor representing the drug's true biological activity relative to its weight. The potency factor (e.g., 0.95 µg active/mg powder) is used when calculating the amount to weigh for accurate drug concentrations.</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Drug – purity</td>
+                        <td>The percentage of material that is the active compound, free from impurities or contaminants. Purity ensures accurate and reliable DST results.</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Drug resistance evolution</td>
+                        <td>The gradual emergence and selection of genetic mutations or adaptive mechanisms in M. tuberculosis that reduce susceptibility to anti-TB drugs, often accelerated by inadequate or incomplete treatment.</td>
+                        <td class="ref-col">C</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Drug</td>
+                        <td>Any chemical substance that affects biological functions of living organisms or pathogens. In DST, "drug" refers to anti-TB agents used to inhibit M. tuberculosis growth.</td>
+                        <td class="ref-col">D, E</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">ECOFF</td>
+                        <td>The epidemiological cut-off value (ECOFF) corresponds to the highest MIC defining the phenotypically wild-type (pWT) population. Isolates with MICs above the ECOFF are considered non-wild type (pNWT) and may harbor resistance mechanisms.</td>
+                        <td class="ref-col">A, F</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Heteroresistance</td>
+                        <td>The presence of subpopulations within a clonal bacterial isolate that show differing levels of susceptibility to the same antimicrobial agent. It represents an early or mixed stage of resistance development.</td>
+                        <td class="ref-col">G</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">High-level resistance</td>
+                        <td>Resistance where the MIC is substantially above achievable serum concentrations, indicating that even high drug doses cannot overcome it.</td>
+                        <td class="ref-col">B, A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Indeterminate result</td>
+                        <td>A DST result that cannot be confidently classified as susceptible or resistant due to technical issues (e.g., contamination, growth failure, or borderline MIC). Repeat testing is required.</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Intermediate resistance</td>
+                        <td>An MIC that falls between susceptible and resistant categories, suggesting reduced sensitivity. Clinical outcome may depend on exposure or dose adjustment.</td>
+                        <td class="ref-col">B, F</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Low-level resistance</td>
+                        <td>Resistance characterized by MICs slightly above the susceptible range, often linked to minimal inhibitory mutations that may still be overcome by higher doses.</td>
+                        <td class="ref-col">H</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Minimum inhibitory concentration (MIC)</td>
+                        <td>The lowest concentration of an antimicrobial agent that prevents visible growth of ≥99% of bacteria in vitro. MIC defines susceptibility levels and underpins breakpoint and ECOFF definitions.</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Monoresistance</td>
+                        <td>Resistance to a single first-line anti-TB drug while remaining susceptible to all others.</td>
+                        <td class="ref-col">I</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Control</td>
+                        <td>A standard sample used in DST to verify that test conditions and reagents are performing correctly. Includes positive controls (known resistant strain) and negative controls (susceptible strain, e.g., H37Rv).</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Negative control</td>
+                        <td>A drug-free condition designed to confirm the expected absence of inhibition, ensuring that observed inhibition is due to the drug rather than technical error. In M. tuberculosis DST, this is typically the drug-free control containing the reference strain (H37Rv).</td>
+                        <td class="ref-col">A, J, K</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Positive control</td>
+                        <td>A culture or sample known to show a resistant or inhibited growth outcome under test conditions. Used to verify that the assay can detect true resistance or inhibition. In M. tuberculosis DST, this typically involves a strain with a known resistance mutation (e.g., rpoB S450L for rifampicin).</td>
+                        <td class="ref-col">A, J, K</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Potency</td>
+                        <td>The biological activity or strength of an antimicrobial agent per unit weight. Laboratories must standardize drug solutions based on the potency of the specific lot, considering purity, water content, and salt form. Potency may be expressed as a percentage or in µg per mg (w/w).</td>
+                        <td class="ref-col">A</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Purity</td>
+                        <td>The extent to which a substance is free from contaminants or inactive material, typically expressed as a percentage. High purity ensures reproducibility and accuracy in DST.</td>
+                        <td class="ref-col">L</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Resistant</td>
+                        <td>A category defined by an MIC or zone diameter indicating that therapeutic success is unlikely at normal or increased drug exposure, usually due to resistance mechanisms.</td>
+                        <td class="ref-col">B</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Resistance</td>
+                        <td>A microorganism is categorized as "Resistant" when there is a high likelihood of therapeutic failure even with increased drug exposure.</td>
+                        <td class="ref-col">F</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Susceptible</td>
+                        <td>A category defined by an MIC or zone diameter indicating that isolates are inhibited by drug concentrations achievable with the standard treatment regimen, predicting therapeutic success.</td>
+                        <td class="ref-col">B</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Susceptible, standard dosing regimen</td>
+                        <td>Indicates a high likelihood of therapeutic success when the standard dosing regimen is used.</td>
+                        <td class="ref-col">F</td>
+                    </tr>
+                    <tr>
+                        <td class="term-col">Susceptible, increased exposure</td>
+                        <td>Indicates a high likelihood of therapeutic success when exposure to the agent is increased (e.g., by higher dose or increased drug concentration at the infection site).</td>
+                        <td class="ref-col">F</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="reference-key">
+            <h4>Reference Key</h4>
+            <div class="ref-item"><span class="ref-letter">A</span> - WHO Technical Manual for DST (2023)</div>
+            <div class="ref-item"><span class="ref-letter">B</span> - CLSI M23 (2022)</div>
+            <div class="ref-item"><span class="ref-letter">C</span> - WHO Global TB Report (2024)</div>
+            <div class="ref-item"><span class="ref-letter">D</span> - Britannica, "Drug – chemical agent"</div>
+            <div class="ref-item"><span class="ref-letter">E</span> - WHO TB Glossary</div>
+            <div class="ref-item"><span class="ref-letter">F</span> - EUCAST (2024)</div>
+            <div class="ref-item"><span class="ref-letter">G</span> - ScienceDirect (2022)</div>
+            <div class="ref-item"><span class="ref-letter">H</span> - Baquero F., Drug Resistance Updates (2001)</div>
+            <div class="ref-item"><span class="ref-letter">I</span> - WHO Global TB Programme</div>
+            <div class="ref-item"><span class="ref-letter">J</span> - CLSI M24 (2021)</div>
+            <div class="ref-item"><span class="ref-letter">K</span> - EUCAST MIC Methods (2023)</div>
+            <div class="ref-item"><span class="ref-letter">L</span> - ScienceDirect – Purity (Chemistry)</div>
+        </div>
+    </div>
+
+    <div class="section" id="dst-overview">
+        <h2 class="section-header">🔬 Overview of Drug Susceptibility Testing (DST)</h2>
+        
+        <h3>Definition</h3>
+        <p>Drug Susceptibility Testing (DST) determines whether a <em>Mycobacterium tuberculosis</em> isolate is susceptible, intermediate, or resistant to one or more anti-TB agents. Testing can be performed using either solid or liquid culture systems and interpreted according to established critical concentrations or minimum inhibitory concentration (MIC) thresholds.</p>
+        
+        <div class="reference-key">
+            <strong>References:</strong>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>WHO. Technical Manual for Drug Susceptibility Testing of Medicines Used in the Treatment of Tuberculosis (2023)</li>
+                <li>CLSI M24 (2021)</li>
+            </ul>
+        </div>
+        
+        <div class="example-box">
+            <strong>Illustration Example:</strong> A schematic showing <em>M. tuberculosis</em> inoculated in tubes or wells with increasing drug concentrations. Visible growth indicates resistance, while no growth indicates susceptibility.
+        </div>
+    </div>
+
+    <div class="section" id="culture-media">
+        <h2 class="section-header">🧫 Culture Media for Mycobacterium tuberculosis</h2>
+        
+        <h3 class="subsection-header">Overview of Culture Media</h3>
+        <p>Culture media are essential for the growth and maintenance of <em>Mycobacterium tuberculosis</em> in the laboratory. They provide the necessary nutrients and environmental conditions for the bacteria to thrive.</p>
+        
+        <h3 class="subsection-header">DST by Culture System</h3>
+        
+        <div class="media-section">
+            <h4 style="color: #27ae60; margin-bottom: 15px;">🧪 1) DST in Liquid Media</h4>
+            
+            <h5><strong>Definition</strong></h5>
+            <p>Liquid culture systems detect bacterial growth in a nutrient broth through changes in fluorescence, turbidity, or oxygen consumption. These systems provide faster results (typically 7–14 days) and allow quantitative MIC determination.</p>
+            
+            <div class="reference-key">
+                <strong>References:</strong> WHO Technical Manual for DST (2023); CLSI M24 (2021)
+            </div>
+            
+            <div class="example-box">
+                <strong>Illustration Example:</strong> A MGIT tube or growth curve showing fluorescence in the control (growth) and none in drug-containing tubes (no growth = susceptible).
+            </div>
+            
+            <h5><strong>Common Liquid Media Systems</strong></h5>
+            
+            <div style="margin-left: 20px; margin-bottom: 20px;">
+                <h6 style="color: #8e44ad; font-weight: bold;">a. MGIT (Mycobacteria Growth Indicator Tube)</h6>
+                <p>MGIT is a liquid-based culture system that measures oxygen consumption via a fluorescent sensor. It is widely used for both culture and DST of <em>M. tuberculosis</em>.</p>
+                <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;"><strong>Reference:</strong> WHO Endorsed MGIT 960 System; CLSI M24 (2021)</div>
+                <div class="example-box">
+                    <strong>Example:</strong> For rifampicin DST, the reference strain H37Rv shows no growth in the drug-containing MGIT (critical concentration 1 µg/mL), but visible growth in the drug-free control tube.
+                </div>
+            </div>
+            
+            <div style="margin-left: 20px; margin-bottom: 20px;">
+                <h6 style="color: #8e44ad; font-weight: bold;">b. Middlebrook 7H9 Broth</h6>
+                <p>7H9 is a nutrient-rich liquid medium supplemented with OADC and Tween 80 to support <em>M. tuberculosis</em> growth. It is commonly used for MIC testing in 96-well microdilution plates.</p>
+                <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;"><strong>Reference:</strong> WHO Technical Manual for DST (2023)</div>
+                <div class="example-box">
+                    <strong>Example:</strong> Used in MIC plates to determine the inhibitory concentration of bedaquiline.
+                </div>
+            </div>
+        </div>
+        
+        <div class="media-section">
+            <h4 style="color: #27ae60; margin-bottom: 15px;">🧫 2) DST in Solid Media</h4>
+            
+            <h5><strong>Definition</strong></h5>
+            <p>Solid media DST measures growth of <em>M. tuberculosis</em> colonies on agar- or egg-based media containing defined drug concentrations. Though slower (up to 6–8 weeks), it allows direct visual observation and confirmatory testing.</p>
+            
+            <div class="reference-key">
+                <strong>References:</strong> WHO Technical Manual for DST (2023); CLSI M24 (2021)
+            </div>
+            
+            <div class="example-box">
+                <strong>Illustration Example:</strong> Petri dishes or slants with and without drug, showing colony counts to determine susceptibility.
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="calculator">
+        <h2 class="section-header">🧮 Try the pDST Calculator</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🖥️ Web Application</h3>
+                <p>Full-featured web interface with 4-step workflow, user authentication, session management, and PDF protocol generation.</p>
+                <a href="http://localhost:8001" class="cta-button">Launch Web App</a>
+            </div>
+            
+            <div class="feature-card">
+                <h3>💻 Command Line Interface</h3>
+                <p>Text-based interface perfect for automated processing, batch operations, and integration with laboratory workflows.</p>
+                <a href="https://github.com/GENPATH-bioinformatics/pDST-calc#using-the-cli" class="cta-button">CLI Guide</a>
+            </div>
+            
+            <div class="feature-card">
+                <h3>📝 User Feedback</h3>
+                <p>Help us improve by sharing your experience, reporting issues, or suggesting new features for the calculator.</p>
+                <a href="https://forms.office.com/r/sMfCywFy4H" class="cta-button">Submit Feedback</a>
+            </div>
+            
+            <div class="feature-card">
+                <h3>📥 Download</h3>
+                <p>Get the latest release for offline use, installation in laboratory environments, or integration with existing systems.</p>
+                <a href="https://github.com/GENPATH-bioinformatics/pDST-calc/releases" class="cta-button">Download Latest</a>
+            </div>
+        </div>
+        
+        <div class="highlight-box">
+            <h3>🎯 Calculator Features</h3>
+            <ul>
+                <li><strong>4-Step Laboratory Workflow:</strong> Drug selection → Parameters → Weight entry → Solution preparation guide</li>
+                <li><strong>User Authentication & Sessions:</strong> Secure user accounts with persistent session management</li>
+                <li><strong>Intelligent Session Restoration:</strong> Automatically resume work at the correct step based on saved data</li>
+                <li><strong>Comprehensive Calculations:</strong> Stock solutions, working solutions, intermediate dilutions with safety considerations</li>
+                <li><strong>PDF Protocol Generation:</strong> Professional laboratory protocols for Steps 2 and 4</li>
+                <li><strong>Real-time Validation:</strong> Input validation with helpful warnings and error messages</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section" id="references">
+        <h2 class="section-header">📚 Authoritative Sources & References</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🏛️ World Health Organization (WHO)</h3>
+                <ul>
+                    <li>Technical Manual for Drug Susceptibility Testing (2023)</li>
+                    <li>Global TB Report (2024)</li>
+                    <li>TB Glossary</li>
+                    <li>Global TB Programme Guidelines</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>🔬 Clinical & Laboratory Standards Institute (CLSI)</h3>
+                <ul>
+                    <li>M23 - Susceptibility Testing for Mycobacteria (2022)</li>
+                    <li>M24 - Susceptibility Testing of Mycobacteria (2021)</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>🇪🇺 European Committee on Antimicrobial Susceptibility Testing (EUCAST)</h3>
+                <ul>
+                    <li>EUCAST Guidelines (2024)</li>
+                    <li>MIC Methods (2023)</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>📖 Scientific Literature</h3>
+                <ul>
+                    <li>Baquero F., Drug Resistance Updates (2001)</li>
+                    <li>ScienceDirect Publications (2022)</li>
+                    <li>Britannica Chemical References</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <footer style="text-align: center; padding: 40px 20px; background-color: #2c3e50; color: white; border-radius: 10px; margin-top: 40px;">
+        <h3>🔗 Connect & Contribute</h3>
+        <p style="margin: 20px 0;">Questions, suggestions, or want to contribute? We'd love to hear from you!</p>
+        <a href="https://forms.office.com/r/sMfCywFy4H" class="cta-button">📧 Submit Feedback</a>
+        <a href="https://github.com/GENPATH-bioinformatics/pDST-calc" class="cta-button">🌟 Star on GitHub</a>
+        <p style="margin-top: 20px; font-size: 0.9em; opacity: 0.8;">
+            Repository: <a href="https://github.com/GENPATH-bioinformatics/pDST-calc" style="color: #3498db;">GENPATH-bioinformatics/pDST-calc</a>
+        </p>
+    </footer>
 </body>
 </html>
