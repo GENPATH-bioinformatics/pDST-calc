@@ -175,6 +175,47 @@
             margin: 20px 0;
         }
         
+        .educational-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin: 20px 0;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .educational-image.small {
+            max-width: 60%;
+        }
+        
+        .educational-image:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        
+        .image-container {
+            text-align: center;
+            margin: 25px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .image-caption {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            margin: 10px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .figure-label {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
         .nav-menu {
             background: #2c3e50;
             padding: 15px;
@@ -389,18 +430,58 @@
         
         <div class="reference-key">
             <h4>Reference Key</h4>
-            <div class="ref-item"><span class="ref-letter">A</span> - WHO Technical Manual for DST (2023)</div>
-            <div class="ref-item"><span class="ref-letter">B</span> - CLSI M23 (2022)</div>
-            <div class="ref-item"><span class="ref-letter">C</span> - WHO Global TB Report (2024)</div>
-            <div class="ref-item"><span class="ref-letter">D</span> - Britannica, "Drug – chemical agent"</div>
-            <div class="ref-item"><span class="ref-letter">E</span> - WHO TB Glossary</div>
-            <div class="ref-item"><span class="ref-letter">F</span> - EUCAST (2024)</div>
-            <div class="ref-item"><span class="ref-letter">G</span> - ScienceDirect (2022)</div>
-            <div class="ref-item"><span class="ref-letter">H</span> - Baquero F., Drug Resistance Updates (2001)</div>
-            <div class="ref-item"><span class="ref-letter">I</span> - WHO Global TB Programme</div>
-            <div class="ref-item"><span class="ref-letter">J</span> - CLSI M24 (2021)</div>
-            <div class="ref-item"><span class="ref-letter">K</span> - EUCAST MIC Methods (2023)</div>
-            <div class="ref-item"><span class="ref-letter">L</span> - ScienceDirect – Purity (Chemistry)</div>
+            <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px 15px 8px 0; vertical-align: top; width: 50%;">
+                            <span class="ref-letter">A</span> - WHO Technical Manual for DST (2023)
+                        </td>
+                        <td style="padding: 8px 0 8px 15px; vertical-align: top; width: 50%;">
+                            <span class="ref-letter">G</span> - ScienceDirect (2022)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 15px 8px 0; vertical-align: top;">
+                            <span class="ref-letter">B</span> - CLSI M23 (2022)
+                        </td>
+                        <td style="padding: 8px 0 8px 15px; vertical-align: top;">
+                            <span class="ref-letter">H</span> - Baquero F., Drug Resistance Updates (2001)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 15px 8px 0; vertical-align: top;">
+                            <span class="ref-letter">C</span> - WHO Global TB Report (2024)
+                        </td>
+                        <td style="padding: 8px 0 8px 15px; vertical-align: top;">
+                            <span class="ref-letter">I</span> - WHO Global TB Programme
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 15px 8px 0; vertical-align: top;">
+                            <span class="ref-letter">D</span> - Britannica, "Drug – chemical agent"
+                        </td>
+                        <td style="padding: 8px 0 8px 15px; vertical-align: top;">
+                            <span class="ref-letter">J</span> - CLSI M24 (2021)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 15px 8px 0; vertical-align: top;">
+                            <span class="ref-letter">E</span> - WHO TB Glossary
+                        </td>
+                        <td style="padding: 8px 0 8px 15px; vertical-align: top;">
+                            <span class="ref-letter">K</span> - EUCAST MIC Methods (2023)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 15px 8px 0; vertical-align: top;">
+                            <span class="ref-letter">F</span> - EUCAST (2024)
+                        </td>
+                        <td style="padding: 8px 0 8px 15px; vertical-align: top;">
+                            <span class="ref-letter">L</span> - ScienceDirect – Purity (Chemistry)
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -418,9 +499,6 @@
             </ul>
         </div>
         
-        <div class="example-box">
-            <strong>Illustration Example:</strong> A schematic showing <em>M. tuberculosis</em> inoculated in tubes or wells with increasing drug concentrations. Visible growth indicates resistance, while no growth indicates susceptibility.
-        </div>
     </div>
 
     <div class="section" id="culture-media">
@@ -429,35 +507,62 @@
         <h3 class="subsection-header">Overview of Culture Media</h3>
         <p>Culture media are essential for the growth and maintenance of <em>Mycobacterium tuberculosis</em> in the laboratory. They provide the necessary nutrients and environmental conditions for the bacteria to thrive.</p>
         
+        <div class="image-container">
+            <img src="app/shiny/images/1 - Mtb Media types.png" alt="Mycobacterium tuberculosis Media Types" class="educational-image">
+            <p class="image-caption">
+                <span class="figure-label">Figure 1:</span> Overview of different culture media types used for M. tuberculosis cultivation and DST.
+            </p>
+        </div>
+        
         <h3 class="subsection-header">DST by Culture System</h3>
         
         <div class="media-section">
-            <h4 style="color: #27ae60; margin-bottom: 15px;">🧪 1) DST in Liquid Media</h4>
+            <h3 style="color: #27ae60; margin-bottom: 15px;">🧪 1) DST in Liquid Media</h4>
             
-            <h5><strong>Definition</strong></h5>
+            <h4><strong>Definition</strong></h5>
             <p>Liquid culture systems detect bacterial growth in a nutrient broth through changes in fluorescence, turbidity, or oxygen consumption. These systems provide faster results (typically 7–14 days) and allow quantitative MIC determination.</p>
             
             <div class="reference-key">
                 <strong>References:</strong> WHO Technical Manual for DST (2023); CLSI M24 (2021)
             </div>
             
-            <div class="example-box">
-                <strong>Illustration Example:</strong> A MGIT tube or growth curve showing fluorescence in the control (growth) and none in drug-containing tubes (no growth = susceptible).
-            </div>
             
-            <h5><strong>Common Liquid Media Systems</strong></h5>
+            <h4><strong>Common Liquid Media Systems</strong></h5>
             
             <div style="margin-left: 20px; margin-bottom: 20px;">
-                <h6 style="color: #8e44ad; font-weight: bold;">a. MGIT (Mycobacteria Growth Indicator Tube)</h6>
+                <h4 style="color: #8e44ad; font-weight: bold;">a. MGIT (Mycobacteria Growth Indicator Tube)</h6>
                 <p>MGIT is a liquid-based culture system that measures oxygen consumption via a fluorescent sensor. It is widely used for both culture and DST of <em>M. tuberculosis</em>.</p>
+                
+                <div class="image-container">
+                    <img src="app/shiny/images/2 - MGIT Principle.png" alt="MGIT Working Principle" class="educational-image small">
+                    <p class="image-caption">
+                        <span class="figure-label">Figure 2:</span> MGIT working principle showing fluorescent detection of oxygen consumption.
+                    </p>
+                </div>
+                
                 <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;"><strong>Reference:</strong> WHO Endorsed MGIT 960 System; CLSI M24 (2021)</div>
+                
+                <div class="image-container">
+                    <img src="app/shiny/images/3 - MGIT Culture QC.png" alt="MGIT Culture Quality Control" class="educational-image small">
+                    <p class="image-caption">
+                        <span class="figure-label">Figure 3:</span> MGIT culture quality control procedures and standards.
+                    </p>
+                </div>
+                
+                <div class="image-container">
+                    <img src="app/shiny/images/4 - MGIT result interpretation.png" alt="MGIT Result Interpretation" class="educational-image small">
+                    <p class="image-caption">
+                        <span class="figure-label">Figure 4:</span> MGIT result interpretation guidelines for DST analysis.
+                    </p>
+                </div>
+                
                 <div class="example-box">
                     <strong>Example:</strong> For rifampicin DST, the reference strain H37Rv shows no growth in the drug-containing MGIT (critical concentration 1 µg/mL), but visible growth in the drug-free control tube.
                 </div>
             </div>
             
             <div style="margin-left: 20px; margin-bottom: 20px;">
-                <h6 style="color: #8e44ad; font-weight: bold;">b. Middlebrook 7H9 Broth</h6>
+                <h4 style="color: #8e44ad; font-weight: bold;">b. Middlebrook 7H9 Broth</h6>
                 <p>7H9 is a nutrient-rich liquid medium supplemented with OADC and Tween 80 to support <em>M. tuberculosis</em> growth. It is commonly used for MIC testing in 96-well microdilution plates.</p>
                 <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;"><strong>Reference:</strong> WHO Technical Manual for DST (2023)</div>
                 <div class="example-box">
@@ -467,18 +572,15 @@
         </div>
         
         <div class="media-section">
-            <h4 style="color: #27ae60; margin-bottom: 15px;">🧫 2) DST in Solid Media</h4>
+            <h3 style="color: #27ae60; margin-bottom: 15px;">🧫 2) DST in Solid Media</h4>
             
-            <h5><strong>Definition</strong></h5>
+            <h4><strong>Definition</strong></h5>
             <p>Solid media DST measures growth of <em>M. tuberculosis</em> colonies on agar- or egg-based media containing defined drug concentrations. Though slower (up to 6–8 weeks), it allows direct visual observation and confirmatory testing.</p>
             
             <div class="reference-key">
                 <strong>References:</strong> WHO Technical Manual for DST (2023); CLSI M24 (2021)
             </div>
             
-            <div class="example-box">
-                <strong>Illustration Example:</strong> Petri dishes or slants with and without drug, showing colony counts to determine susceptibility.
-            </div>
         </div>
     </div>
 

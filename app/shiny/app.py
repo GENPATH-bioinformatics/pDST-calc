@@ -2739,53 +2739,76 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     ui.tags.div(
                         ui.tags.h4("Reference Key", style="color: #2c3e50; margin: 20px 0 15px 0; font-size: 1.1em; font-weight: bold;"),
                         ui.tags.div(
-                            ui.tags.div(
-                                ui.tags.strong("A", style="color: #3498db; font-size: 1.1em;"), " - WHO Technical Manual for DST (2023)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("B", style="color: #3498db; font-size: 1.1em;"), " - CLSI M23 (2022)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("C", style="color: #3498db; font-size: 1.1em;"), " - WHO Global TB Report (2024)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("D", style="color: #3498db; font-size: 1.1em;"), " - Britannica, \"Drug – chemical agent\"",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("E", style="color: #3498db; font-size: 1.1em;"), " - WHO TB Glossary",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("F", style="color: #3498db; font-size: 1.1em;"), " - EUCAST (2024)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("G", style="color: #3498db; font-size: 1.1em;"), " - ScienceDirect (2022)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("H", style="color: #3498db; font-size: 1.1em;"), " - Baquero F., Drug Resistance Updates (2001)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("I", style="color: #3498db; font-size: 1.1em;"), " - WHO Global TB Programme",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("J", style="color: #3498db; font-size: 1.1em;"), " - CLSI M24 (2021)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("K", style="color: #3498db; font-size: 1.1em;"), " - EUCAST MIC Methods (2023)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
-                            ),
-                            ui.tags.div(
-                                ui.tags.strong("L", style="color: #3498db; font-size: 1.1em;"), " - ScienceDirect – Purity (Chemistry)",
-                                style="margin-bottom: 8px; padding: 5px 0;"
+                            ui.tags.table(
+                                ui.tags.tbody(
+                                    # Row 1: A and G
+                                    ui.tags.tr(
+                                        ui.tags.td(
+                                            ui.tags.strong("A", style="color: #3498db; font-size: 1.1em;"), " - WHO Technical Manual for DST (2023)",
+                                            style="padding: 8px 15px 8px 0; vertical-align: top; width: 50%;"
+                                        ),
+                                        ui.tags.td(
+                                            ui.tags.strong("G", style="color: #3498db; font-size: 1.1em;"), " - ScienceDirect (2022)",
+                                            style="padding: 8px 0 8px 15px; vertical-align: top; width: 50%;"
+                                        )
+                                    ),
+                                    # Row 2: B and H
+                                    ui.tags.tr(
+                                        ui.tags.td(
+                                            ui.tags.strong("B", style="color: #3498db; font-size: 1.1em;"), " - CLSI M23 (2022)",
+                                            style="padding: 8px 15px 8px 0; vertical-align: top;"
+                                        ),
+                                        ui.tags.td(
+                                            ui.tags.strong("H", style="color: #3498db; font-size: 1.1em;"), " - Baquero F., Drug Resistance Updates (2001)",
+                                            style="padding: 8px 0 8px 15px; vertical-align: top;"
+                                        )
+                                    ),
+                                    # Row 3: C and I
+                                    ui.tags.tr(
+                                        ui.tags.td(
+                                            ui.tags.strong("C", style="color: #3498db; font-size: 1.1em;"), " - WHO Global TB Report (2024)",
+                                            style="padding: 8px 15px 8px 0; vertical-align: top;"
+                                        ),
+                                        ui.tags.td(
+                                            ui.tags.strong("I", style="color: #3498db; font-size: 1.1em;"), " - WHO Global TB Programme",
+                                            style="padding: 8px 0 8px 15px; vertical-align: top;"
+                                        )
+                                    ),
+                                    # Row 4: D and J
+                                    ui.tags.tr(
+                                        ui.tags.td(
+                                            ui.tags.strong("D", style="color: #3498db; font-size: 1.1em;"), " - Britannica, \"Drug – chemical agent\"",
+                                            style="padding: 8px 15px 8px 0; vertical-align: top;"
+                                        ),
+                                        ui.tags.td(
+                                            ui.tags.strong("J", style="color: #3498db; font-size: 1.1em;"), " - CLSI M24 (2021)",
+                                            style="padding: 8px 0 8px 15px; vertical-align: top;"
+                                        )
+                                    ),
+                                    # Row 5: E and K
+                                    ui.tags.tr(
+                                        ui.tags.td(
+                                            ui.tags.strong("E", style="color: #3498db; font-size: 1.1em;"), " - WHO TB Glossary",
+                                            style="padding: 8px 15px 8px 0; vertical-align: top;"
+                                        ),
+                                        ui.tags.td(
+                                            ui.tags.strong("K", style="color: #3498db; font-size: 1.1em;"), " - EUCAST MIC Methods (2023)",
+                                            style="padding: 8px 0 8px 15px; vertical-align: top;"
+                                        )
+                                    ),
+                                    # Row 6: F and L
+                                    ui.tags.tr(
+                                        ui.tags.td(
+                                            ui.tags.strong("F", style="color: #3498db; font-size: 1.1em;"), " - EUCAST (2024)",
+                                            style="padding: 8px 15px 8px 0; vertical-align: top;"
+                                        ),
+                                        ui.tags.td(
+                                            ui.tags.strong("L", style="color: #3498db; font-size: 1.1em;"), " - ScienceDirect – Purity (Chemistry)",
+                                            style="padding: 8px 0 8px 15px; vertical-align: top;"
+                                        )
+                                    )
+                                ),
+                                style="width: 100%; border-collapse: collapse; margin: 0;"
                             ),
                             style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 4px solid #3498db; font-size: 0.9em; line-height: 1.4;"
                         ),
@@ -2817,16 +2840,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             ),
                             style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 15px 0;"
                         ),
-                        
-                        ui.tags.div(
-                            ui.tags.strong("Illustration Example:", style="color: #e67e22;"),
-                            ui.tags.p(
-                                "A schematic showing M. tuberculosis inoculated in tubes or wells with increasing drug concentrations. "
-                                "Visible growth indicates resistance, while no growth indicates susceptibility.",
-                                style="margin: 10px 0; font-style: italic;"
-                            ),
-                            style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 15px 0;"
-                        )
                     )
                 ),
 
@@ -2838,6 +2851,21 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         "Culture media are essential for the growth and maintenance of Mycobacterium tuberculosis in the laboratory. "
                         "They provide the necessary nutrients and environmental conditions for the bacteria to thrive.",
                         style="margin-bottom: 15px; line-height: 1.6; text-align: justify;"
+                    ),
+                    
+                    # Image 1: Mtb Media types
+                    ui.tags.div(
+                        ui.tags.img(
+                            src="images/1 - Mtb Media types.png",
+                            alt="Mycobacterium tuberculosis Media Types",
+                            style="max-width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 20px 0;"
+                        ),
+                        ui.tags.p(
+                            ui.tags.strong("Figure 1:", style="color: #2c3e50;"),
+                            " Overview of different culture media types used for M. tuberculosis cultivation and DST.",
+                            style="text-align: center; font-style: italic; color: #666; margin: 10px 0;"
+                        ),
+                        style="text-align: center; margin: 25px 0;"
                     )
                 ),
                 ui.tags.div(
@@ -2861,15 +2889,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #27ae60; margin: 15px 0;"
                             ),
                             
-                            ui.tags.div(
-                                ui.tags.strong("Illustration Example:", style="color: #e67e22;"),
-                                ui.tags.p(
-                                    "A MGIT tube or growth curve showing fluorescence in the control (growth) and none in drug-containing "
-                                    "tubes (no growth = susceptible).",
-                                    style="margin: 10px 0; font-style: italic;"
-                                ),
-                                style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 15px 0;"
-                            )
                         ),
                         
                         # Common Liquid Media Systems
@@ -2884,10 +2903,57 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                     "It is widely used for both culture and DST of M. tuberculosis.",
                                     style="margin-bottom: 10px; line-height: 1.6; text-align: justify;"
                                 ),
+                                
+                                # Image 2: MGIT Principle
+                                ui.tags.div(
+                                    ui.tags.img(
+                                        src="images/2 - MGIT Principle.png",
+                                        alt="MGIT Working Principle",
+                                        style="max-width: 60%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 15px 0;"
+                                    ),
+                                    ui.tags.p(
+                                        ui.tags.strong("Figure 2:", style="color: #8e44ad;"),
+                                        " MGIT working principle showing fluorescent detection of oxygen consumption.",
+                                        style="text-align: center; font-style: italic; color: #666; margin: 10px 0; font-size: 0.9em;"
+                                    ),
+                                    style="text-align: center; margin: 20px 0;"
+                                ),
+                                
                                 ui.tags.div(
                                     ui.tags.strong("Reference: "), "WHO Endorsed MGIT 960 System; CLSI M24 (2021)",
                                     style="font-size: 0.9em; color: #666; margin-bottom: 10px;"
                                 ),
+                                
+                                # Image 3: MGIT Culture QC
+                                ui.tags.div(
+                                    ui.tags.img(
+                                        src="images/3 - MGIT Culture QC.png",
+                                        alt="MGIT Culture Quality Control",
+                                        style="max-width: 60%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 15px 0;"
+                                    ),
+                                    ui.tags.p(
+                                        ui.tags.strong("Figure 3:", style="color: #8e44ad;"),
+                                        " MGIT culture quality control procedures and standards.",
+                                        style="text-align: center; font-style: italic; color: #666; margin: 10px 0; font-size: 0.9em;"
+                                    ),
+                                    style="text-align: center; margin: 20px 0;"
+                                ),
+                                
+                                # Image 4: MGIT Result Interpretation
+                                ui.tags.div(
+                                    ui.tags.img(
+                                        src="images/4 - MGIT result interpretation.png",
+                                        alt="MGIT Result Interpretation",
+                                        style="max-width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 15px 0;"
+                                    ),
+                                    ui.tags.p(
+                                        ui.tags.strong("Figure 4:", style="color: #8e44ad;"),
+                                        " MGIT result interpretation guidelines for DST analysis.",
+                                        style="text-align: center; font-style: italic; color: #666; margin: 10px 0; font-size: 0.9em;"
+                                    ),
+                                    style="text-align: center; margin: 20px 0;"
+                                ),
+                                
                                 ui.tags.div(
                                     ui.tags.strong("Example: ", style="color: #d35400;"),
                                     "For rifampicin DST, the reference strain H37Rv shows no growth in the drug-containing MGIT "
@@ -2936,15 +3002,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #27ae60; margin: 15px 0;"
                             ),
                             
-                            ui.tags.div(
-                                ui.tags.strong("Illustration Example:", style="color: #e67e22;"),
-                                ui.tags.p(
-                                    "Löwenstein–Jensen (LJ) slants showing full growth in control and no growth in the isoniazid-containing "
-                                    "tube (susceptible).",
-                                    style="margin: 10px 0; font-style: italic;"
-                                ),
-                                style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 15px 0;"
-                            )
                         ),
                         
                         # Common Solid Media
