@@ -141,7 +141,9 @@ After logging in, the Account & Sessions tab provides a comprehensive overview o
 
 Each session is displayed as a card showing the session name, creation date, and completion status. This makes it easy to organize and track your DST calculations across different projects or experiments.
 
-![Login Interface](app/shiny/images/Screenshot%20from%202025-11-04%2018-15-59.png)
+![Login Interface](app/shiny/images/Screenshot%20from%202025-11-04%11-25-07.png)
+
+![Session Interface](app/shiny/images/Screenshot%20from%202025-11-04%2018-15-59.png)
 
 ### Application Workflow
 
@@ -173,7 +175,6 @@ The Calculator tab begins with drug selection, where you can choose from a compr
 - Choose one or more drugs from the comprehensive database
 - View drug properties: molecular weight, default diluent, critical concentrations
 - Selected drugs displayed in organized summary table
-
 
 
 **Step 2 - Parameters:**
