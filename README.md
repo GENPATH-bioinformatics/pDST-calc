@@ -306,10 +306,25 @@ uv run pytest --cov=lib
 
 ## Documentation
 
-- [User Manual](docs/USER_MANUAL.md) — Complete usage instructions for CLI and Shiny app
-- [Calculation Formulae](docs/CALCULATION_FORMULAE.md) — Mathematical formulations and algorithms
-- [Development Log](docs/DEVELOPMENT_LOG.md) — Development history and changelog  
-- [Testing Guide](docs/TESTING.md) — Testing procedures and guidelines
+### 📚 Core Documentation
+- **[Calculation Formulae](docs/CALCULATION_FORMULAE.md)** — Comprehensive mathematical formulations and algorithms used in DST calculations
+- **[Testing Guide](docs/TESTING.md)** — Testing procedures, guidelines, and validation methods
+
+### 📖 Component Documentation
+- **[Library README](lib/README.md)** — Core calculation library documentation and API reference
+- **[Application README](app/README.md)** — Application-level documentation and architecture overview
+- **[CLI README](app/cli/README.md)** — Command-line interface usage and examples
+- **[Shiny Tests README](app/shiny/tests/README.md)** — Web application testing documentation
+
+### 📄 Example Output Files
+- **[Example Step 2 Results PDF](docs/Example_Step2_Results.pdf)** — Sample PDF output from Step 2 parameter calculations
+- **[Example Step 4 Results PDF](docs/Example_Step4_Results.pdf)** — Sample PDF output from Step 4 solution preparation guide
+
+### 🔬 Educational Resources
+- **[Educational Website](https://genpath-bioinformatics.github.io/pDST-calc/)** — Interactive web portal with DST resources and terminology
+
+### 💬 Support & Feedback
+- **[User Feedback Form](https://forms.office.com/r/sMfCywFy4H)** — Submit feedback, report issues, or suggest new features
 
 ---
 For more details, see the documentation in `docs/`.
