@@ -83,6 +83,12 @@ def get_drug_inputs(drug_index, fallback_session_data=None):
             'mgit_tubes': input[f"mgit_tubes_{drug_index}"]()
         }
         
+        # Add purity input if available
+        try:
+            inputs['purity'] = input[f"purity_{drug_index}"]()
+        except Exception:
+            inputs['purity'] = None
+        
         # Add aliquot inputs if make_stock is enabled
         try:
             make_stock = input.make_stock_toggle() if hasattr(input, 'make_stock_toggle') else False
@@ -104,7 +110,8 @@ def get_drug_inputs(drug_index, fallback_session_data=None):
                 ('actual_weight', 'Act_DrugW(mg)'),
                 ('mgit_tubes', 'Total_Mgit_tubes'),
                 ('num_aliquots', 'Num_Aliquots'),
-                ('ml_per_aliquot', 'ML_Per_Aliquot')
+                ('ml_per_aliquot', 'ML_Per_Aliquot'),
+                ('purity', 'Purity_%')
             ]:
                 if inputs[key] is None and session_key in fallback_session_data:
                     inputs[key] = fallback_session_data[session_key]
@@ -454,6 +461,12 @@ def perform_final_calculations_from_session(session_data):
                 # Use the EXACT same calculation logic as the original function
                 total_volWS = calc_adjusted_volume(actual_weight, est_weight, vol_ws_ml)
                 new_a_val = calc_stock_factor(actual_weight, total_stock_vol, ws_conc_ugml, pot)
+                
+                # Validate if the stock concentration factor is less than 1 
+                # then adjust to prevent negative diluent volumes
+                if new_a_val < 1:
+                    new_a_val = 1  # Minimum factor of 1 to prevent impossible negative diluent
+                
                 stock_vol_to_add_to_ws_ml = calc_volume_divided_by_factor(total_volWS, new_a_val)
                 diluent_vol_to_add_to_ws_ml = total_volWS - stock_vol_to_add_to_ws_ml
                 total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
@@ -817,6 +830,12 @@ def perform_final_calculations():
                 # Use modular calculation functions
                 total_volWS = calc_adjusted_volume(actual_weight, est_weight, ws_vol_ml)
                 new_a_val = calc_stock_factor(actual_weight, total_stock_vol, ws_conc_ugml, pot)
+                
+                # Validate if the stock concentration factor is less than 1 
+                # then adjust to prevent negative diluent volumes
+                if new_a_val < 1:
+                    new_a_val = 1  # Minimum factor of 1 to prevent impossible negative diluent
+                
                 stock_vol_to_add_to_ws_ml = calc_volume_divided_by_factor(total_volWS, new_a_val)
                 diluent_vol_to_add_to_ws_ml = total_volWS - stock_vol_to_add_to_ws_ml
                 total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
@@ -1158,7 +1177,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                 if not rows:
                     return ui.tags.div(
                         ui.tags.h3("Your Sessions", style="color: #2c3e50; margin-bottom: 10px;"),
-                        ui.tags.p("No sessions found. Start a new session in Tab B.", style="color: #7f8c8d; font-style: italic;"),
+                        ui.tags.p("No sessions found.", style="color: #7f8c8d; font-style: italic;"),
                         style="margin-bottom: 12px;"
                     )
                 
@@ -3108,9 +3127,14 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     is_restored_session = cs is not None
                     print(f"is_restored_session: {is_restored_session}, calculate_clicked: {calculate_clicked()}")
                     
-                    # For restored sessions, skip validation and show Next button directly
+                    # Always validate inputs before showing action buttons (even for restored sessions)
+                    if not validate_inputs():
+                        print("Inputs are not valid - hiding action buttons")
+                        return ui.tags.div()  # Return empty div when validation fails
+                    
+                    # For restored sessions, show action buttons after validation passes
                     if is_restored_session:
-                        print("Restored session - showing Next button directly")
+                        print("Restored session - showing action buttons after validation")
                         return ui.tags.div(
                             ui.input_action_button("back_btn", "Back to Account", class_="btn-secondary", style="margin-right: 10px;"),
                             ui.input_action_button("save_step2_btn", "Save Progress", class_="btn-success", style="background-color: #28a745; border-color: #28a745; margin-right: 10px;"),
@@ -3119,32 +3143,24 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             style="text-align: center; margin-top: 30px;"
                         )
                     
-                    # For new sessions, validate inputs
-                    if validate_inputs():
-                        print("Inputs are valid")
-                        if calculate_clicked():
-                            print("Showing Next button (calculation done)")
-                            # Show Next button and download button after calculation
-                            return ui.tags.div(
-                                ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                                ui.input_action_button("save_step2_btn", "Save Progress", class_="btn-success", style="background-color: #28a745; border-color: #28a745; margin-right: 10px;"),
-                                ui.input_action_button("download_step2_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
-                                ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
-                                style="text-align: center; margin-top: 30px;"
-                            )
-                        else:
-                            print("Showing Calculate button")
-                            # Show Calculate button initially
-                            return ui.tags.div(
-                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
-                                ui.input_action_button("calculate_btn", "Calculate", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
-                            style="text-align: center; margin-top: 30px;"
-                            )
-                    else:
-                        print("Inputs not valid, showing only back button")
-                        # Show only back button if validation fails
+                    # For new sessions, inputs are valid so show appropriate buttons
+                    print("Inputs are valid")
+                    if calculate_clicked():
+                        print("Showing Next button (calculation done)")
+                        # Show Next button and download button after calculation
                         return ui.tags.div(
-                            ui.input_action_button("back_btn", "Back", class_="btn-secondary"),
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                            ui.input_action_button("save_step2_btn", "Save Progress", class_="btn-success", style="background-color: #28a745; border-color: #28a745; margin-right: 10px;"),
+                            ui.input_action_button("download_step2_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
+                            ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
+                    else:
+                        print("Showing Calculate button")
+                        # Show Calculate button initially
+                        return ui.tags.div(
+                            ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                            ui.input_action_button("calculate_btn", "Calculate", class_="btn-success", style="background-color: #27ae60; border-color: #27ae60;"),
                             style="text-align: center; margin-top: 30px;"
                         )
                 elif current_step() == 3:
@@ -3912,7 +3928,7 @@ def back_step():
         if is_restored_session:
             # For restored sessions, go back to account management (Tab A)
             print("Back button - going back to account management")
-            show_results_view.set(True)
+            ui.update_navs("tab", selected="Account & Sessions")
             current_session.set(None)  # Clear current session
             current_step.set(1)  # Reset to step 1
         else:
@@ -3939,7 +3955,7 @@ def reset_selection():
     if current_step() == 4:
         print("reset_selection: Calculation completed, navigating back to account")
         # Navigate to Account tab instead of resetting
-        ui.update_navs("tab", selected="Account")
+        ui.update_navs("tab", selected="Account & Sessions")
         return
     
     # For other steps, do full reset
@@ -3994,6 +4010,51 @@ def reset_selection():
         current_session.set(None)
     
     print("reset_selection: Reset completed")
+
+def determine_potency_method_from_session(preparation):
+    """Determine potency method based on saved session data.
+    
+    Logic:
+    - If mol_weight > 0 and purity > 0: use "both" 
+    - If mol_weight > 0 and purity == 0: use "mol_weight"
+    - If mol_weight == 0 and purity > 0: use "purity"
+    - Default: use current preference
+    """
+    try:
+        inputs = preparation.get('inputs', {})
+        if not inputs:
+            return None
+            
+        # Check all drugs to determine the best potency method
+        has_mol_weight = False
+        has_purity = False
+        
+        for drug_key, drug_data in inputs.items():
+            if not drug_key.isdigit():  # Skip non-drug keys
+                continue
+                
+            if isinstance(drug_data, dict):
+                mol_weight = drug_data.get('PurMol_W(g/mol)', 0)
+                purity = drug_data.get('Purity_%', 0)
+                
+                if mol_weight and mol_weight > 0:
+                    has_mol_weight = True
+                if purity and purity > 0:
+                    has_purity = True
+        
+        # Determine method based on available data
+        if has_mol_weight and has_purity:
+            return "both"
+        elif has_mol_weight and not has_purity:
+            return "mol_weight"
+        elif not has_mol_weight and has_purity:
+            return "purity"
+        else:
+            return None  # Use default
+            
+    except Exception as e:
+        print(f"Error determining potency method from session: {e}")
+        return None
 
 def clear_global_state():
     """Helper function to clear all global arrays and reactive state"""
@@ -4186,8 +4247,9 @@ def calculate_final_results():
                                 mgit_tubes = drug_inputs['mgit_tubes']
                                 num_aliquots = drug_inputs.get('num_aliquots')
                                 ml_per_aliquot = drug_inputs.get('ml_per_aliquot')
+                                purity = drug_inputs.get('purity')
                                 
-                                print(f"calculate_final_results: Final input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}, num_aliquots: {num_aliquots}, ml_per_aliquot: {ml_per_aliquot}")
+                                print(f"calculate_final_results: Final input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}, num_aliquots: {num_aliquots}, ml_per_aliquot: {ml_per_aliquot}, purity: {purity}")
                                 
                                 # Store complete session data
                                 session_data[drug_id] = {
@@ -4196,7 +4258,8 @@ def calculate_final_results():
                                     'Act_DrugW(mg)': actual_weight if actual_weight is not None else 0.0,
                                     'Total_Mgit_tubes': mgit_tubes if mgit_tubes is not None else 0,
                                     'Num_Aliquots': num_aliquots,
-                                    'ML_Per_Aliquot': ml_per_aliquot
+                                    'ML_Per_Aliquot': ml_per_aliquot,
+                                    'Purity_%': purity if purity is not None else 0.0
                                 }
                                 print(f"calculate_final_results: Stored session data for drug {i}: {session_data[drug_id]}")
                         except Exception as e:
@@ -4299,6 +4362,28 @@ def handle_session_card_click():
                 print(f"Restoring selected drugs: {preparation['selected_drugs']}")
                 ui.update_selectize("drug_selection", selected=preparation['selected_drugs'])
             
+            # Determine and set potency method based on saved session data
+            determined_potency_method = determine_potency_method_from_session(preparation)
+            if determined_potency_method:
+                print(f"Determined potency method from session data: {determined_potency_method}")
+                potency_method_pref.set(determined_potency_method)
+                try:
+                    ui.update_radio_buttons("potency_method_radio", selected=determined_potency_method)
+                except Exception as e:
+                    print(f"Could not update potency method radio: {e}")
+            else:
+                print("Could not determine potency method from session data, using current preference")
+            
+            # Restore saved potency method if available (overrides determined method)
+            if 'potency_method' in preparation:
+                saved_potency_method = preparation['potency_method']
+                print(f"Restoring saved potency method: {saved_potency_method}")
+                potency_method_pref.set(saved_potency_method)
+                try:
+                    ui.update_radio_buttons("potency_method_radio", selected=saved_potency_method)
+                except Exception as e:
+                    print(f"Could not update potency method radio: {e}")
+            
             # Set to step 4 to show final results
             current_step.set(4)
             print(f"Set completed session to step 4")
@@ -4345,6 +4430,28 @@ def handle_session_card_click():
             if 'selected_drugs' in preparation:
                 print(f"Restoring selected drugs: {preparation['selected_drugs']}")
                 ui.update_selectize("drug_selection", selected=preparation['selected_drugs'])
+            
+            # Determine and set potency method based on saved session data
+            determined_potency_method = determine_potency_method_from_session(preparation)
+            if determined_potency_method:
+                print(f"Determined potency method from session data: {determined_potency_method}")
+                potency_method_pref.set(determined_potency_method)
+                try:
+                    ui.update_radio_buttons("potency_method_radio", selected=determined_potency_method)
+                except Exception as e:
+                    print(f"Could not update potency method radio: {e}")
+            else:
+                print("Could not determine potency method from session data, using current preference")
+            
+            # Restore saved potency method if available
+            if 'potency_method' in preparation:
+                saved_potency_method = preparation['potency_method']
+                print(f"Restoring saved potency method: {saved_potency_method}")
+                potency_method_pref.set(saved_potency_method)
+                try:
+                    ui.update_radio_buttons("potency_method_radio", selected=saved_potency_method)
+                except Exception as e:
+                    print(f"Could not update potency method radio: {e}")
             
             # Intelligent step determination based on actual data content
             selected_drugs_data = preparation.get('selected_drugs', [])
@@ -4606,15 +4713,88 @@ def handle_step2_save():
         session_data_inputs = {}
         for i, drug_name in enumerate(selected):
             try:
-                # Get drug inputs using the same logic as next_step
-                drug_inputs = get_drug_inputs(i)
-                if drug_inputs:
-                    session_data_inputs[str(i)] = drug_inputs
-                    print(f"handle_step2_save: Saved inputs for drug {i} ({drug_name}): {drug_inputs}")
+                # Directly capture input values instead of relying on get_drug_inputs
+                drug_data_row = drug_data[drug_data['Drug'] == drug_name]
+                if drug_data_row.empty:
+                    print(f"handle_step2_save: Drug {drug_name} not found in database")
+                    continue
+                
+                # Capture all Step 2 inputs directly
+                drug_inputs = {}
+                
+                # Critical concentration
+                try:
+                    custom_crit = input[f"custom_critical_{i}"]()
+                    drug_inputs['custom_crit'] = custom_crit if custom_crit is not None else drug_data_row.iloc[0]['Critical_Concentration']
+                except Exception as e:
+                    print(f"handle_step2_save: Error getting custom_crit for drug {i}: {e}")
+                    drug_inputs['custom_crit'] = drug_data_row.iloc[0]['Critical_Concentration']
+                
+                # Purchased molecular weight
+                try:
+                    purch_molw = input[f"purchased_molw_{i}"]()
+                    drug_inputs['purch_molw'] = purch_molw if purch_molw is not None else drug_data_row.iloc[0]['OrgMolecular_Weight']
+                except Exception as e:
+                    print(f"handle_step2_save: Error getting purch_molw for drug {i}: {e}")
+                    drug_inputs['purch_molw'] = drug_data_row.iloc[0]['OrgMolecular_Weight']
+                
+                # Purity
+                try:
+                    purity = input[f"purity_{i}"]()
+                    drug_inputs['purity'] = purity if purity is not None else 0.0
+                except Exception as e:
+                    print(f"handle_step2_save: Error getting purity for drug {i}: {e}")
+                    drug_inputs['purity'] = 0.0
+                
+                # MGIT tubes
+                try:
+                    mgit_tubes = input[f"mgit_tubes_{i}"]()
+                    drug_inputs['mgit_tubes'] = mgit_tubes if mgit_tubes is not None else 2
+                except Exception as e:
+                    print(f"handle_step2_save: Error getting mgit_tubes for drug {i}: {e}")
+                    drug_inputs['mgit_tubes'] = 2
+                
+                # Actual weight (for Step 3)
+                try:
+                    actual_weight = input[f"actual_weight_{i}"]()
+                    drug_inputs['actual_weight'] = actual_weight if actual_weight is not None else 0.0
+                except Exception as e:
+                    print(f"handle_step2_save: Error getting actual_weight for drug {i}: {e}")
+                    drug_inputs['actual_weight'] = 0.0
+                
+                # Aliquot inputs if make_stock is enabled
+                if make_stock:
+                    try:
+                        num_aliquots = input[f"num_aliquots_{i}"]()
+                        drug_inputs['num_aliquots'] = num_aliquots
+                    except Exception as e:
+                        print(f"handle_step2_save: Error getting num_aliquots for drug {i}: {e}")
+                        drug_inputs['num_aliquots'] = None
+                    
+                    try:
+                        ml_per_aliquot = input[f"ml_per_aliquot_{i}"]()
+                        drug_inputs['ml_per_aliquot'] = ml_per_aliquot
+                    except Exception as e:
+                        print(f"handle_step2_save: Error getting ml_per_aliquot for drug {i}: {e}")
+                        drug_inputs['ml_per_aliquot'] = None
                 else:
-                    print(f"handle_step2_save: No inputs found for drug {i} ({drug_name})")
+                    drug_inputs['num_aliquots'] = None
+                    drug_inputs['ml_per_aliquot'] = None
+                
+                session_data_inputs[str(i)] = drug_inputs
+                print(f"handle_step2_save: Saved inputs for drug {i} ({drug_name}): {drug_inputs}")
+                
             except Exception as e:
-                print(f"handle_step2_save: Error getting drug inputs for index {i}: {e}")
+                print(f"handle_step2_save: Error processing drug {i} ({drug_name}): {e}")
+        
+        # Add estimated weights if available from calculation results
+        try:
+            current_results = calculation_results.get() or {}
+            if 'estimated_weights' in current_results:
+                session_data_inputs['estimated_weights'] = current_results['estimated_weights']
+                print(f"handle_step2_save: Added estimated_weights: {current_results['estimated_weights']}")
+        except Exception as e:
+            print(f"handle_step2_save: Error getting estimated_weights: {e}")
         
         # Prepare session data for saving
         preparation = {
