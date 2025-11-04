@@ -7,6 +7,8 @@ import pandas as pd
 import sys
 import os
 import io
+import sqlite3
+import json
 
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -20,30 +22,89 @@ from lib.dst_calc import (
 from lib.supp_calc import ml_to_ul, ul_to_ml
 from app.api.auth import register_user, login_user
 from app.api.database import db_manager
+from app.shiny.session_handler import SessionHandler
+
+# Create session handler instance
+session_handler = SessionHandler(db_manager)
 
 # Import PDF generation functions from the separate module
 from app.shiny.generate_pdf import generate_step2_pdf as generate_step2_pdf_module, generate_step4_pdf as generate_step4_pdf_backend
+
+
+def save_preparation_merge(session_id, new_prep: dict) -> bool:
+    """Merge new_prep into existing preparation JSON in the DB and save.
+
+    Behavior:
+    - Fetches existing preparation JSON for session_id (or empty dict if none).
+    - Merges top-level keys from new_prep into existing prep. If the key is 'inputs', it
+      merges the inner mapping rather than overwriting, preserving per-drug entries and
+      fields like 'estimated_weights'.
+    - Saves merged preparation using db_manager.update_session_data.
+    """
+    try:
+        with db_manager.get_connection() as conn:
+            cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (session_id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                try:
+                    prep = json.loads(row[0])
+                except Exception:
+                    prep = {}
+            else:
+                prep = {}
+
+        # Merge new_prep into prep
+        for k, v in (new_prep or {}).items():
+            if k == 'inputs':
+                if 'inputs' not in prep or not isinstance(prep.get('inputs'), dict):
+                    prep['inputs'] = {}
+                # Merge inputs dict (may contain drug_id keys or special keys like estimated_weights)
+                for in_k, in_v in v.items():
+                    prep['inputs'][in_k] = in_v
+            else:
+                prep[k] = v
+
+        success = db_manager.update_session_data(session_id, prep)
+        print(f"save_preparation_merge: session={session_id}, keys_saved={list(prep.keys())}, success={success}")
+        return success
+    except Exception as e:
+        print(f"save_preparation_merge: Error merging preparation for session {session_id}: {e}")
+        return False
 
 # Helper functions for common operations
 def get_drug_inputs(drug_index, fallback_session_data=None):
     """Get all inputs for a specific drug with session fallback."""
     try:
+        # Try to get inputs from Shiny controls
         inputs = {
             'custom_crit': input[f"custom_critical_{drug_index}"](),
             'purch_molw': input[f"purchased_molw_{drug_index}"](),
-            'stock_vol': input[f"stock_volume_{drug_index}"](),
             'actual_weight': input[f"actual_weight_{drug_index}"](),
             'mgit_tubes': input[f"mgit_tubes_{drug_index}"]()
         }
+        
+        # Add aliquot inputs if make_stock is enabled
+        try:
+            make_stock = input.make_stock_toggle() if hasattr(input, 'make_stock_toggle') else False
+            if make_stock:
+                inputs['num_aliquots'] = input[f"num_aliquots_{drug_index}"]() if f"num_aliquots_{drug_index}" in input else None
+                inputs['ml_per_aliquot'] = input[f"ml_per_aliquot_{drug_index}"]() if f"ml_per_aliquot_{drug_index}" in input else None
+            else:
+                inputs['num_aliquots'] = None
+                inputs['ml_per_aliquot'] = None
+        except Exception:
+            inputs['num_aliquots'] = None
+            inputs['ml_per_aliquot'] = None
         
         # Apply session fallbacks for None values
         if fallback_session_data:
             for key, session_key in [
                 ('custom_crit', 'Crit_Conc(μg/ml)'),
                 ('purch_molw', 'PurMol_W(g/mol)'),
-                ('stock_vol', 'St_Vol(ml)'),
                 ('actual_weight', 'Act_DrugW(mg)'),
-                ('mgit_tubes', 'Total Mgit tubes')
+                ('mgit_tubes', 'Total_Mgit_tubes'),
+                ('num_aliquots', 'Num_Aliquots'),
+                ('ml_per_aliquot', 'ML_Per_Aliquot')
             ]:
                 if inputs[key] is None and session_key in fallback_session_data:
                     inputs[key] = fallback_session_data[session_key]
@@ -51,6 +112,19 @@ def get_drug_inputs(drug_index, fallback_session_data=None):
         return inputs
     except Exception as e:
         print(f"Error getting drug inputs for index {drug_index}: {e}")
+        
+        # If Shiny controls fail, try to use session data directly
+        if fallback_session_data:
+            print(f"Using session data directly for drug {drug_index}")
+            return {
+                'custom_crit': fallback_session_data.get('Crit_Conc(μg/ml)'),
+                'purch_molw': fallback_session_data.get('PurMol_W(g/mol)'),
+                'actual_weight': fallback_session_data.get('Act_DrugW(mg)'),
+                'mgit_tubes': fallback_session_data.get('Total_Mgit_tubes'),
+                'num_aliquots': fallback_session_data.get('Num_Aliquots'),
+                'ml_per_aliquot': fallback_session_data.get('ML_Per_Aliquot')
+            }
+        
         return None
 
 def build_step2_data_structure():
@@ -78,11 +152,7 @@ def build_step2_data_structure():
 make_stock_pref = reactive.Value(False)
 potency_method_pref = reactive.Value("mol_weight")
 
-# Unit constants (base units)
-def weight_unit():
-    return "mg"
-def volume_unit():
-    return "ml"
+# Units are standardized: weight=mg, volume=ml, concentration=μg/ml, mol_weight=g/mol
 
 # Global variables to store calculation results
 calculation_results = reactive.Value({})
@@ -135,16 +205,31 @@ def calculate_weights_for_restored_session():
                         drug_data = load_drug_data()
                         
                         for i, drug_name in enumerate(selected):
-                            drug_inputs = inputs.get(str(i), {})
-                            if drug_inputs:
-                                # Get values from session
-                                custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 1)
-                                stock_vol = drug_inputs.get('St_Vol(ml)', 20)
-                                purch_molw = drug_inputs.get('PurMol_W(g/mol)', 558)
+                            # Get drug ID from database to match session data structure
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
+                                drug_inputs = inputs.get(drug_id, {})  # Use drug_id instead of str(i)
                                 
-                                # Get drug data
-                                drug_row = drug_data[drug_data['Drug'] == drug_name]
-                                if not drug_row.empty:
+                                print(f"Reactive effect: Drug {i} ({drug_name}), drug_id={drug_id}")
+                                print(f"Reactive effect: Available input keys: {list(inputs.keys())}")
+                                print(f"Reactive effect: Drug inputs: {drug_inputs}")
+                                
+                                if drug_inputs:
+                                    # Get values from session
+                                    custom_crit = drug_inputs.get('Crit_Conc(μg/ml)', 1)
+                                    purch_molw = drug_inputs.get('PurMol_W(g/mol)', 558)
+                                    
+                                    # Calculate stock volume based on make_stock preference and aliquot data
+                                    make_stock = preparation.get('make_stock', False)
+                                    if make_stock:
+                                        num_aliquots = drug_inputs.get('Num_Aliquots', 10)
+                                        ml_per_aliquot = drug_inputs.get('ML_Per_Aliquot', 2)
+                                        stock_vol = num_aliquots * ml_per_aliquot
+                                    else:
+                                        stock_vol = 20  # Default for no-stock workflow
+                                    
+                                    # Get drug data
                                     org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
                                     
                                     # Calculate potency
@@ -166,17 +251,329 @@ def calculate_weights_for_restored_session():
                         calculation_results.set({'estimated_weights': estimated_weights})
                         weights_calculated.set(True)
                         print(f"Reactive effect: Calculated estimated weights: {estimated_weights}")
+                        
+                        # Also store in session inputs for persistence
+                        try:
+                            cs = current_session.get()
+                            if cs and 'session_id' in cs:
+                                # Get current session data
+                                with sqlite3.connect(db_manager.db_path) as conn:
+                                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                                    session_row = cur.fetchone()
+                                    if session_row and session_row[0]:
+                                        import json
+                                        preparation = json.loads(session_row[0])
+                                        if 'inputs' not in preparation:
+                                            preparation['inputs'] = {}
+                                        preparation['inputs']['estimated_weights'] = estimated_weights
+                                        save_preparation_merge(cs['session_id'], preparation)
+                        except Exception as e:
+                            print(f"Error saving estimated weights to session: {e}")
             except Exception as e:
                 print(f"Reactive effect: Error calculating estimated weights: {e}")
 
+# Variables for session results view
+show_results_view = reactive.Value(False)
+session_data = reactive.Value({})
+session_inputs = reactive.Value({})
+
+# Flag to prevent multiple calculations
+weights_calculated = reactive.Value(False)
+
+# Reactive effect to calculate weights for restored sessions
 def get_estimated_weight(drug_index):
     """Get the estimated weight for a drug from previous calculations."""
+    # First check calculation results (for current session)
     results = calculation_results.get()
     if results and 'estimated_weights' in results:
         estimated_weights = results['estimated_weights']
         if isinstance(estimated_weights, list) and drug_index < len(estimated_weights):
             return estimated_weights[drug_index]
+    
+    # Also check session inputs (for restored sessions)
+    try:
+        cs = current_session.get()
+        if cs and 'session_id' in cs:
+            with sqlite3.connect(db_manager.db_path) as conn:
+                cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                session_row = cur.fetchone()
+                if session_row and session_row[0]:
+                    import json
+                    preparation = json.loads(session_row[0])
+                    if 'inputs' in preparation and 'estimated_weights' in preparation['inputs']:
+                        estimated_weights = preparation['inputs']['estimated_weights']
+                        if isinstance(estimated_weights, list) and drug_index < len(estimated_weights):
+                            return estimated_weights[drug_index]
+    except Exception as e:
+        print(f"Error getting estimated weight from session: {e}")
+    
     return 0
+
+def perform_final_calculations_from_session(session_data):
+    """Perform final calculations using data directly from session instead of global arrays"""
+    print("perform_final_calculations_from_session: Starting")
+    
+    try:
+        # Extract data from session
+        selected_drugs = session_data.get('selected_drugs', [])
+        inputs = session_data.get('inputs', {})
+        
+        if not selected_drugs:
+            print("perform_final_calculations_from_session: No drugs in session")
+            return []
+        
+        print(f"perform_final_calculations_from_session: Processing {len(selected_drugs)} drugs")
+        
+        drug_data = load_drug_data()
+        print(f"perform_final_calculations_from_session: Loaded drug_data with shape {drug_data.shape}")
+        print(f"perform_final_calculations_from_session: Drug data columns: {list(drug_data.columns)}")
+        
+        final_results = []
+        
+        # Get make_stock preference from session data or current setting
+        make_stock = session_data.get('make_stock', bool(make_stock_pref()))
+        
+        # If make_stock is False but we have aliquot data, this indicates a stock workflow
+        # (This handles sessions created before make_stock was saved properly)
+        if not make_stock and inputs:
+            for drug_key, drug_input_data in inputs.items():
+                # Skip non-drug keys
+                if not drug_key.isdigit():
+                    continue
+                    
+                # Check if this is a dictionary (proper drug data)
+                if isinstance(drug_input_data, dict):
+                    if drug_input_data.get('Num_Aliquots') or drug_input_data.get('ML_Per_Aliquot'):
+                        make_stock = True
+                        print(f"perform_final_calculations_from_session: Detected stock workflow from aliquot data, setting make_stock = True")
+                        break
+        
+        print(f"perform_final_calculations_from_session: make_stock = {make_stock}")
+        
+        # Process each drug using session data
+        for drug_idx, drug_name in enumerate(selected_drugs):
+            # Get drug data from session inputs (need to check both formats)
+            drug_inputs = inputs.get(str(drug_idx), {})
+            
+            # Also check by drug name or ID as key
+            if not drug_inputs:
+                # Look for drug data by name or find first matching entry
+                drug_data_obj = load_drug_data()
+                drug_row = drug_data_obj[drug_data_obj['Drug'] == drug_name]
+                if not drug_row.empty:
+                    drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(drug_idx)
+                    drug_inputs = inputs.get(drug_id, {})
+            
+            if not drug_inputs:
+                print(f"perform_final_calculations_from_session: No inputs for drug {drug_idx} ({drug_name})")
+                print(f"perform_final_calculations_from_session: Available input keys: {list(inputs.keys())}")
+                continue
+            
+            print(f"perform_final_calculations_from_session: Found inputs for drug {drug_idx}: {drug_inputs}")
+            print(f"perform_final_calculations_from_session: Available keys: {list(drug_inputs.keys())}")
+            
+            # Extract values from session data (handle both key formats)
+            actual_weight = drug_inputs.get('Act_DrugW(mg)', drug_inputs.get('actual_weight', 0))
+            mgit_tubes = drug_inputs.get('Total_Mgit_tubes', drug_inputs.get('Total Mgit tubes', drug_inputs.get('mgit_tubes', 2)))
+            custom_crit = drug_inputs.get('Crit_Conc(μg/ml)', drug_inputs.get('Crit_Conc(mg/ml)', drug_inputs.get('custom_crit', None)))
+            
+            print(f"perform_final_calculations_from_session: Retrieved values before fallback - actual_weight={actual_weight}, mgit_tubes={mgit_tubes}, custom_crit={custom_crit}")
+            purch_molw = drug_inputs.get('PurMol_W(g/mol)', drug_inputs.get('purch_molw', None))
+            
+            # Get default values from drug database if not in session
+            # Check if drug_data is valid DataFrame
+            if not hasattr(drug_data, 'columns'):
+                print(f"perform_final_calculations_from_session: ERROR - drug_data is not a DataFrame: {type(drug_data)}")
+                continue
+                
+            print(f"perform_final_calculations_from_session: drug_data columns: {list(drug_data.columns)}")
+            print(f"perform_final_calculations_from_session: drug_data shape: {drug_data.shape}")
+            print(f"perform_final_calculations_from_session: Looking for drug: '{drug_name}'")
+            
+            # Check if 'Drug' column exists
+            if 'Drug' not in drug_data.columns:
+                print(f"perform_final_calculations_from_session: ERROR - 'Drug' column not found in drug_data")
+                print(f"perform_final_calculations_from_session: Available columns: {list(drug_data.columns)}")
+                continue
+                
+            drug_row = drug_data[drug_data['Drug'] == drug_name]
+            if drug_row.empty:
+                print(f"perform_final_calculations_from_session: Drug {drug_name} not found in database")
+                continue
+                
+            if custom_crit is None:
+                custom_crit = drug_row.iloc[0]['Critical_Concentration']
+            if purch_molw is None:
+                purch_molw = drug_row.iloc[0]['OrgMolecular_Weight']
+            
+            print(f"perform_final_calculations_from_session: Drug {drug_name} - actual_weight={actual_weight}, mgit_tubes={mgit_tubes}, custom_crit={custom_crit}")
+            
+            # Calculate working solution values
+            org_molw = drug_row.iloc[0]['OrgMolecular_Weight']
+            pot = potency(purch_molw, org_molw)
+            ws_conc_ugml = conc_ws(custom_crit)
+            vol_ws_ml = vol_workingsol(mgit_tubes)
+            
+            # Get estimated weight from session inputs (calculated in Step 2)
+            est_weight = 0
+            if 'estimated_weights' in inputs:
+                estimated_weights = inputs['estimated_weights']
+                if isinstance(estimated_weights, list) and drug_idx < len(estimated_weights):
+                    est_weight = estimated_weights[drug_idx]
+            
+            # Fallback: calculate estimated drug weight if not available
+            if est_weight == 0:
+                stock_vol = 30  # Default stock volume for fallback calculation
+                est_weight = est_drugweight(custom_crit, stock_vol, pot)
+            
+            est_dw_mg = est_weight
+            
+            # Calculate final diluent volume
+            final_vol_diluent = calc_adjusted_volume(actual_weight, est_dw_mg, vol_ws_ml)
+            
+            print(f"perform_final_calculations_from_session: Calculated - ws_conc={ws_conc_ugml}, vol_ws={vol_ws_ml}, est_weight={est_dw_mg}, final_vol_diluent={final_vol_diluent}")
+            
+            if make_stock:
+                print(f"Taking STOCK solution path for {drug_name}")
+                # Stock solution calculations - MIMIC the original perform_final_calculations() exactly
+                
+                # Get the values that would have been calculated in Step 2
+                # These should come from estimated_weights stored in session inputs
+                # (est_weight is already calculated above)
+                
+                # Get aliquot data from session
+                num_aliquots = drug_inputs.get('Num_Aliquots', 10)
+                ml_ali = drug_inputs.get('ML_Per_Aliquot', 2)
+                
+                # Calculate total stock volume the same way as Step 2 would have
+                # This follows the same logic as the original calculation
+                aliquots_stock_vol = num_aliquots * ml_ali
+                safety_margin = 1.1  # 10% safety margin
+                total_stock_vol = aliquots_stock_vol * safety_margin
+                
+                # Use the EXACT same calculation logic as the original function
+                total_volWS = calc_adjusted_volume(actual_weight, est_weight, vol_ws_ml)
+                new_a_val = calc_stock_factor(actual_weight, total_stock_vol, ws_conc_ugml, pot)
+                stock_vol_to_add_to_ws_ml = calc_volume_divided_by_factor(total_volWS, new_a_val)
+                diluent_vol_to_add_to_ws_ml = total_volWS - stock_vol_to_add_to_ws_ml
+                total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
+                num_final_aliquots = floor(total_stock_left / ml_ali)
+                Final_stock_conc = calc_concentration_times_factor(ws_conc_ugml, new_a_val)
+                
+                # DEBUG: Print calculation values for aliquot calculation (same as original)
+                print(f"ALIQUOT CALC DEBUG: drug={drug_name}")
+                print(f"  total_stock_vol={total_stock_vol}")
+                print(f"  stock_vol_to_add_to_ws_ml={stock_vol_to_add_to_ws_ml}")
+                print(f"  total_stock_left={total_stock_left}")
+                print(f"  ml_ali={ml_ali}")
+                print(f"  num_final_aliquots=floor({total_stock_left}/{ml_ali})={num_final_aliquots}")
+                
+                if stock_vol_to_add_to_ws_ml >= 0.1:
+                    final_results.append({
+                        'Intermediate': False,
+                        'Drug': drug_name,
+                        'Diluent': drug_row.iloc[0]['Diluent'],
+                        'Crit_Conc': round(custom_crit, 2),
+                        'Act_Weight': round(actual_weight, 2),
+                        'Stock_Conc': round(Final_stock_conc, 2),
+                        'Stock_Factor': round(new_a_val, 1),
+                        'Stock_to_WS_µl': ml_to_ul(stock_vol_to_add_to_ws_ml),
+                        'Stock_to_WS': round(stock_vol_to_add_to_ws_ml, 2),
+                        'Dil_to_WS_µl': ml_to_ul(diluent_vol_to_add_to_ws_ml),
+                        'Dil_to_WS': round(diluent_vol_to_add_to_ws_ml, 2),
+                        'Conc_Ws': round(ws_conc_ugml, 2),
+                        'Total_Stock_Vol_µl': ml_to_ul(total_stock_vol),
+                        'Total_Stock_Vol': round(total_stock_vol, 2),
+                        'Total_Stock_Left_µl': ml_to_ul(total_stock_left),
+                        'Total_Stock_Left': round(total_stock_left, 2),
+                        'MGIT_Tubes': round(mgit_tubes),
+                        'Number_of_Ali': round(num_final_aliquots),
+                        'ml_aliquot_µl': ml_to_ul(ml_ali),
+                        'ml_aliquot': round(ml_ali, 2),
+                    })
+                else:
+                    # Intermediate solution calculations - MIMIC the original exactly
+                    intermediate = True
+                    
+                    # Use modular intermediate calculation functions (same as original)
+                    InterFactor = calc_intermediate_factor(new_a_val, total_volWS)
+                    stock_to_inter = calc_volume_divided_by_factor(total_volWS, InterFactor)
+                    total_stock_left = total_stock_vol - stock_to_inter
+                    num_final_aliquots = floor(total_stock_left / ml_ali)
+                    inter_conc = calc_concentration_times_factor(ws_conc_ugml, InterFactor)
+                    Vol_of_inter = calc_intermediate_volume(stock_to_inter, Final_stock_conc, InterFactor, ws_conc_ugml)
+                    dil_to_inter = calc_volume_difference(Vol_of_inter, stock_to_inter)
+                    vol_inter_to_ws = calc_volume_divided_by_factor(total_volWS, InterFactor)
+                    vol_dil_to_ws = calc_volume_difference(total_volWS, vol_inter_to_ws)
+
+                    final_results.append({
+                        'Intermediate': True,
+                        'Drug': drug_name,
+                        'Diluent': drug_row.iloc[0]['Diluent'],
+                        'Crit_Conc': round(custom_crit, 2),
+                        'Act_Weight': round(actual_weight, 2),
+                        'Stock_Conc': round(Final_stock_conc, 2),
+                        'Stock_Factor': round(new_a_val, 2),
+                        'Total_Stock_Vol_µl': ml_to_ul(total_stock_vol),
+                        'Total_Stock_Vol': round(total_stock_vol, 2),
+                        'Total_Stock_Left_µl': ml_to_ul(total_stock_left),
+                        'Total_Stock_Left': round(total_stock_left, 2),
+                        'Stock_to_Inter_µl': ml_to_ul(stock_to_inter),
+                        'Stock_to_Inter': round(stock_to_inter, 2),
+                        'Inter_Factor': round(InterFactor, 1),
+                        'Inter_Conc': round(inter_conc, 2),
+                        'Dil_to_Inter_µl': ml_to_ul(dil_to_inter),
+                        'Dil_to_Inter': round(dil_to_inter, 2),
+                        'Vol_Inter_to_WS_µl': ml_to_ul(vol_inter_to_ws),
+                        'Vol_Inter_to_WS': round(vol_inter_to_ws, 2),
+                        'Dil_to_WS_µl': ml_to_ul(vol_dil_to_ws),
+                        'Dil_to_WS': round(vol_dil_to_ws, 2),
+                        'Conc_Ws': round(ws_conc_ugml, 2),
+                        'MGIT_Tubes': round(mgit_tubes),
+                        'Number_of_Ali': round(num_final_aliquots),
+                        'ml_aliquot_µl': ml_to_ul(ml_ali),
+                        'ml_aliquot': round(ml_ali, 2),
+                    })
+            else:
+                print(f"Taking NO-STOCK solution path for {drug_name}")
+                # No stock solution calculations (direct preparation)
+                final_results.append({
+                    'Intermediate': False,
+                    'Drug': drug_name,
+                    'Diluent': drug_row.iloc[0]['Diluent'],
+                    'Crit_Conc': round(custom_crit, 2),
+                    'Act_Weight': round(actual_weight, 2),
+                    'Final_Vol_Dil_µl': ml_to_ul(final_vol_diluent),
+                    'Final_Vol_Dil': round(final_vol_diluent, 2),
+                    'Conc_Ws': round(ws_conc_ugml, 2),
+                    'MGIT_Tubes': round(mgit_tubes),
+                    'Stock_Conc': round(ws_conc_ugml, 2),  # Same as working solution for no-stock pathway
+                    'Stock_Factor': 1,  # No dilution factor for direct preparation
+                    'ml_aliquot': 0,  # No aliquots in no-stock pathway
+                    'ml_aliquot_µl': 0,
+                    'Number_of_Ali': 0,
+                    'Total_Stock_Vol': round(final_vol_diluent, 2),  # Total volume is the diluent volume
+                    'Total_Stock_Vol_µl': ml_to_ul(final_vol_diluent),
+                    'Stock_to_WS': 0,  # No stock solution used in no-stock pathway
+                    'Stock_to_WS_µl': 0,
+                    'Dil_to_WS': round(final_vol_diluent, 2),  # All diluent goes to working solution
+                    'Dil_to_WS_µl': ml_to_ul(final_vol_diluent),
+                    'Vol_Inter_to_WS': 0,  # No intermediate solution in no-stock pathway
+                    'Vol_Inter_to_WS_µl': 0,
+                    'Total_Stock_Left': 0,  # No stock left in no-stock pathway
+                    'Total_Stock_Left_µl': 0,
+                })
+        
+        print(f"perform_final_calculations_from_session: Generated {len(final_results)} results")
+        if final_results:
+            print(f"perform_final_calculations_from_session: Sample result keys: {list(final_results[0].keys())}")
+        return final_results
+        
+    except Exception as e:
+        import traceback
+        print(f"perform_final_calculations_from_session: Error: {e}")
+        print(f"perform_final_calculations_from_session: Traceback: {traceback.format_exc()}")
+        return []
 
 def build_step4_data_tables(final_results, make_stock):
     """Build HTML tables for Step 4 data that match the PDF tables."""
@@ -234,8 +631,8 @@ def build_step4_data_tables(final_results, make_stock):
                 'Drug': drug_name,
                 'Diluent': diluent,
                 'Intermediate_to_Add': f"{result.get('Vol_Inter_to_WS', 0):.2f}",
-                'Diluent_to_Add': f"{result.get('Dil_to_WS', 0):.4f}",
-                'Volume_WS': f"{result.get('Dil_to_WS', 0) + result.get('Vol_Inter_to_WS', 0):.4f}",
+                'Diluent_to_Add': f"{result.get('Dil_to_WS', 0):.2f}",
+                'Volume_WS': f"{result.get('Dil_to_WS', 0) + result.get('Vol_Inter_to_WS', 0):.2f}",
                 'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
             })
     if ws_intermediate_data:
@@ -271,8 +668,8 @@ def build_step4_data_tables(final_results, make_stock):
             ws_no_stock_data.append({
                 'Drug': drug_name,
                 'Diluent': diluent,
-                'Drug_Weight': f"{result.get('Act_Weight', 0):.4f}",
-                'Diluent_to_Add': f"{result.get('Final_Vol_Dil', 0):.4f}",
+                'Drug_Weight': f"{result.get('Act_Weight', 0):.2f}",
+                'Diluent_to_Add': f"{result.get('Final_Vol_Dil', result.get('Dil_to_WS', 0)):.2f}",
                 'Conc_WS': f"{result.get('Conc_Ws', 0):.2f}"
             })
     if ws_no_stock_data:
@@ -356,6 +753,7 @@ def create_html_table(data, headers, table_style="", header_style="", row_style=
         style=f"border-collapse: collapse; margin: 15px 0; width: 100%; {table_style}"
     )
 
+
 def perform_final_calculations():
     """Perform final calculations for MGIT tubes and working solutions based on two categories:
     1. No stock solution: Recalculate diluent volume using actual weight
@@ -364,6 +762,22 @@ def perform_final_calculations():
     print("perform_final_calculations: Starting")
     
     try:
+        # First check if this is a completed session with session data available
+        cs = current_session()
+        if cs and current_step() == 4:
+            try:
+                with db_manager.get_connection() as conn:
+                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        import json
+                        preparation = json.loads(row[0])
+                        if preparation.get('inputs') and preparation.get('selected_drugs'):
+                            print("perform_final_calculations: Using session data for completed session")
+                            return perform_final_calculations_from_session(preparation)
+            except Exception as e:
+                print(f"perform_final_calculations: Could not use session data: {e}")
+        
         # Get selected drugs and preferences
         selected = input.drug_selection()
         if not selected:
@@ -376,6 +790,10 @@ def perform_final_calculations():
         # Debug: Check if Step3 data exists
         print(f"perform_final_calculations: Step3_ActDrugWeights = {Step3_ActDrugWeights[:len(selected)]}")
         print(f"perform_final_calculations: Step2_MgitTubes = {Step2_MgitTubes[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_CriticalConc = {Step2_CriticalConc[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_VolWS = {Step2_VolWS[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_ConcWS = {Step2_ConcWS[:len(selected)]}")
+        print(f"perform_final_calculations: Step2_EstWeights = {Step2_EstWeights[:len(selected)]}")
         
         drug_data = load_drug_data()
         final_results = []
@@ -386,6 +804,7 @@ def perform_final_calculations():
             crit_conc = Step2_CriticalConc[drug_idx]
             actual_weight = Step3_ActDrugWeights[drug_idx]
             ws_vol_ml = Step2_VolWS[drug_idx]
+            ws_conc_ugml = Step2_ConcWS[drug_idx]
             ws_conc_ugml = Step2_ConcWS[drug_idx]
 
             if make_stock:
@@ -403,6 +822,14 @@ def perform_final_calculations():
                 total_stock_left = total_stock_vol - stock_vol_to_add_to_ws_ml
                 num_aliquots = floor(total_stock_left / ml_ali)
                 Final_stock_conc = calc_concentration_times_factor(ws_conc_ugml, new_a_val)
+                
+                # DEBUG: Print calculation values for aliquot calculation
+                print(f"ALIQUOT CALC DEBUG: drug={drug_name}")
+                print(f"  total_stock_vol={total_stock_vol}")
+                print(f"  stock_vol_to_add_to_ws_ml={stock_vol_to_add_to_ws_ml}")
+                print(f"  total_stock_left={total_stock_left}")
+                print(f"  ml_ali={ml_ali}")
+                print(f"  num_aliquots=floor({total_stock_left}/{ml_ali})={num_aliquots}")
                 
                 if stock_vol_to_add_to_ws_ml >= 0.1:
                     final_results.append({
@@ -486,13 +913,30 @@ def perform_final_calculations():
                     'Final_Vol_Dil': round(final_vol_diluent, 2),
                     'Conc_Ws': round(ws_conc_ugml, 2),
                     'MGIT_Tubes': round(mgit_tubes),
+                    'Stock_Conc': round(ws_conc_ugml, 2),  # Same as working solution for no-stock pathway
+                    'Stock_Factor': 1,  # No dilution factor for direct preparation
+                    'ml_aliquot': 0,  # No aliquots in no-stock pathway
+                    'ml_aliquot_µl': 0,
+                    'Number_of_Ali': 0,
+                    'Total_Stock_Vol': round(final_vol_diluent, 2),  # Total volume is the diluent volume
+                    'Total_Stock_Vol_µl': ml_to_ul(final_vol_diluent),
+                    'Stock_to_WS': 0,  # No stock solution used in no-stock pathway
+                    'Stock_to_WS_µl': 0,
+                    'Dil_to_WS': round(final_vol_diluent, 2),  # All diluent goes to working solution
+                    'Dil_to_WS_µl': ml_to_ul(final_vol_diluent),
+                    'Vol_Inter_to_WS': 0,  # No intermediate solution in no-stock pathway
+                    'Vol_Inter_to_WS_µl': 0,
+                    'Total_Stock_Left': 0,  # No stock left in no-stock pathway
+                    'Total_Stock_Left_µl': 0,
                 })
     
         
         return final_results
         
     except Exception as e:
+        import traceback
         print(f"perform_final_calculations: Error: {e}")
+        print(f"perform_final_calculations: Traceback: {traceback.format_exc()}")
         return []
 
 
@@ -516,10 +960,129 @@ def generate_step2_pdf():
 def generate_step4_pdf():
     """Generate PDF for Step 4 final results using modular PDF generation"""
     try:
+        print("generate_step4_pdf: Starting PDF generation")
+        
+        # Check if we're in a session context (completed or current)
+        cs = current_session()
+        if cs and current_step() == 4:
+            # For session-based generation, get data from session
+            try:
+                with db_manager.get_connection() as conn:
+                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        import json
+                        preparation = json.loads(row[0])
+                        
+                        # Get session data
+                        selected = preparation.get('selected_drugs', [])
+                        make_stock = preparation.get('make_stock', bool(make_stock_pref()))
+                        inputs = preparation.get('inputs', {})
+                        
+                        print(f"generate_step4_pdf: Session data - drugs: {selected}, make_stock: {make_stock}")
+                        
+                        if not selected:
+                            print("generate_step4_pdf: No drugs in session")
+                            return None
+                        
+                        # Generate final results from session data
+                        final_results = perform_final_calculations_from_session(preparation)
+                        
+                        if not final_results:
+                            print("generate_step4_pdf: No final results available")
+                            return None
+                        
+                        # Build Step 2 data structure from session data
+                        step2_data = {
+                            'CriticalConc': [],
+                            'Purch': [],
+                            'MgitTubes': [],
+                            'Potencies': [],
+                            'ConcWS': [],
+                            'VolWS': [],
+                            'CalEstWeights': [],
+                            'num_aliquots': [],
+                            'mlperAliquot': [],
+                            'TotalStockVolumes': [],
+                            'StocktoWS': [],
+                            'DiltoWS': [],
+                            'Factors': [],
+                            'EstWeights': [],
+                            'PracWeights': [],
+                            'PracVol': []
+                        }
+                        
+                        # Populate Step 2 data from session inputs and estimated weights
+                        drug_data = load_drug_data()
+                        estimated_weights = inputs.get('estimated_weights', [])
+                        
+                        for i, drug_name in enumerate(selected):
+                            # Get drug data
+                            drug_row = drug_data[drug_data['Drug'] == drug_name]
+                            if not drug_row.empty:
+                                drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
+                                drug_inputs = inputs.get(drug_id, {})
+                                
+                                # Populate Step 2 arrays with session data
+                                step2_data['CriticalConc'].append(drug_inputs.get('Crit_Conc(μg/ml)', drug_row.iloc[0]['Critical_Concentration']))
+                                step2_data['Purch'].append(drug_inputs.get('PurMol_W(g/mol)', drug_row.iloc[0]['OrgMolecular_Weight']))
+                                step2_data['MgitTubes'].append(drug_inputs.get('Total_Mgit_tubes', 0))
+                                step2_data['num_aliquots'].append(drug_inputs.get('Num_Aliquots', 0))
+                                step2_data['mlperAliquot'].append(drug_inputs.get('ML_Per_Aliquot', 0))
+                                
+                                # Use estimated weights from session
+                                if i < len(estimated_weights):
+                                    step2_data['EstWeights'].append(estimated_weights[i])
+                                    step2_data['CalEstWeights'].append(estimated_weights[i])
+                                else:
+                                    step2_data['EstWeights'].append(0)
+                                    step2_data['CalEstWeights'].append(0)
+                                
+                                # Calculate other values based on session data
+                                # These would typically come from Step 2 calculations
+                                step2_data['Potencies'].append(1.0)  # Default potency
+                                step2_data['ConcWS'].append(0)  # Will be calculated
+                                step2_data['VolWS'].append(0)  # Will be calculated
+                                step2_data['TotalStockVolumes'].append(0)
+                                step2_data['StocktoWS'].append(0)
+                                step2_data['DiltoWS'].append(0)
+                                step2_data['Factors'].append(0)
+                                step2_data['PracWeights'].append(0)
+                                step2_data['PracVol'].append(0)
+                        
+                        # Build Step 3 actual drug weights from session data
+                        step3_actual_weights = []
+                        for i, drug_name in enumerate(selected):
+                            drug_id = str(i)  # Use index as fallback
+                            if not drug_data.empty:
+                                drug_row = drug_data[drug_data['Drug'] == drug_name]
+                                if not drug_row.empty:
+                                    drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
+                            
+                            drug_inputs = inputs.get(drug_id, {})
+                            actual_weight = drug_inputs.get('Act_DrugW(mg)', 0)
+                            step3_actual_weights.append(actual_weight)
+                        
+                        print(f"generate_step4_pdf: Calling backend with {len(final_results)} results")
+                        
+                        # Call the modular PDF generation function with session data
+                        return generate_step4_pdf_backend(selected, make_stock, step2_data, step3_actual_weights, final_results)
+                        
+            except Exception as e:
+                print(f"generate_step4_pdf: Error with session data: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Fallback to original method for non-session generation
         selected = input.drug_selection()
         make_stock = bool(make_stock_pref())
         
         final_results = perform_final_calculations()
+        
+        print(f"generate_step4_pdf: Got final_results: {final_results}")
+        if not final_results:
+            print("generate_step4_pdf: No final results available")
+            return None
         
         # Prepare Step 2 data structure for the modular function
         step2_data = build_step2_data_structure()
@@ -548,10 +1111,6 @@ final_calculation_done = reactive.Value(False)
 
 # Track warnings for modal display
 warnings = reactive.Value([])
-
-# Unit selection reactive values
-volume_unit = reactive.Value("ml")
-weight_unit = reactive.Value("mg")
 
 # Auth/user session state
 current_user = reactive.Value(None)
@@ -608,7 +1167,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     completed = False
                     try:
                         prep = json.loads(prep_json) if prep_json else {}
-                        completed = bool(prep and prep.get('step', 0) >= 3 and prep.get('results'))
+                        # 'results' field was removed from preparation; consider session completed if step >= 3
+                        completed = bool(prep and prep.get('step', 0) >= 3)
                     except Exception:
                         completed = False
                     
@@ -667,7 +1227,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     users_cur = conn.execute("SELECT user_id, username FROM users ORDER BY user_id ASC")
                     users_rows = users_cur.fetchall()
                     header = ui.tags.tr(
-                        ui.tags.th("User ID", style="padding: 6px; border: 1px solid #ddd;"),
                         ui.tags.th("Username", style="padding: 6px; border: 1px solid #ddd;"),
                         ui.tags.th("Total Sessions", style="padding: 6px; border: 1px solid #ddd;"),
                         ui.tags.th("Recent Session", style="padding: 6px; border: 1px solid #ddd;")
@@ -686,7 +1245,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         total_count = count_cur.fetchone()[0]
                         body_rows.append(
                             ui.tags.tr(
-                                ui.tags.td(str(user_id), style="padding: 6px; border: 1px solid #ddd;"),
                                 ui.tags.td(username, style="padding: 6px; border: 1px solid #ddd;"),
                                 ui.tags.td(str(total_count), style="padding: 6px; border: 1px solid #ddd;"),
                                 ui.tags.td(
@@ -811,8 +1369,6 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                 
                 preparation = data.get('preparation', {})
                 selected_drugs = data.get('selected_drugs', [])
-                volume_unit_val = data.get('volume_unit', 'ml')
-                weight_unit_val = data.get('weight_unit', 'mg')
                 inputs = data.get('inputs', {})
                 
                 # Get drug data for calculations
@@ -827,7 +1383,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     ui.tags.h2("Session Results", style="color: #2c3e50; margin-bottom: 20px;"),
                     ui.tags.div(
                         ui.tags.p(f"Session: {session_name}", style="font-weight: bold; margin-bottom: 5px;"),
-                        ui.tags.p(f"Volume Unit: {volume_unit_val} | Weight Unit: {weight_unit_val}", style="color: #7f8c8d; margin-bottom: 10px;"),
+                        ui.tags.p(f"Units: Volume (ml) | Weight (mg)", style="color: #7f8c8d; margin-bottom: 10px;"),
                         style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;"
                     )
                 )
@@ -852,11 +1408,11 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         ui.tags.div(
                             ui.tags.h4(f"Drug: {drug_name}", style="color: #2c3e50; margin-bottom: 10px; font-size: 16px;"),
                             ui.tags.div(
-                                ui.tags.p(f"Critical Concentration: {drug_inputs.get('Crit_Conc(mg/ml)', 'N/A')} μg/ml", style="margin-bottom: 5px;"),
+                                ui.tags.p(f"Critical Concentration: {drug_inputs.get('Crit_Conc(μg/ml)', 'N/A')} μg/ml", style="margin-bottom: 5px;"),
                                 ui.tags.p(f"Purchased Molecular Weight: {drug_inputs.get('PurMol_W(g/mol)', 'N/A')} g/mol", style="margin-bottom: 5px;"),
-                                ui.tags.p(f"Stock Volume: {drug_inputs.get('St_Vol(ml)', 'N/A')} {volume_unit_val}", style="margin-bottom: 5px;"),
-                                ui.tags.p(f"Actual Drug Weight: {drug_inputs.get('Act_DrugW(mg)', 'N/A')} {weight_unit_val}", style="margin-bottom: 5px;"),
-                                ui.tags.p(f"MGIT Tubes: {drug_inputs.get('Total Mgit tubes', 'N/A')}", style="margin-bottom: 5px;"),
+                                ui.tags.p(f"Actual Drug Weight: {drug_inputs.get('Act_DrugW(mg)', 'N/A')} mg", style="margin-bottom: 5px;"),
+                                ui.tags.p(f"MGIT Tubes: {drug_inputs.get('Total_Mgit_tubes', 'N/A')}", style="margin-bottom: 5px;"),
+                                ui.tags.p(f"Aliquots: {drug_inputs.get('Num_Aliquots', 'N/A')} × {drug_inputs.get('ML_Per_Aliquot', 'N/A')} ml", style="margin-bottom: 5px;"),
                                 style="background-color: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 15px;"
                             )
                         )
@@ -879,9 +1435,17 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         
                         if drug_inputs:
                             # Get input values
-                            stock_vol = drug_inputs.get('St_Vol(ml)', 0)
                             purch_molw = drug_inputs.get('PurMol_W(g/mol)', 0)
-                            custom_crit = drug_inputs.get('Crit_Conc(mg/ml)', 0)
+                            custom_crit = drug_inputs.get('Crit_Conc(μg/ml)', 0)
+                            
+                            # Calculate stock volume based on make_stock preference and aliquot data
+                            make_stock = preparation.get('make_stock', False)
+                            if make_stock:
+                                num_aliquots = drug_inputs.get('Num_Aliquots', 10)
+                                ml_per_aliquot = drug_inputs.get('ML_Per_Aliquot', 2)
+                                stock_vol = num_aliquots * ml_per_aliquot
+                            else:
+                                stock_vol = 20  # Default for no-stock workflow
                             
                             if stock_vol and purch_molw and custom_crit:
                                 stock_vol_ml = stock_vol
@@ -918,7 +1482,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 ui.tags.table(
                                     ui.tags.tr(
                                         ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;"),
-                                        ui.tags.th(f"Estimated Weight ({weight_unit_val})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;")
+                                        ui.tags.th(f"Estimated Weight (mg)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold;")
                                     ),
                                     *[ui.tags.tr(
                                         ui.tags.td(selected_drugs[i], style="padding: 8px; border: 1px solid #ddd;"),
@@ -938,10 +1502,18 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         if drug_inputs:
                                     # Get input values in base units
                                     actual_weight_mg = drug_inputs.get('Act_DrugW(mg)', 0)
-                                    mgit_tubes = drug_inputs.get('Total Mgit tubes', 0)
-                                    stock_vol_ml = drug_inputs.get('St_Vol(ml)', 0)
+                                    mgit_tubes = drug_inputs.get('Total_Mgit_tubes', 0)
                                     purch_molw_gmol = drug_inputs.get('PurMol_W(g/mol)', 0)
-                                    custom_crit_mgml = drug_inputs.get('Crit_Conc(mg/ml)', 0)
+                                    custom_crit_mgml = drug_inputs.get('Crit_Conc(μg/ml)', 0)
+                                    
+                                    # Calculate stock volume based on make_stock preference and aliquot data
+                                    make_stock = preparation.get('make_stock', False)
+                                    if make_stock:
+                                        num_aliquots = drug_inputs.get('Num_Aliquots', 10)
+                                        ml_per_aliquot = drug_inputs.get('ML_Per_Aliquot', 2)
+                                        stock_vol_ml = num_aliquots * ml_per_aliquot
+                                    else:
+                                        stock_vol_ml = 20  # Default for no-stock workflow
                                     
                                     if actual_weight_mg and mgit_tubes and stock_vol_ml and purch_molw_gmol and custom_crit_mgml:                                # Get drug data
                                         drug_row = drug_data[drug_data['Drug'] == drug_name]
@@ -1231,7 +1803,11 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             except Exception:
                                 existing_purch = None
                             if existing_purch is None:
-                                purch_default = purch_molw_value
+                                # Use stored value or default to original molecular weight
+                                if purch_molw_value > 0:
+                                    purch_default = purch_molw_value
+                                else:
+                                    purch_default = row_data['OrgMolecular_Weight']
                             else:
                                 purch_default = existing_purch
 
@@ -1331,7 +1907,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     # Create table headers for step 3
                     table_headers = ui.tags.tr(
                         ui.tags.th("Drug", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 200px;"),
-                        ui.tags.th(f"Actual Weight ({weight_unit()})", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
+                        ui.tags.th("Actual Weight (mg)", style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa; font-weight: bold; font-size: 14px; width: 120px;"),
                     )
                     
                     # Create table rows for each selected drug
@@ -1382,7 +1958,24 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                 elif current_step() == 4:
                     try:
                         # Collect data needed for instructions
+                        # Get make_stock from session data if available, otherwise use preference
                         make_stock = bool(make_stock_pref())
+                        cs = current_session()
+                        if cs:
+                            try:
+                                with db_manager.get_connection() as conn:
+                                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                                    row = cur.fetchone()
+                                    if row and row[0]:
+                                        import json
+                                        preparation = json.loads(row[0])
+                                        session_make_stock = preparation.get('make_stock')
+                                        if session_make_stock is not None:
+                                            make_stock = bool(session_make_stock)
+                                            print(f"Using make_stock from session: {make_stock}")
+                            except Exception as e:
+                                print(f"Error getting make_stock from session: {e}")
+                        
                         drug_data = load_drug_data()
                         final_results = perform_final_calculations()
 
@@ -1446,14 +2039,14 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                         ui.tags.li(f"Date: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Drug: {result['Drug']}"),
                                                         ui.tags.li(f"Diluent: {result['Diluent']}"),
-                                                        ui.tags.li(f"Concentration: {result['Stock_Conc']:.2f} μg/ml"),
-                                                        ui.tags.li(f"Dilution Factor: 1:{result['Stock_Factor']:.1f}"),
+                                                        ui.tags.li(f"Concentration: {result.get('Stock_Conc', 0):.2f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result.get('Stock_Factor', 1):.1f}"),
                                                         ui.tags.li(f"Initials")
                                                     )
                                                 ),
                                                 ui.tags.li(f"Add the {result['Act_Weight']:.2f} mg weighed drug powder to a clean tube"),
                                                 ui.tags.li(
-                                                    f"Add {result['Total_Stock_Vol']:.2f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) of {result['Diluent']} to the same tube"
+                                                    f"Add {result.get('Total_Stock_Vol', 0):.2f} ml (= {result.get('Total_Stock_Vol_µl', 0):.2f} µl) of {result['Diluent']} to the same tube"
                                                 ),
                                                 ui.tags.li("Mix thoroughly:",
                                                     ui.tags.ul(
@@ -1584,12 +2177,12 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ),
                                             *(
                                                 [
-                                                    ui.tags.li(f"Add {result['Stock_to_WS']:.2f} ml (= {result['Stock_to_WS_µl']:.2f} µl) of stock solution to a new clean tube"),
-                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.2f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                    ui.tags.li(f"Add {result.get('Stock_to_WS', 0):.2f} ml (= {result.get('Stock_to_WS_µl', 0):.2f} µl) of stock solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result.get('Dil_to_WS', 0):.2f} ml (= {result.get('Dil_to_WS_µl', 0):.2f} µl) of {result['Diluent']} to the same tube")
                                                 ] if make_stock and result['Intermediate'] == False else
                                                 [
-                                                    ui.tags.li(f"Add {result['Vol_Inter_to_WS']:.2f} ml (= {result['Vol_Inter_to_WS_µl']:.2f} µl) of intermediate solution to a new clean tube"),
-                                                    ui.tags.li(f"Add {result['Dil_to_WS']:.2f} ml (= {result['Dil_to_WS_µl']:.2f} µl) of {result['Diluent']} to the same tube")
+                                                    ui.tags.li(f"Add {result.get('Vol_Inter_to_WS', 0):.2f} ml (= {result.get('Vol_Inter_to_WS_µl', 0):.2f} µl) of intermediate solution to a new clean tube"),
+                                                    ui.tags.li(f"Add {result.get('Dil_to_WS', 0):.2f} ml (= {result.get('Dil_to_WS_µl', 0):.2f} µl) of {result['Diluent']} to the same tube")
                                                 ] if result['Intermediate'] == True and make_stock else
                                                 [
                                                     ui.tags.li(f"Add the {result['Act_Weight']:.2f} mg weighed drug powder to a clean tube"),
@@ -1642,14 +2235,14 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ui.tags.ol(
                                                 ui.tags.li("Remaining stock solution:",
                                                     ui.tags.ul(
-                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.1f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Used for working solution: {result['Stock_to_WS']:.2f} ml (= {result['Stock_to_WS_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.2f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
+                                                        ui.tags.li(f"Total stock solution: {result.get('Total_Stock_Vol', 0):.1f} ml (= {result.get('Total_Stock_Vol_µl', 0):.2f} µl) "),
+                                                        ui.tags.li(f"Used for working solution: {result.get('Stock_to_WS', 0):.2f} ml (= {result.get('Stock_to_WS_µl', 0):.2f} µl) "),
+                                                        ui.tags.li(f"Remaining stock: {result.get('Total_Stock_Left', 0):.2f} ml (= {result.get('Total_Stock_Left_µl', 0):.2f} µl) ")
                                                     ) if result['Intermediate'] == False else
                                                     ui.tags.ul(
-                                                        ui.tags.li(f"Total stock solution: {result['Total_Stock_Vol']:.1f} ml (= {result['Total_Stock_Vol_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Used for intermediate solution: {result['Stock_to_Inter']:.2f} ml (= {result['Stock_to_Inter_µl']:.2f} µl) "),
-                                                        ui.tags.li(f"Remaining stock: {(result['Total_Stock_Left']):.2f} ml (= {result['Total_Stock_Left_µl']:.2f} µl) ")
+                                                        ui.tags.li(f"Total stock solution: {result.get('Total_Stock_Vol', 0):.1f} ml (= {result.get('Total_Stock_Vol_µl', 0):.2f} µl) "),
+                                                        ui.tags.li(f"Used for intermediate solution: {result.get('Stock_to_Inter', 0):.2f} ml (= {result.get('Stock_to_Inter_µl', 0):.2f} µl) "),
+                                                        ui.tags.li(f"Remaining stock: {result.get('Total_Stock_Left', 0):.2f} ml (= {result.get('Total_Stock_Left_µl', 0):.2f} µl) ")
                                                     )
                                                 ),
                                                 ui.tags.li(f"Prepare {result['Number_of_Ali']} sterile tubes"),
@@ -1657,9 +2250,9 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     ui.tags.ul(
                                                         ui.tags.li(f"Drug name: {result['Drug']}"),
                                                         ui.tags.li("Stock solution"),
-                                                        ui.tags.li(f"Volume: {result['ml_aliquot']:.1f} ml (= {result['ml_aliquot_µl']:.1f} µl)"),
-                                                        ui.tags.li(f"Concentration: {result['Stock_Conc']:.2f} μg/ml"),
-                                                        ui.tags.li(f"Dilution Factor: 1:{result['Stock_Factor']:.1f}"),
+                                                        ui.tags.li(f"Volume: {result.get('ml_aliquot', 0):.1f} ml (= {result.get('ml_aliquot_µl', 0):.1f} µl)"),
+                                                        ui.tags.li(f"Concentration: {result.get('Stock_Conc', 0):.2f} μg/ml"),
+                                                        ui.tags.li(f"Dilution Factor: 1:{result.get('Stock_Factor', 1):.1f}"),
                                                         ui.tags.li(f"Date prepared: {datetime.now().strftime('%Y-%m-%d')}"),
                                                         ui.tags.li(f"Storage temperature: -20°C or -80°C"),
                                                         ui.tags.li(f"Expiry: {(datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d')}"),
@@ -1947,6 +2540,24 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         # Store step 2 outputs for step 3 and allow Next
                         calculation_results.set({'estimated_weights': estimated_weights, 'diluent_volumes': diluent_volumes})
                         calculate_clicked.set(True)
+                        
+                        # Also save estimated_weights to session inputs
+                        try:
+                            cs = current_session.get()
+                            if cs and 'session_id' in cs:
+                                with sqlite3.connect(db_manager.db_path) as conn:
+                                    cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                                    session_row = cur.fetchone()
+                                    if session_row and session_row[0]:
+                                        import json
+                                        preparation = json.loads(session_row[0])
+                                        if 'inputs' not in preparation:
+                                            preparation['inputs'] = {}
+                                        preparation['inputs']['estimated_weights'] = estimated_weights
+                                        preparation['step'] = 2
+                                        save_preparation_merge(cs['session_id'], preparation)
+                        except Exception as e:
+                            print(f"Error saving step 2 estimated weights to session: {e}")
 
                         # Create results tables (split emphasis)
                         if results_data:
@@ -1960,8 +2571,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
 
                                 emph_headers = ui.tags.tr(
                                     ui.tags.th("Drug", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 200px;"),
-                                    ui.tags.th(f"Calculated Drug Weight to Weigh Out ({weight_unit()})", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 220px;"),
-                                    ui.tags.th(f"Volume of Diluent to Add ({volume_unit()})", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 200px;"),
+                                    ui.tags.th("Calculated Drug Weight to Weigh Out (mg)", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 220px;"),
+                                    ui.tags.th("Volume of Diluent to Add (ml)", style="padding: 8px; border: 2px solid #27ae60; background-color: #eafaf1; font-weight: bold; font-size: 14px; width: 200px;"),
                                     style="background-color: #eafaf1;"
                                 )
                             
@@ -2172,11 +2783,11 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                             ui.tags.tr(
                                                 ui.tags.td(r['Drug'], style="padding: 8px; border: 2px solid #d35400; font-weight: bold; font-size: 14px;"),
                                                 ui.tags.td(
-                                                    f"{total_stock_vol:.2f}",
+                                                    f"{total_stock_vol:.4f}",
                                                     style="padding: 8px; border: 2px solid #d35400; text-align: center; font-size: 14px;"
                                                 ),
                                                 ui.tags.td(
-                                                    f"{drug_to_weigh:.2f}",
+                                                    f"{drug_to_weigh:.4f}",
                                                     style="padding: 8px; border: 2px solid #d35400; text-align: center; font-size: 14px;"
                                                 ),
                                                 style="background-color: #ffffff;"
@@ -2226,8 +2837,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                         ui.tags.tr(
                                                             ui.tags.th("Drug", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
                                                             ui.tags.th("Number of Aliquots", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                            ui.tags.th(f"Volume per Aliquot ({volume_unit()})", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                            ui.tags.th(f"Total Aliquot Volume ({volume_unit()})", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                            ui.tags.th("Volume per Aliquot (ml)", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 180px;"),
+                                                            ui.tags.th("Total Aliquot Volume (ml)", style="padding: 8px; border: 2px solid #008080; background-color: #e0f2f1; font-weight: bold; font-size: 14px; width: 200px;"),
                                                         )
                                                     ),
                                                     *[
@@ -2274,7 +2885,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                     ui.tags.tr(
                                                         ui.tags.th("Drug", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 180px;"),
                                                         ui.tags.th("Weight to Weigh Out (mg)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 180px;"),
-                                                        ui.tags.th(f"Volume of Diluent Needed (ml)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 200px;"),
+                                                        ui.tags.th("Volume of Diluent Needed (ml)", style="padding: 8px; border: 2px solid #f39c12; background-color: #fff7e6; font-weight: bold; font-size: 14px; width: 200px;"),
                                                     ) if not make_stock else (
                                                         ui.tags.h3("Stock Solution Planning", style="color: #8e44ad; margin-top: 10px; margin-bottom: 10px;"),
                                                         ui.tags.thead(
@@ -2284,8 +2895,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                                 ui.tags.th("Working Solution Make Up", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; text-align: center;", colspan="2"),
                                                             ),
                                                             ui.tags.tr(
-                                                                ui.tags.th(f"Volume of Stock (ml)", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
-                                                                ui.tags.th(f"Volume Diluent (ml)", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                                ui.tags.th("Volume of Stock (ml)", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
+                                                                ui.tags.th("Volume Diluent (ml)", style="padding: 8px; border: 2px solid #8e44ad; background-color: #f5eef8; font-weight: bold; font-size: 14px; width: 150px;"),
                                                             )
                                                         )
                                                     )
@@ -2301,7 +2912,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                                             ui.tags.table(
                                                                 ui.tags.tr(
                                                                     ui.tags.th("Drug", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 200px;"),
-                                                                    ui.tags.th(f"Total Stock Volume (ml)", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 250px;"),
+                                                                    ui.tags.th("Total Stock Volume (ml)", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 250px;"),
                                                                     ui.tags.th("Drug to Weigh Out (mg)", style="padding: 8px; border: 2px solid #d35400; background-color: #fdf2e9; font-weight: bold; font-size: 14px; width: 200px;"),
                                                                 ),
                                                                 *aliquot_summary_rows,
@@ -2502,6 +3113,8 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         print("Restored session - showing Next button directly")
                         return ui.tags.div(
                             ui.input_action_button("back_btn", "Back to Account", class_="btn-secondary", style="margin-right: 10px;"),
+                            ui.input_action_button("save_step2_btn", "Save Progress", class_="btn-success", style="background-color: #28a745; border-color: #28a745; margin-right: 10px;"),
+                            ui.input_action_button("download_step2_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
                             ui.input_action_button("next_btn", "Continue to Step 3", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
                             style="text-align: center; margin-top: 30px;"
                         )
@@ -2514,6 +3127,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                             # Show Next button and download button after calculation
                             return ui.tags.div(
                                 ui.input_action_button("back_btn", "Back", class_="btn-secondary", style="margin-right: 10px;"),
+                                ui.input_action_button("save_step2_btn", "Save Progress", class_="btn-success", style="background-color: #28a745; border-color: #28a745; margin-right: 10px;"),
                                 ui.input_action_button("download_step2_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
                                 ui.input_action_button("next_btn", "Next", class_="btn-primary", style="background-color: #3498db; border-color: #3498db;"),
                                 style="text-align: center; margin-top: 30px;"
@@ -2559,12 +3173,37 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                         )
                 elif current_step() == 4:
                     print("Step 4 action buttons logic")
-                    # Show Download and Reset buttons
-                    return ui.tags.div(
-                        ui.input_action_button("download_step4_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
-                        ui.input_action_button("reset_btn", "Start New Calculation", class_="btn-warning", style="background-color: #f39c12; border-color: #f39c12;"),
-                        style="text-align: center; margin-top: 30px;"
-                    )
+                    
+                    # Check if this is a viewing completed session (vs newly completed)
+                    cs = current_session()
+                    is_viewing_completed_session = False
+                    
+                    if cs:
+                        try:
+                            with db_manager.get_connection() as conn:
+                                cur = conn.execute("SELECT preparation FROM session WHERE session_id = ?", (cs['session_id'],))
+                                row = cur.fetchone()
+                                if row and row[0]:
+                                    import json
+                                    preparation = json.loads(row[0])
+                                    # If session has step >= 3 and we didn't just create it, we're viewing a completed session
+                                    is_viewing_completed_session = preparation.get('step', 0) >= 3
+                        except Exception as e:
+                            print(f"Error checking session status: {e}")
+                    
+                    if is_viewing_completed_session:
+                        # For viewing completed sessions, only show Download button
+                        return ui.tags.div(
+                            ui.input_action_button("download_step4_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8;"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
+                    else:
+                        # For newly completed sessions, show both Download and Back to Account buttons
+                        return ui.tags.div(
+                            ui.input_action_button("download_step4_btn", "Download PDF", class_="btn-info", style="background-color: #17a2b8; border-color: #17a2b8; margin-right: 10px;"),
+                            ui.input_action_button("reset_btn", "Back to Account", class_="btn-warning", style="background-color: #f39c12; border-color: #f39c12;"),
+                            style="text-align: center; margin-top: 30px;"
+                        )
                 else:
                     return ui.tags.div()
 
@@ -3107,6 +3746,78 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
 def next_step():
     print(f"next_step called, current_step: {current_step()}")
     
+    # Save session data before moving to next step
+    try:
+        cs = current_session()
+        user = current_user()
+        if cs and user:
+            selected = input.drug_selection() or []
+            if selected:
+                print(f"next_step: Saving session data for {len(selected)} drugs at step {current_step()}")
+                
+                # Get drug data for session formatting
+                drug_data = load_drug_data()
+                
+                # Collect global settings
+                try:
+                    potency_method = input.potency_method_radio() if hasattr(input, 'potency_method_radio') else potency_method_pref()
+                    make_stock = input.make_stock_toggle() if hasattr(input, 'make_stock_toggle') else make_stock_pref()
+                except Exception:
+                    potency_method = potency_method_pref()
+                    make_stock = make_stock_pref()
+                
+                # Create session data structure
+                session_data = {}
+                for i, drug_name in enumerate(selected):
+                    try:
+                        # Get drug ID from database
+                        drug_row = drug_data[drug_data['Drug'] == drug_name]
+                        if not drug_row.empty:
+                            drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
+                            
+                            # Get input values using helper function
+                            drug_inputs = get_drug_inputs(i)
+                            if drug_inputs:
+                                # Get fallback for purchased molecular weight
+                                purch_molw_fallback = drug_inputs['purch_molw']
+                                if purch_molw_fallback is None or purch_molw_fallback <= 0:
+                                    # Default to original molecular weight if not provided
+                                    purch_molw_fallback = drug_row.iloc[0]['OrgMolecular_Weight']
+                                
+                                # Store in session format with all current inputs
+                                session_data[drug_id] = {
+                                    'Crit_Conc(μg/ml)': drug_inputs['custom_crit'] if drug_inputs['custom_crit'] is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                    'PurMol_W(g/mol)': purch_molw_fallback,
+                                    'Act_DrugW(mg)': drug_inputs['actual_weight'] if drug_inputs['actual_weight'] is not None else 0.0,
+                                    'Total_Mgit_tubes': drug_inputs['mgit_tubes'] if drug_inputs['mgit_tubes'] is not None else 0,
+                                    'Num_Aliquots': drug_inputs['num_aliquots'] if drug_inputs['num_aliquots'] is not None else None,
+                                    'ML_Per_Aliquot': drug_inputs['ml_per_aliquot'] if drug_inputs['ml_per_aliquot'] is not None else None
+                                }
+                    except Exception as e:
+                        print(f"next_step: Error processing drug {drug_name} for session: {e}")
+                
+                # Update session with preparation data
+                current_results = calculation_results.get() or {}
+                if 'estimated_weights' in current_results:
+                    session_data['estimated_weights'] = current_results['estimated_weights']
+                
+                preparation = {
+                    'selected_drugs': selected,
+                    'potency_method': potency_method,
+                    'make_stock': make_stock,
+                    'step': current_step(),
+                    'inputs': session_data
+                }
+                save_preparation_merge(cs['session_id'], preparation)
+                print(f"next_step: Session saved at step {current_step()}")
+                
+                try:
+                    ui.notification_show("Session saved.", type="message", duration=2)
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"next_step: Error saving session: {e}")
+    
     # Use a simple approach - just check current step and move forward
     if current_step() == 1:
         print("Moving from step 1 to step 2")
@@ -3134,6 +3845,64 @@ def next_step():
 @reactive.event(input.back_btn)
 def back_step():
     print(f"back_step called, current_step: {current_step()}")
+    
+    # Save session data before moving back
+    try:
+        cs = current_session()
+        user = current_user()
+        if cs and user:
+            selected = input.drug_selection() or []
+            if selected:
+                print(f"back_step: Saving session data for {len(selected)} drugs at step {current_step()}")
+                
+                # Get drug data for session formatting
+                drug_data = load_drug_data()
+                
+                # Collect global settings
+                try:
+                    potency_method = input.potency_method_radio() if hasattr(input, 'potency_method_radio') else potency_method_pref()
+                    make_stock = input.make_stock_toggle() if hasattr(input, 'make_stock_toggle') else make_stock_pref()
+                except Exception:
+                    potency_method = potency_method_pref()
+                    make_stock = make_stock_pref()
+                
+                # Create session data structure
+                session_data = {}
+                for i, drug_name in enumerate(selected):
+                    try:
+                        # Get drug ID from database
+                        drug_row = drug_data[drug_data['Drug'] == drug_name]
+                        if not drug_row.empty:
+                            drug_id = str(drug_row.iloc[0]['drug_id']) if 'drug_id' in drug_row.columns else str(i)
+                            
+                            # Get input values using helper function
+                            drug_inputs = get_drug_inputs(i)
+                            if drug_inputs:
+                                # Store in session format with all current inputs
+                                session_data[drug_id] = {
+                                    'Crit_Conc(μg/ml)': drug_inputs['custom_crit'] if drug_inputs['custom_crit'] is not None else drug_row.iloc[0]['Critical_Concentration'],
+                                    'PurMol_W(g/mol)': drug_inputs['purch_molw'] if drug_inputs['purch_molw'] is not None else 0.0,
+                                    'Act_DrugW(mg)': drug_inputs['actual_weight'] if drug_inputs['actual_weight'] is not None else 0.0,
+                                    'Total_Mgit_tubes': drug_inputs['mgit_tubes'] if drug_inputs['mgit_tubes'] is not None else 0,
+                                    'Num_Aliquots': drug_inputs['num_aliquots'] if drug_inputs['num_aliquots'] is not None else None,
+                                    'ML_Per_Aliquot': drug_inputs['ml_per_aliquot'] if drug_inputs['ml_per_aliquot'] is not None else None
+                                }
+                    except Exception as e:
+                        print(f"back_step: Error processing drug {drug_name} for session: {e}")
+                
+                # Update session with preparation data
+                preparation = {
+                    'selected_drugs': selected,
+                    'potency_method': potency_method,
+                    'make_stock': make_stock,
+                    'step': current_step(),
+                    'inputs': session_data
+                }
+                save_preparation_merge(cs['session_id'], preparation)
+                print(f"back_step: Session saved at step {current_step()}")
+    except Exception as e:
+        print(f"back_step: Error saving session: {e}")
+    
     if current_step() == 2:
         # Check if this is a restored session
         cs = current_session()
@@ -3163,11 +3932,101 @@ def back_step():
 @reactive.effect
 @reactive.event(input.reset_btn)
 def reset_selection():
+    """Reset function - navigates to account when calculation is complete, otherwise starts fresh"""
+    print("reset_selection: Starting reset")
+    
+    # Check if we're at step 4 (completed calculation)
+    if current_step() == 4:
+        print("reset_selection: Calculation completed, navigating back to account")
+        # Navigate to Account tab instead of resetting
+        ui.update_navs("tab", selected="Account")
+        return
+    
+    # For other steps, do full reset
+    print("reset_selection: Doing full reset for incomplete calculation")
+    
+    # Clear all global state using helper function
+    clear_global_state()
+    
+    # Reset additional reactive values specific to reset
     current_step.set(1)
-    calculate_clicked.set(False)
-    final_calculation_done.set(False)  # Reset final calculation flag
-    calculation_results.set({})
+    final_calculation_done.set(False)
+    show_results_view.set(False)
+    
+    # Clear UI inputs
     ui.update_selectize("drug_selection", selected=[])
+    
+    # Create a new session for the current user
+    user = current_user()
+    if user:
+        try:
+            # Create a new session
+            user_id = user['user_id']
+            session_name = f"Session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            with db_manager.get_connection() as conn:
+                cur = conn.execute(
+                    "INSERT INTO session (user_id, session_name, session_date, preparation) VALUES (?, ?, ?, ?)",
+                    (user_id, session_name, datetime.now().isoformat(), "{}")
+                )
+                new_session_id = cur.lastrowid
+                conn.commit()
+            
+            # Set the new session as current
+            current_session.set({
+                'session_id': new_session_id,
+                'session_name': session_name
+            })
+            
+            print(f"reset_selection: Created new session {new_session_id} for user {user_id}")
+            
+            # Show notification
+            try:
+                ui.notification_show(f"Started new calculation session: {session_name}", type="message", duration=3)
+            except Exception:
+                pass
+                
+        except Exception as e:
+            print(f"reset_selection: Error creating new session: {e}")
+            # If session creation fails, at least clear the current session
+            current_session.set(None)
+    else:
+        current_session.set(None)
+    
+    print("reset_selection: Reset completed")
+
+def clear_global_state():
+    """Helper function to clear all global arrays and reactive state"""
+    global Step2_CalEstWeights, Step2_EstWeights, Step2_TotalStockVolumes, Step2_ConcWS, Step2_VolWS
+    global Step2_Potencies, Step2_MgitTubes, Step2_mlperAliquot, Step2_num_aliquots, Step3_ActDrugWeights
+    global Step2_CriticalConc, Step2_StocktoWS, Step2_DiltoWS, Step2_Factors, Step2_PracWeights
+    global Step2_PracVol, Step2_Purch
+    
+    Step2_CalEstWeights = [None] * 21
+    Step2_EstWeights = [None] * 21
+    Step2_TotalStockVolumes = [None] * 21
+    Step2_ConcWS = [None] * 21
+    Step2_VolWS = [None] * 21
+    Step2_Potencies = [None] * 21
+    Step2_MgitTubes = [None] * 21
+    Step2_mlperAliquot = [None] * 21
+    Step2_num_aliquots = [None] * 21
+    Step3_ActDrugWeights = [None] * 21
+    Step2_CriticalConc = [None] * 21
+    Step2_StocktoWS = [None] * 21
+    Step2_DiltoWS = [None] * 21
+    Step2_Factors = [None] * 21
+    Step2_PracWeights = [None] * 21
+    Step2_PracVol = [None] * 21
+    Step2_Purch = [None] * 21
+    
+    # Clear reactive values (but don't reset step or final_calculation_done which may be needed)
+    calculate_clicked.set(False)
+    calculation_results.set({})
+    session_data.set({})
+    session_inputs.set({})
+    weights_calculated.set(False)
+    warnings.set([])
 
 @reactive.effect
 @reactive.event(input.calculate_btn)
@@ -3188,6 +4047,14 @@ def calculate_results():
                     # Get drug data for session formatting
                     drug_data = load_drug_data()
                     
+                    # Collect global settings
+                    try:
+                        potency_method = input.potency_method_radio() if hasattr(input, 'potency_method_radio') else potency_method_pref()
+                        make_stock = input.make_stock_toggle() if hasattr(input, 'make_stock_toggle') else make_stock_pref()
+                    except Exception:
+                        potency_method = potency_method_pref()
+                        make_stock = make_stock_pref()
+                    
                     # Create a DataFrame-like structure for session data
                     session_data = {}
                     for i, drug_name in enumerate(selected):
@@ -3200,13 +4067,14 @@ def calculate_results():
                                 # Get input values using helper function
                                 drug_inputs = get_drug_inputs(i)
                                 if drug_inputs:
-                                    # Store in session format similar to CLI
+                                    # Store in session format with current inputs (Step 2 level)
                                     session_data[drug_id] = {
                                         'Crit_Conc(μg/ml)': drug_inputs['custom_crit'] if drug_inputs['custom_crit'] is not None else drug_row.iloc[0]['Critical_Concentration'],
                                         'PurMol_W(g/mol)': drug_inputs['purch_molw'] if drug_inputs['purch_molw'] is not None else 0.0,
-                                        'St_Vol(ml)': drug_inputs['stock_vol'] if drug_inputs['stock_vol'] is not None else 0.0,
-                                        'Act_DrugW(mg)': 0.0,  # Not yet entered
-                                        'Total Mgit tubes': 0  # Not yet entered
+                                        'Act_DrugW(mg)': 0.0,  # Not yet entered in Step 2
+                                        'Total_Mgit_tubes': drug_inputs['mgit_tubes'] if drug_inputs['mgit_tubes'] is not None else 0,
+                                        'Num_Aliquots': None,  # Not yet determined in Step 2
+                                        'ML_Per_Aliquot': None  # Not yet determined in Step 2
                                     }
                         except Exception as e:
                             print(f"Error processing drug {drug_name} for session: {e}")
@@ -3214,12 +4082,12 @@ def calculate_results():
                     # Update session with preparation data
                     preparation = {
                         'selected_drugs': selected,
-                        'volume_unit': volume_unit(),
-                        'weight_unit': weight_unit(),
+                        'potency_method': potency_method,
+                        'make_stock': make_stock,
                         'step': 2,
                         'inputs': session_data
                     }
-                    db_manager.update_session_data(cs['session_id'], preparation)
+                    save_preparation_merge(cs['session_id'], preparation)
                     print(f"Session saved after instruction phase for {len(selected)} drugs")
                     try:
                         ui.notification_show("Session saved (instruction phase).", type="message", duration=4)
@@ -3314,34 +4182,38 @@ def calculate_final_results():
                                 
                                 custom_crit = drug_inputs['custom_crit']
                                 purch_molw = drug_inputs['purch_molw']
-                                stock_vol = drug_inputs['stock_vol']
                                 actual_weight = drug_inputs['actual_weight']
                                 mgit_tubes = drug_inputs['mgit_tubes']
+                                num_aliquots = drug_inputs.get('num_aliquots')
+                                ml_per_aliquot = drug_inputs.get('ml_per_aliquot')
                                 
-                                print(f"calculate_final_results: Final input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, stock_vol: {stock_vol}, actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}")
+                                print(f"calculate_final_results: Final input values - custom_crit: {custom_crit}, purch_molw: {purch_molw}, actual_weight: {actual_weight}, mgit_tubes: {mgit_tubes}, num_aliquots: {num_aliquots}, ml_per_aliquot: {ml_per_aliquot}")
                                 
                                 # Store complete session data
                                 session_data[drug_id] = {
                                     'Crit_Conc(μg/ml)': custom_crit if custom_crit is not None else drug_row.iloc[0]['Critical_Concentration'],
                                     'PurMol_W(g/mol)': purch_molw if purch_molw is not None else 0.0,
-                                    'St_Vol(ml)': stock_vol if stock_vol is not None else 0.0,
                                     'Act_DrugW(mg)': actual_weight if actual_weight is not None else 0.0,
-                                    'Total Mgit tubes': mgit_tubes if mgit_tubes is not None else 0
+                                    'Total_Mgit_tubes': mgit_tubes if mgit_tubes is not None else 0,
+                                    'Num_Aliquots': num_aliquots,
+                                    'ML_Per_Aliquot': ml_per_aliquot
                                 }
                                 print(f"calculate_final_results: Stored session data for drug {i}: {session_data[drug_id]}")
                         except Exception as e:
                             print(f"Error processing drug {drug_name} for final session: {e}")
                     
                     # Update session with complete preparation data
+                    # Add estimated_weights to session_data inputs if available
+                    current_results = calculation_results.get() or {}
+                    if 'estimated_weights' in current_results:
+                        session_data['estimated_weights'] = current_results['estimated_weights']
+                    
                     preparation = {
                         'selected_drugs': selected,
-                        'volume_unit': volume_unit(),
-                        'weight_unit': weight_unit(),
                         'step': 3,
-                        'inputs': session_data,
-                        'results': calculation_results.get()
+                        'inputs': session_data
                     }
-                    db_manager.update_session_data(cs['session_id'], preparation)
+                    save_preparation_merge(cs['session_id'], preparation)
                     print(f"Session saved after final calculation for {len(selected)} drugs")
                     try:
                         ui.notification_show("Session saved (final calculation).", type="message", duration=4)
@@ -3365,17 +4237,6 @@ def new_calculation():
         calculation_results.set({})
         warnings.set([])
         ui.update_selectize("drug_selection", selected=[])
-
-# Unit selection reactive effects
-@reactive.effect
-@reactive.event(input.vol_unit)
-def update_volume_unit():
-    volume_unit.set(input.vol_unit())
-
-@reactive.effect
-@reactive.event(input.weight_unit)
-def update_weight_unit():
-    weight_unit.set(input.weight_unit())
 
 # Auth handlers
 @reactive.effect
@@ -3403,6 +4264,10 @@ def handle_session_card_click():
         clicked_sid = input.session_clicked()
         if not clicked_sid:
             return
+        
+        # Clear global state when switching sessions
+        clear_global_state()
+        print("handle_session_card_click: Cleared global state")
             
         with db_manager.get_connection() as conn:
             cur = conn.execute("SELECT preparation FROM session WHERE session_id = ? AND user_id = ?", (clicked_sid, user['user_id']))
@@ -3414,26 +4279,53 @@ def handle_session_card_click():
         preparation = json.loads(row[0])
         
         # Check if session is completed
-        completed = bool(preparation and preparation.get('step', 0) >= 3 and preparation.get('results'))
+        completed = bool(preparation and preparation.get('step', 0) >= 3)
         
         if completed:
-            # View results for completed session - show read-only results
-            # Set a flag to show results view instead of editable form
-            show_results_view.set(True)
+            # View completed session as step 4
+            print(f"Viewing completed session: {clicked_sid}")
+            
+            # Make sure we're not in results view mode
+            show_results_view.set(False)
+            
+            # Navigate to Calculator tab
+            ui.update_navs("tab", selected="Calculator")
+            
+            # Update current session
             current_session.set({'session_id': int(clicked_sid), 'session_name': preparation.get('session_name') or ''})
             
-            # Store the session data for the results view
-            session_data.set({
-                'preparation': preparation,
-                'selected_drugs': preparation.get('selected_drugs', []),
-                'volume_unit': preparation.get('volume_unit', 'ml'),
-                'weight_unit': preparation.get('weight_unit', 'mg'),
-                'inputs': preparation.get('inputs', {}),
-                'results': preparation.get('results', {}),
-                'step': preparation.get('step', 3)
-            })
+            # Restore session state
+            if 'selected_drugs' in preparation:
+                print(f"Restoring selected drugs: {preparation['selected_drugs']}")
+                ui.update_selectize("drug_selection", selected=preparation['selected_drugs'])
             
-            ui.update_navs("tab", selected="B")
+            # Set to step 4 to show final results
+            current_step.set(4)
+            print(f"Set completed session to step 4")
+            
+            # Store inputs for later restoration after UI is ready
+            if 'inputs' in preparation:
+                print(f"Restoring inputs: {preparation['inputs']}")
+                session_inputs.set(preparation['inputs'])
+                
+                # Calculate final results directly from session data
+                print("Calculating final results from session data")
+                session_final_results = perform_final_calculations_from_session(preparation)
+                if session_final_results:
+                    print(f"Calculated {len(session_final_results)} final results from session")
+                    calculation_results.set({'final_results': session_final_results})
+                    calculate_clicked.set(True)
+                    final_calculation_done.set(True)
+                else:
+                    print("No final results calculated from session")
+            
+            # Since this is a completed session, set the appropriate flags
+            if preparation.get('step', 0) >= 2:
+                calculate_clicked.set(True)
+            if preparation.get('step', 0) >= 3:
+                final_calculation_done.set(True)
+            
+            print(f"Successfully loaded completed session {clicked_sid} at step 4")
         else:
             # Continue incomplete session
             print(f"Continuing incomplete session: {clicked_sid}")
@@ -3443,8 +4335,8 @@ def handle_session_card_click():
             show_results_view.set(False)
             print(f"Set show_results_view to: {show_results_view()}")
             
-            # First, navigate to Tab B
-            ui.update_navs("tab", selected="B")
+            # Navigate to Calculator tab
+            ui.update_navs("tab", selected="Calculator")
             
             # Update current session
             current_session.set({'session_id': int(clicked_sid), 'session_name': preparation.get('session_name') or ''})
@@ -3453,17 +4345,36 @@ def handle_session_card_click():
             if 'selected_drugs' in preparation:
                 print(f"Restoring selected drugs: {preparation['selected_drugs']}")
                 ui.update_selectize("drug_selection", selected=preparation['selected_drugs'])
-            if 'volume_unit' in preparation:
-                print(f"Restoring volume unit: {preparation['volume_unit']}")
-                volume_unit.set(preparation['volume_unit'])
-                ui.update_select("vol_unit", selected=preparation['volume_unit'])
-            if 'weight_unit' in preparation:
-                print(f"Restoring weight unit: {preparation['weight_unit']}")
-                weight_unit.set(preparation['weight_unit'])
-                ui.update_select("weight_unit", selected=preparation['weight_unit'])
-            if 'step' in preparation:
-                print(f"Restoring step: {preparation['step']}")
-                current_step.set(preparation['step'])
+            
+            # Intelligent step determination based on actual data content
+            selected_drugs_data = preparation.get('selected_drugs', [])
+            inputs = preparation.get('inputs', {})
+            
+            if not selected_drugs_data or len(selected_drugs_data) == 0:
+                # No drugs selected - start from step 1 (drug selection)
+                current_step_val = 1
+                print(f"Session has no drugs selected - starting from step 1")
+            else:
+                # Check if any drugs have actual weights
+                has_weights = False
+                for drug_name in selected_drugs_data:
+                    drug_data = inputs.get(drug_name, {})
+                    actual_weight = drug_data.get('Act_DrugW(mg)')
+                    if actual_weight is not None and actual_weight != "" and actual_weight != 0:
+                        has_weights = True
+                        break
+                
+                if not has_weights:
+                    # Drugs selected but no weights entered - start from step 3 (weight entry)
+                    current_step_val = 3
+                    print(f"Session has drugs but no weights - starting from step 3")
+                else:
+                    # Has drugs and weights - start from step 4 (final results/calculations)
+                    current_step_val = 4
+                    print(f"Session has weights - starting from step 4")
+            
+            print(f"Determined step: {current_step_val}")
+            current_step.set(current_step_val)
             
             # Store inputs for later restoration after UI is ready
             if 'inputs' in preparation and preparation['inputs']:
@@ -3471,19 +4382,12 @@ def handle_session_card_click():
                 # Store the inputs in a reactive value for the UI to pick up
                 session_inputs.set(preparation['inputs'])
             
-            # Restore results if they exist
-            if 'results' in preparation and preparation['results']:
-                print(f"Restoring results: {preparation['results']}")
-                calculation_results.set(preparation['results'])
-                if preparation.get('step', 1) >= 2:
-                    calculate_clicked.set(True)
-                if preparation.get('step', 1) >= 3:
-                    final_calculation_done.set(True)
-            else:
-                # If no results but we're at step 2 or 3, trigger calculation to show estimated weights
-                if preparation.get('step', 1) >= 2:
-                    print("Triggering calculation for step 2+")
-                    calculate_clicked.set(True)
+            # Set calculation state flags based on step
+            if preparation.get('step', 1) >= 2:
+                print("Setting calculation flags for step 2+")
+                calculate_clicked.set(True)
+            if preparation.get('step', 1) >= 3:
+                final_calculation_done.set(True)
     except Exception:
         pass
 
@@ -3572,14 +4476,6 @@ def start_session():
                         if 'selected_drugs' in preparation:
                             ui.update_selectize("drug_selection", selected=preparation['selected_drugs'])
                         
-                        if 'volume_unit' in preparation:
-                            volume_unit.set(preparation['volume_unit'])
-                            ui.update_select("vol_unit", selected=preparation['volume_unit'])
-                        
-                        if 'weight_unit' in preparation:
-                            weight_unit.set(preparation['weight_unit'])
-                            ui.update_select("weight_unit", selected=preparation['weight_unit'])
-                        
                         if 'step' in preparation:
                             current_step.set(preparation['step'])
                         
@@ -3601,19 +4497,24 @@ def start_session():
                                         
                                         # Update inputs based on session data
                                         if 'Crit_Conc(μg/ml)' in drug_inputs:
-                                            ui.update_numeric(f"custom_critical_{drug_index}", value=drug_inputs['Crit_Conc(mg/ml)'])
+                                            ui.update_numeric(f"custom_critical_{drug_index}", value=drug_inputs['Crit_Conc(μg/ml)'])
                                         if 'PurMol_W(g/mol)' in drug_inputs:
                                             ui.update_numeric(f"purchased_molw_{drug_index}", value=drug_inputs['PurMol_W(g/mol)'])
-                                        if 'St_Vol(ml)' in drug_inputs:
-                                            ui.update_numeric(f"stock_volume_{drug_index}", value=drug_inputs['St_Vol(ml)'])
                                         if 'Act_DrugW(mg)' in drug_inputs:
                                             ui.update_numeric(f"actual_weight_{drug_index}", value=drug_inputs['Act_DrugW(mg)'])
-                                        if 'Total Mgit tubes' in drug_inputs:
-                                            ui.update_numeric(f"mgit_tubes_{drug_index}", value=drug_inputs['Total Mgit tubes'])
+                                        if 'Total_Mgit_tubes' in drug_inputs:
+                                            ui.update_numeric(f"mgit_tubes_{drug_index}", value=drug_inputs['Total_Mgit_tubes'])
+                                        if 'Num_Aliquots' in drug_inputs:
+                                            ui.update_numeric("num_aliquots", value=drug_inputs['Num_Aliquots'])
+                                        if 'ML_Per_Aliquot' in drug_inputs:
+                                            ui.update_numeric("ml_per_aliquot", value=drug_inputs['ML_Per_Aliquot'])
                             
-                            # Load calculation results if available
-                            if 'results' in preparation and preparation['results']:
-                                calculation_results.set(preparation['results'])
+                            # Load estimated_weights from inputs if available
+                            if 'estimated_weights' in preparation['inputs']:
+                                # Create a results dict with estimated_weights for compatibility
+                                current_results = calculation_results.get() or {}
+                                current_results['estimated_weights'] = preparation['inputs']['estimated_weights']
+                                calculation_results.set(current_results)
                                 if preparation.get('step', 1) >= 2:
                                     calculate_clicked.set(True)
                                 if preparation.get('step', 1) >= 3:
@@ -3669,7 +4570,75 @@ def on_potency_method_change():
         pass
 
 
-# PDF Download handlers
+# Save and PDF Download handlers
+@reactive.effect
+@reactive.event(input.save_step2_btn)
+def handle_step2_save():
+    """Save Step 2 inputs to the session database"""
+    print("handle_step2_save: Starting Step 2 manual save")
+    
+    try:
+        cs = current_session()
+        user = current_user()
+        if not cs or not user:
+            ui.notification_show("No active session found", type="error", duration=3)
+            return
+            
+        selected = input.drug_selection() or []
+        if not selected:
+            ui.notification_show("No drugs selected", type="warning", duration=3)
+            return
+            
+        print(f"handle_step2_save: Saving data for {len(selected)} drugs")
+        
+        # Get drug data for session formatting
+        drug_data = load_drug_data()
+        
+        # Collect global settings
+        try:
+            potency_method = input.potency_method_radio() if hasattr(input, 'potency_method_radio') else potency_method_pref()
+            make_stock = input.make_stock_toggle() if hasattr(input, 'make_stock_toggle') else make_stock_pref()
+        except Exception:
+            potency_method = potency_method_pref()
+            make_stock = make_stock_pref()
+        
+        # Create session data structure for Step 2
+        session_data_inputs = {}
+        for i, drug_name in enumerate(selected):
+            try:
+                # Get drug inputs using the same logic as next_step
+                drug_inputs = get_drug_inputs(i)
+                if drug_inputs:
+                    session_data_inputs[str(i)] = drug_inputs
+                    print(f"handle_step2_save: Saved inputs for drug {i} ({drug_name}): {drug_inputs}")
+                else:
+                    print(f"handle_step2_save: No inputs found for drug {i} ({drug_name})")
+            except Exception as e:
+                print(f"handle_step2_save: Error getting drug inputs for index {i}: {e}")
+        
+        # Prepare session data for saving
+        preparation = {
+            'selected_drugs': selected,
+            'potency_method': potency_method,
+            'make_stock': make_stock,
+            'step': 2,  # Save as step 2
+            'inputs': session_data_inputs
+        }
+        
+        # Save to database
+        success = save_preparation_merge(cs['session_id'], preparation)
+        
+        if success:
+            ui.notification_show("Step 2 progress saved successfully!", type="message", duration=3)
+            print(f"handle_step2_save: Successfully saved Step 2 data for session {cs['session_id']}")
+        else:
+            ui.notification_show("Failed to save progress", type="error", duration=3)
+            print("handle_step2_save: Failed to save session data")
+            
+    except Exception as e:
+        print(f"handle_step2_save: Error saving Step 2 data: {e}")
+        ui.notification_show(f"Error saving progress: {str(e)}", type="error", duration=5)
+
 @reactive.effect
 @reactive.event(input.download_step2_btn)
 def handle_step2_download():
