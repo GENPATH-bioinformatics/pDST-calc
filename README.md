@@ -2,6 +2,10 @@
 
 A comprehensive **Phenotypic Drug Susceptibility Testing (pDST) Calculator** for tuberculosis research and clinical laboratories. This project provides both command-line and web-based interfaces for calculating drug concentrations, solution preparations, and laboratory protocols.
 
+## 🌐 Live Demo & Educational Resources
+
+**🚀 [Visit the Educational Guide Website](https://genpath-bioinformatics.github.io/pDST-calc/)** - Interactive web portal with comprehensive DST terminology and resources
+
 ## Key Features
 
 - **🧪 4-Step Laboratory Workflow:** Drug selection → Parameters → Weight entry → Solution preparation guide
@@ -32,6 +36,23 @@ A comprehensive **Phenotypic Drug Susceptibility Testing (pDST) Calculator** for
 4. **Get started:**
    - Sign up for an account in the "Account & Sessions" tab
    - Create a new session and start calculating!
+
+## Educational Resources
+
+🧪 **[DST Educational Guide](docs/DST_EDUCATIONAL_GUIDE.md)** - Comprehensive terminology and reference guide for Drug Susceptibility Testing, including:
+
+- **Glossary of Terms:** 27+ essential DST definitions with authoritative sources
+- **Clinical Context:** Critical concentrations, breakpoints, MIC interpretations
+- **Laboratory Methods:** Culture systems, potency calculations, quality control
+- **Reference Standards:** Links to WHO, CLSI, and EUCAST guidelines
+
+Perfect for students, researchers, and laboratory professionals working with tuberculosis DST.
+
+## User Feedback
+
+We value your feedback! Help us improve the pDST Calculator by sharing your experience, reporting issues, or suggesting new features.
+
+**📝 [Submit Feedback](https://forms.office.com/r/sMfCywFy4H)**
 
 ## Requirements
 
@@ -110,7 +131,7 @@ uv run pdst-calc --session-name "experiment_001"
 
 ### Application Workflow
 
-The DST Calculator features a comprehensive 4-step workflow with user authentication and intelligent session management:
+pDST-Calc features a comprehensive 4-step workflow with user authentication and session management:
 
 #### Account & Sessions Tab
 - **User Authentication:** 
@@ -128,7 +149,7 @@ The DST Calculator features a comprehensive 4-step workflow with user authentica
     - **Complete sessions** → View in Step 4 results format
   - All inputs and calculations are automatically preserved
 
-#### Calculator Tab - 4-Step Process
+#### Calculator Tab
 **Step 1 - Drug Selection:**
 - Choose one or more drugs from the comprehensive database
 - View drug properties: molecular weight, default diluent, critical concentrations

@@ -6,8 +6,9 @@ This document describes the comprehensive testing setup for the pDST Calculator 
 
 The testing framework includes:
 - **Unit tests**: Individual function testing
-- **Integration tests**: Complete workflow testing
+- **Integration tests**: Complete workflow testing  
 - **Property-based tests**: Using Hypothesis for edge cases
+- **Application tests**: CLI and Shiny app testing
 - **Code quality tools**: Linting, formatting, type checking
 
 ## Quick Start
@@ -15,31 +16,34 @@ The testing framework includes:
 ### Prerequisites
 
 ```bash
-# Use uv directly:
-uv sync --group dev --group test --group lint
+# Install all dependencies including test dependencies
+uv sync
 ```
 
 ### Running Tests
 
 **Quick Unit Tests (Recommended for Development)**
 ```bash
-# Run only unit tests (fast, excludes hypothesis property-based tests)
-uv run pytest test/lib/test_drug_database.py test/lib/test_dst_calc.py test/lib/test_supp_calc.py
+# Run only lib unit tests (fast, excludes hypothesis property-based tests)
+uv run pytest lib/tests/test_drug_database.py lib/tests/test_dst_calc.py lib/tests/test_supp_calc.py
 ```
 
 **All Tests (Comprehensive)**
 ```bash
-# Run all tests including hypothesis property-based tests
+# Run all tests including hypothesis property-based tests and app tests
 uv run pytest
 ```
 
 **Specific Test Categories**
 ```bash
 # Run only hypothesis property-based tests
-uv run pytest test/lib/test_dst_calc_hypothesis.py test/lib/test_supp_calc_hypothesis.py test/lib/test_drug_database_hypothesis.py
+uv run pytest lib/tests/test_dst_calc_hypothesis.py lib/tests/test_supp_calc_hypothesis.py lib/tests/test_drug_database_hypothesis.py
 
 # Run specific module tests
-uv run pytest test/lib/test_dst_calc.py -v
+uv run pytest lib/tests/test_dst_calc.py -v
+
+# Run application tests
+uv run pytest app/cli/tests/ app/shiny/tests/
 ```
 
 ## Available Test Commands
@@ -49,29 +53,44 @@ uv run pytest test/lib/test_dst_calc.py -v
 **Fast Unit Tests (Development)**
 ```bash
 # Quick unit tests only (excludes hypothesis property-based tests)
-uv run pytest test/lib/test_drug_database.py test/lib/test_dst_calc.py test/lib/test_supp_calc.py
+uv run pytest lib/tests/test_drug_database.py lib/tests/test_dst_calc.py lib/tests/test_supp_calc.py
 ```
 
 **Comprehensive Testing**
 ```bash
-# All tests including hypothesis property-based tests
+# All tests including hypothesis property-based tests and application tests
 uv run pytest
 ```
 
 ### Module-Specific Tests
 
-**Unit Tests**
+**Library Unit Tests**
 ```bash
-uv run pytest test/lib/test_dst_calc.py          # DST calculation unit tests
-uv run pytest test/lib/test_drug_database.py     # Drug database unit tests
-uv run pytest test/lib/test_supp_calc.py         # Supplementary calculation unit tests
+uv run pytest lib/tests/test_dst_calc.py          # DST calculation unit tests
+uv run pytest lib/tests/test_drug_database.py     # Drug database unit tests
+uv run pytest lib/tests/test_supp_calc.py         # Supplementary calculation unit tests
 ```
 
 **Property-Based Tests (Hypothesis)**
 ```bash
-uv run pytest test/lib/test_dst_calc_hypothesis.py        # DST calc hypothesis tests
-uv run pytest test/lib/test_drug_database_hypothesis.py   # Drug DB hypothesis tests
-uv run pytest test/lib/test_supp_calc_hypothesis.py       # Supp calc hypothesis tests
+uv run pytest lib/tests/test_dst_calc_hypothesis.py        # DST calc hypothesis tests
+uv run pytest lib/tests/test_drug_database_hypothesis.py   # Drug DB hypothesis tests
+uv run pytest lib/tests/test_supp_calc_hypothesis.py       # Supp calc hypothesis tests
+```
+
+**Application Tests**
+```bash
+# CLI tests
+uv run pytest app/cli/tests/test_argument_parsing.py      # CLI argument parsing
+uv run pytest app/cli/tests/test_cli_main.py              # CLI main functionality
+uv run pytest app/cli/tests/test_error_handling.py        # CLI error handling
+uv run pytest app/cli/tests/test_input_validation.py      # CLI input validation
+uv run pytest app/cli/tests/test_integration.py           # CLI integration tests
+uv run pytest app/cli/tests/test_logging.py               # CLI logging tests
+
+# Shiny app tests
+uv run pytest app/shiny/tests/test_shiny_app.py           # Shiny app functionality
+uv run pytest app/shiny/tests/test_runner.py              # Shiny test runner
 ```
 
 ### Test Categories Using Markers
@@ -88,14 +107,31 @@ uv run pytest -m 'not slow'          # Exclude slow tests
 
 ```
 test/
-├── lib/
-│   ├── test_dst_calc.py              # Unit tests for DST calculations
-│   ├── test_dst_calc_hypothesis.py   # Property-based tests for DST calc
-│   ├── test_drug_database.py         # Unit tests for drug database
-│   ├── test_drug_database_hypothesis.py
-│   ├── test_supp_calc.py             # Unit tests for supplementary calc
-│   └── test_supp_calc_hypothesis.py
-└── app/                              # Application-level tests
+├── __init__.py
+├── app/                              # Legacy test directory
+├── db/                               # Database tests
+lib/tests/
+├── __init__.py
+├── test_dst_calc.py                  # Unit tests for DST calculations
+├── test_dst_calc_hypothesis.py       # Property-based tests for DST calc
+├── test_drug_database.py             # Unit tests for drug database
+├── test_drug_database_hypothesis.py  # Property-based tests for drug DB
+├── test_supp_calc.py                 # Unit tests for supplementary calc
+└── test_supp_calc_hypothesis.py      # Property-based tests for supp calc
+app/cli/tests/
+├── __init__.py
+├── test_argument_parsing.py          # CLI argument parsing tests
+├── test_cli_main.py                  # CLI main functionality tests
+├── test_error_handling.py            # CLI error handling tests
+├── test_input_validation.py          # CLI input validation tests
+├── test_integration.py               # CLI integration tests
+├── test_logging.py                   # CLI logging tests
+└── data/                             # Test data files
+app/shiny/tests/
+├── __init__.py
+├── test_shiny_app.py                 # Shiny app tests
+├── test_runner.py                    # Shiny test runner
+└── README.md                         # Shiny testing documentation
 ```
 
 ## Test Categories
@@ -121,13 +157,27 @@ test/
 - **When to use**: Before releases, regression testing
 - **Markers**: `@pytest.mark.integration`
 
+### CLI Tests
+- **Purpose**: Test command-line interface functionality
+- **Characteristics**: Input validation, argument parsing, workflow testing
+- **Content**: CLI argument handling, error scenarios, integration workflows
+- **Location**: `app/cli/tests/`
+
+### Shiny App Tests
+- **Purpose**: Test web application functionality
+- **Characteristics**: UI component testing, session management, reactive behavior
+- **Content**: App initialization, user interactions, session handling
+- **Location**: `app/shiny/tests/`
+
 ## Performance Comparison
 
 | Test Type | Duration | Coverage | Use Case |
 |-----------|----------|----------|----------|
 | Unit Tests Only | ~1-2 seconds | 95%+ | Development iteration |
-| All Tests | ~15-30 seconds | 96%+ | Pre-commit, CI/CD |
+| All Tests | ~30-60 seconds | 96%+ | Pre-commit, CI/CD |
 | Hypothesis Only | ~10-20 seconds | Edge cases | Property validation |
+| CLI Tests | ~5-10 seconds | CLI coverage | CLI development |
+| Shiny Tests | ~10-20 seconds | App coverage | UI development |
 
 ## Configuration
 
@@ -147,24 +197,68 @@ markers = [
 ]
 ```
 
+### Dependencies
+
+The project uses uv's dependency groups for organized testing dependencies:
+
+```toml
+[dependency-groups]
+test = [
+    "pytest>=8",
+    "pytest-cov>=6.0.0",
+    "pytest-watch>=4.2.0",
+    "hypothesis>=6.135.32",
+]
+dev = [
+    "nbwipers>=0.6.1",
+    "pytest>=8",
+    "pytest-cov>=6.0.0",
+    "pytest-watch>=4.2.0",
+    "pre-commit>=4.1.0",
+    "typos>=1.29.4",
+    "hypothesis>=6.135.32",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    # ... additional dev tools
+]
+```
+
 ### Coverage Configuration
-- Coverage reports can be enabled with `--cov=lib --cov-report=term --cov-report=html`
+- Coverage reports can be enabled with `--cov=lib --cov=app --cov-report=term --cov-report=html`
 - HTML reports are saved to `htmlcov/` when coverage is enabled
 - Terminal reports show coverage summary
 - Coverage is optional to allow faster unit test runs during development
 
-## Dependencies
+## Testing Workflows
 
-### Runtime Dependencies
-- Core calculation libraries (numpy, pandas)
-- Testing framework (pytest, unittest)
-- Property-based testing (hypothesis)
+### Development Workflow
+1. **During active development**: Use unit tests only for fast feedback
+   ```bash
+   uv run pytest lib/tests/test_dst_calc.py
+   ```
 
-### Development Dependencies
-- Code quality (ruff, flake8, black, mypy)
-- Test coverage (pytest-cov)
-- Continuous testing (pytest-watch)
-- Documentation (included in dev group)
+2. **Testing CLI changes**: Run CLI-specific tests
+   ```bash
+   uv run pytest app/cli/tests/
+   ```
+
+3. **Testing Shiny app changes**: Run Shiny-specific tests
+   ```bash
+   uv run pytest app/shiny/tests/
+   ```
+
+4. **Before committing**: Run comprehensive tests
+   ```bash
+   uv run pytest
+   ```
+
+### Continuous Integration
+The testing setup is designed for CI environments:
+- All dependencies specified in `pyproject.toml`
+- Organized dependency groups for targeted testing
+- Exit codes properly indicate test success/failure
+- Coverage reports can be generated for CI dashboards
 
 ## Tips for Writing Tests
 
@@ -185,70 +279,62 @@ def test_property_always_holds(self, value):
     assert result > 0  # Property: output always positive
 ```
 
-### Integration Tests
+### CLI Tests
 ```python
-def test_complete_workflow(self):
-    """Test the entire calculation pipeline."""
-    # Setup inputs
-    inputs = {...}
-
-    # Run workflow
-    results = complete_calculation(**inputs)
-
-    # Verify properties
-    assert all(r > 0 for r in results.values())
-    assert abs(sum(results.values()) - expected_total) < tolerance
+def test_cli_argument_parsing():
+    """Test CLI argument parsing."""
+    args = parse_args(['--drug', 'rifampicin', '--concentration', '1.0'])
+    assert args.drug == 'rifampicin'
+    assert args.concentration == 1.0
 ```
 
-## Continuous Integration
-
-The testing setup is designed to work in CI environments:
-- All dependencies are specified in `pyproject.toml`
-- Tests can be run with simple commands (`make test`)
-- Coverage reports can be generated for CI dashboards
-- Exit codes properly indicate test success/failure
+### Shiny App Tests
+```python
+def test_app_initialization():
+    """Test Shiny app initializes correctly."""
+    from app.shiny.app import app
+    # Test app components and initial state
+    assert app is not None
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Import errors**: Ensure you're running from the package root directory
-2. **Missing dependencies**: Run `uv sync --group dev --group test`
-3. **Hypothesis slow**: Use unit tests only for development: `pytest test/lib/test_*.py`
-4. **ModuleNotFoundError for hypothesis**: This is expected when running unit tests with filtering - use file-specific commands instead
+2. **Missing dependencies**: Run `uv sync` to install all dependency groups
+3. **Hypothesis slow**: Use unit tests only for development: `pytest lib/tests/test_*.py`
+4. **ModuleNotFoundError**: Check that you're using the correct test paths
 
 ### Test Failures
 
-1. **Floating-point precision**: The integration tests use relative tolerances (5e-3) for accumulated floating-point errors
-2. **Random test failures**: Property-based tests may reveal edge cases - examine the failing inputs in the test output
-3. **Slow tests**: Use unit tests only for faster feedback: `pytest test/lib/test_*.py`
-4. **Hypothesis test failures**: These tests use extreme value ranges and may uncover edge cases in mathematical calculations
+1. **Floating-point precision**: Integration tests use relative tolerances (5e-3) for accumulated errors
+2. **Random test failures**: Property-based tests may reveal edge cases - examine failing inputs
+3. **Slow tests**: Use targeted test commands for faster feedback during development
+4. **CLI test failures**: Check that CLI dependencies and data files are available
+5. **Shiny test failures**: Ensure Shiny dependencies are installed and app components are importable
 
 ## Best Practices
 
-### Development Workflow
-1. **During active development**: Use unit tests only for fast feedback
-   ```bash
-   uv run pytest test/lib/test_dst_calc.py
-   ```
-
-2. **Before committing**: Run all tests to ensure comprehensive coverage
-   ```bash
-   uv run pytest
-   ```
-
-3. **Debugging specific issues**: Run individual test methods
-   ```bash
-   uv run pytest test/lib/test_dst_calc.py::TestDstCalc::test_potency_calculation -v
-   ```
-
 ### Test Organization
 - **Unit tests** (`test_*.py`): Keep focused on individual functions
-- **Hypothesis tests** (`*_hypothesis.py`): Test mathematical properties and edge cases
-- **Use markers**: `@pytest.mark.integration` for workflow tests, `@pytest.mark.slow` for time-consuming tests
+- **Hypothesis tests** (`*_hypothesis.py`): Test mathematical properties and edge cases  
+- **CLI tests**: Focus on argument parsing, validation, and workflow integration
+- **Shiny tests**: Test UI components, session management, and user interactions
+- **Use markers**: `@pytest.mark.integration`, `@pytest.mark.slow`, etc.
 
 ### Performance Tips
 - Use unit tests during development for sub-second feedback
 - Reserve hypothesis tests for pre-commit and CI/CD pipelines
-- Run specific test files rather than using marker filters to avoid import issues
+- Run specific test directories rather than using marker filters to avoid import issues
 - Consider using `@settings(max_examples=10)` in hypothesis tests during development
+- Use targeted test commands: `pytest lib/tests/` vs `pytest app/cli/tests/` vs `pytest app/shiny/tests/`
+
+### Code Coverage
+- Aim for >95% coverage on core calculation functions
+- CLI tests should cover argument parsing and error handling
+- Shiny tests should cover critical user workflows
+- Use coverage reports to identify untested code paths:
+  ```bash
+  uv run pytest --cov=lib --cov=app --cov-report=html
+  ```
