@@ -4,18 +4,18 @@ A comprehensive **Phenotypic Drug Susceptibility Testing (pDST) Calculator** for
 
 ## 🌐 Live Demo & Educational Resources
 
-**🚀 [Visit the Educational Guide Website](https://genpath-bioinformatics.github.io/pDST-calc/)** - Interactive web portal with comprehensive DST terminology and resources
+**[Visit the Educational Guide Website](https://genpath-bioinformatics.github.io/pDST-calc/)** - Interactive web portal with comprehensive DST terminology and resources
 
 ## Key Features
 
-- **🧪 4-Step Laboratory Workflow:** Drug selection → Parameters → Weight entry → Solution preparation guide
-- **👤 User Authentication & Sessions:** Secure user accounts with persistent session management
-- **🔄 Intelligent Session Restoration:** Automatically resume work at the correct step based on saved data
-- **📊 Comprehensive Calculations:** Stock solutions, working solutions, intermediate dilutions with safety considerations
-- **📄 PDF Protocol Generation:** Professional laboratory protocols for Steps 2 and 4
-- **⚡ Real-time Validation:** Input validation with helpful warnings and error messages
-- **🔧 Flexible Unit Support:** Customizable units for weight, volume, and concentration measurements
-- **💻 Dual Interface:** Full-featured web app and command-line interface for different workflows
+- **4-Step Laboratory Workflow:** Drug selection → Parameters → Weight entry → Solution preparation guide
+- **User Authentication & Sessions:** Secure user accounts with persistent session management
+- **Intelligent Session Restoration:** Automatically resume work at the correct step based on saved data
+- **Comprehensive Calculations:** Stock solutions, working solutions, intermediate dilutions with safety considerations
+- **PDF Protocol Generation:** Professional laboratory protocols for Steps 2 and 4
+- **Real-time Validation:** Input validation with helpful warnings and error messages
+- **Flexible Unit Support:** Customizable units for weight, volume, and concentration measurements
+- **Dual Interface:** Full-featured web app and command-line interface for different workflows
 
 ## Quick Start
 
@@ -37,16 +37,7 @@ A comprehensive **Phenotypic Drug Susceptibility Testing (pDST) Calculator** for
    - Sign up for an account in the "Account & Sessions" tab
    - Create a new session and start calculating!
 
-## Educational Resources
 
-🧪 **[DST Educational Guide](docs/DST_EDUCATIONAL_GUIDE.md)** - Comprehensive terminology and reference guide for Drug Susceptibility Testing, including:
-
-- **Glossary of Terms:** 27+ essential DST definitions with authoritative sources
-- **Clinical Context:** Critical concentrations, breakpoints, MIC interpretations
-- **Laboratory Methods:** Culture systems, potency calculations, quality control
-- **Reference Standards:** Links to WHO, CLSI, and EUCAST guidelines
-
-Perfect for students, researchers, and laboratory professionals working with tuberculosis DST.
 
 ## User Feedback
 
@@ -141,7 +132,7 @@ After logging in, the Account & Sessions tab provides a comprehensive overview o
 
 Each session is displayed as a card showing the session name, creation date, and completion status. This makes it easy to organize and track your DST calculations across different projects or experiments.
 
-![Login Interface](app/shiny/images/Screenshot%20from%202025-11-04%11-25-07.png)
+![Login Interface](app/shiny/images/Screenshot%20from%202025-11-04%2011-25-07.png)
 
 ![Session Interface](app/shiny/images/Screenshot%20from%202025-11-04%2018-15-59.png)
 

@@ -9,6 +9,11 @@ import os
 import io
 import sqlite3
 import json
+from pathlib import Path
+
+# Configure static file serving for images
+current_dir = Path(__file__).parent
+images_dir = current_dir / "images"
 
 # Add the project root to Python path so we can import from app.api
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -3511,7 +3516,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                     # Image 1: Mtb Media types
                     ui.tags.div(
                         ui.tags.img(
-                            src="images/1 - Mtb Media types.png",
+                            src="1 - Mtb Media types.png",
                             alt="Mycobacterium tuberculosis Media Types",
                             style="max-width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 20px 0;"
                         ),
@@ -3562,7 +3567,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 # Image 2: MGIT Principle
                                 ui.tags.div(
                                     ui.tags.img(
-                                        src="images/2 - MGIT Principle.png",
+                                        src="2 - MGIT Principle.png",
                                         alt="MGIT Working Principle",
                                         style="max-width: 60%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 15px 0;"
                                     ),
@@ -3582,7 +3587,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 # Image 3: MGIT Culture QC
                                 ui.tags.div(
                                     ui.tags.img(
-                                        src="images/3 - MGIT Culture QC.png",
+                                        src="3 - MGIT Culture QC.png",
                                         alt="MGIT Culture Quality Control",
                                         style="max-width: 60%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 15px 0;"
                                     ),
@@ -3597,7 +3602,7 @@ with ui.navset_card_pill(id="tab", selected="Account & Sessions"):
                                 # Image 4: MGIT Result Interpretation
                                 ui.tags.div(
                                     ui.tags.img(
-                                        src="images/4 - MGIT result interpretation.png",
+                                        src="4 - MGIT result interpretation.png",
                                         alt="MGIT Result Interpretation",
                                         style="max-width: 80%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 15px 0;"
                                     ),
