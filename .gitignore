@@ -48,3 +48,6 @@ results/
 *.db
 *.sqlite
 *.sqlite3
+# Local deployment descriptors (kept out of the repo)
+abc-app.yaml
+DEPLOY.md
