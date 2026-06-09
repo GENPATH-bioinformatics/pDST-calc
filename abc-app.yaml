@@ -1,0 +1,22 @@
+# abc-app.yaml — deploy descriptor for `abc app deploy` on ABC-cluster.
+# See DEPLOY.md for the full flow.
+version: "1.0"
+name: pdst-calc
+project: genpath
+framework: shiny
+
+# Bring-your-own-image (phase 1 has no cluster-side build). Build from the
+# included Dockerfile and tag it for the cluster's local image store:
+#   docker build -t pdst-calc:poc .
+#   docker tag  pdst-calc:poc aither.local/pdst-calc:poc
+image: aither.local/pdst-calc:poc
+
+port: 3838          # Shiny listen port (the container binds 0.0.0.0:3838)
+health: /           # HTTP path polled for readiness
+
+access: team        # gated to the `genpath` group
+exposure: public    # reachable on the public edge
+
+resources:
+  cpu: 1000         # MHz
+  memory: 2048      # MiB  (pandas / numpy / reportlab headroom)
