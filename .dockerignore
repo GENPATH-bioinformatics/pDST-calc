@@ -1,0 +1,9 @@
+.git
+.github
+**/tests
+test
+docs/*.pdf
+publication
+*.duckdb
+dstcalc.db
+.venv
